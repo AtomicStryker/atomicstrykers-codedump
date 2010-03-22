@@ -1,7 +1,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.7"
+#define PLUGIN_VERSION "1.0.8"
 #define PLUGIN_NAME "L4D Special Ammo"
 
 
@@ -47,6 +47,8 @@ public OnMapEnd()
 
 public OnPluginStart()
 {
+	PrepSDKCalls();
+
 	HookEvent("infected_hurt", AnInfectedGotHurt);
 	HookEvent("player_hurt", APlayerGotHurt);
 	HookEvent("weapon_fire", WeaponFired);
@@ -68,27 +70,29 @@ public OnPluginStart()
 	
 	RegAdminCmd("sm_givespecialammo", GiveSpecialAmmo, ADMFLAG_KICK, " sm_givespecialammo <1, 2 or 3> ");
 	
-	AutoExecConfig(true, "l4d_specialammo"); // an autoexec! ooooh shiny
-	
-	
+	AutoExecConfig(true, "l4d_specialammo"); // an autoexec! ooooh shiny	
+}
+
+PrepSDKCalls()
+{
 	LoadTranslations("common.phrases"); // Needed for SDK Calls
+	new Handle:ConfigFile = LoadGameConfigFile("l4dspecialammo");
 	
 	StartPrepSDKCall(SDKCall_Player);
-	if (!PrepSDKCall_SetSignature(SDKLibrary_Server, "\xA1****\x83***\x57\x8B\xF9\x0F*****\x8B***\x56\x51\xE8****\x8B\xF0\x83\xC4\x04", 34))
+	if (!PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "AddUpgrade"))
 	{
-		PrepSDKCall_SetSignature(SDKLibrary_Server, "@_ZN13CTerrorPlayer10AddUpgradeE19SurvivorUpgradeType", 0);
+		SetFailState("Signature AddUpgrade failed to load, contact author");
 	}
 	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_ByValue);
 	AddUpgrade = EndPrepSDKCall();
 	
 	StartPrepSDKCall(SDKCall_Player);
-	if (!PrepSDKCall_SetSignature(SDKLibrary_Server, "\x51\x53\x55\x8B***\x8B\xD9\x56\x8B\xCD\x83\xE1\x1F\xBE\x01\x00\x00\x00\x57\xD3\xE6\x8B\xFD\xC1\xFF\x05\x89***", 32))
+	if (!PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "RemoveUpgrade"))
 	{
-		PrepSDKCall_SetSignature(SDKLibrary_Server, "@_ZN13CTerrorPlayer13RemoveUpgradeE19SurvivorUpgradeType", 0);
+		SetFailState("Signature RemoveUpgrade failed to load, contact author");
 	}
 	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_ByValue);
 	RemoveUpgrade = EndPrepSDKCall();
-	
 }
 
 public Action:WeaponFired(Handle:event, const String:ename[], bool:dontBroadcast)
@@ -96,16 +100,21 @@ public Action:WeaponFired(Handle:event, const String:ename[], bool:dontBroadcast
 	// get client and used weapon
 	new client=GetClientOfUserId(GetEventInt(event, "userid"));
 	decl String: weapon[64];
-	GetEventString(event, "weapon", weapon, 64)
+	GetEventString(event, "weapon", weapon, sizeof(weapon))
 	
-	if(client && (HasFieryAmmo[client]==true || HasHighdamageAmmo[client]==true || HasDumDumAmmo[client]==true)) // if client hasnt special ammo, we dont care
+	if(client && (HasFieryAmmo[client] || HasHighdamageAmmo[client] || HasDumDumAmmo[client])) // if client hasnt special ammo, we dont care
 	{
-		if (StrContains(weapon, "shotgun", false)==-1) SpecialAmmoUsed[client]++; // if not a shotgun, one round per shot.
-		if (StrContains(weapon, "shotgun", false)!=-1) SpecialAmmoUsed[client] = SpecialAmmoUsed[client]+5; // Five times the special rounds usage for shotguns.
+		if (StrContains(weapon, "shotgun", false) == -1) SpecialAmmoUsed[client]++; // if not a shotgun, one round per shot.
+		else
+		{
+			SpecialAmmoUsed[client] = SpecialAmmoUsed[client]+5; // Five times the special rounds usage for shotguns.
+		}
 		
 		new SpecialAmmoLeft = GetConVarInt(SpecialAmmoAmount) - SpecialAmmoUsed[client]
 		if((SpecialAmmoLeft % 10) == 0 && SpecialAmmoLeft != 0) // Display a center HUD message every round decimal value of leftover ammo (30, 20, 10...)
+		{
 			PrintCenterText(client, "Special ammo rounds left: %d", SpecialAmmoLeft);
+		}
 		
 		if(SpecialAmmoUsed[client]>=GetConVarInt(SpecialAmmoAmount)) CreateTimer(0.3, OutOfAmmo, client); //to remove the toys
 	}
@@ -115,10 +124,10 @@ public Action:WeaponFired(Handle:event, const String:ename[], bool:dontBroadcast
 public Action:APlayerGotHurt(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	new attacker = GetEventInt(event, "attacker");
-	if(attacker == 0) return Plugin_Continue; // if hit by a zombie or anything, we dont care
+	if(!attacker) return Plugin_Continue; // if hit by a zombie or anything, we dont care
 	
 	new client = GetClientOfUserId(attacker);
-	if (!HasFieryAmmo[client] && !HasDumDumAmmo[client]==true) return Plugin_Continue; //this function only handles special ammo
+	if (!HasFieryAmmo[client] && !HasDumDumAmmo[client]) return Plugin_Continue; //this function only handles special ammo
 	if (GetClientTeam(client) != 2) return Plugin_Continue; //if for some reason a Zombie ends up with incendiary ammo LOL
 	
 	new InfClient = GetClientOfUserId(GetEventInt(event, "userid"));
@@ -127,21 +136,23 @@ public Action:APlayerGotHurt(Handle:event, const String:name[], bool:dontBroadca
 	if (HasFieryAmmo[client])
 	{
 		decl String:class_string[64];
-		GetClientModel(InfClient, class_string, 64);
-		if(StrContains(class_string, "hulk", false)!=-1 && GetConVarInt(CanLightTank)==0) return Plugin_Continue; //only burn Playertanks if the convar is 1
+		GetClientModel(InfClient, class_string, sizeof(class_string));
+		if(StrContains(class_string, "hulk", false) != -1 && !GetConVarBool(CanLightTank)) return Plugin_Continue; //only burn Playertanks if the convar is 1
 		
 		new damagetype = GetEventInt(event, "type");
 		if(damagetype != 64 && damagetype != 128 && damagetype != 268435464)
 		{
 			IgniteEntity(InfClient, 120.0, false);
-			if(StrContains(class_string, "hulk", false)!=-1) SetEntPropFloat(InfClient, Prop_Data, "m_flLaggedMovementValue", 1.3); // for a mad speed increase
+			if(StrContains(class_string, "hulk", false) != -1)
+			{
+				SetEntPropFloat(InfClient, Prop_Data, "m_flLaggedMovementValue", 1.3); // for a mad speed increase
+			}
 		}
 	}
 	
 	if (HasDumDumAmmo[client])
 	{
-		decl Float:FiringAngles[3];
-		decl Float:PushforceAngles[3];
+		decl Float:FiringAngles[3], Float:PushforceAngles[3];
 		new Float:force = GetConVarFloat(DumDumForce);
 		
 		GetClientEyeAngles(client, FiringAngles);
@@ -167,7 +178,7 @@ public Action:APlayerGotHurt(Handle:event, const String:name[], bool:dontBroadca
 public Action:AnInfectedGotHurt(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	new client = GetClientOfUserId(GetEventInt(event, "attacker"));
-	if (!HasFieryAmmo[client] && !HasDumDumAmmo[client]==true) return Plugin_Continue; //this function only handles special ammo
+	if (!HasFieryAmmo[client] && !HasDumDumAmmo[client]) return Plugin_Continue; //this function only handles special ammo
 	if (GetClientTeam(client) != 2) return Plugin_Continue; //if for some reason a Zombie ends up with incendiary ammo LOL
 	
 	new infectedentity = GetEventInt(event, "entityid");
@@ -175,8 +186,8 @@ public Action:AnInfectedGotHurt(Handle:event, const String:name[], bool:dontBroa
 	if (HasFieryAmmo[client])
 	{
 		decl String:class_string[64];
-		GetEntityNetClass(infectedentity, class_string, 64); // witch has no client, so we cant use getclientmodel
-		if(strcmp(class_string, "Witch")==0) return Plugin_Continue; // no witch burning
+		GetEntityNetClass(infectedentity, class_string, sizeof(class_string)); // witch has no client, so we cant use getclientmodel
+		if(!strcmp(class_string, "Witch")) return Plugin_Continue; // no witch burning
 		
 		new damagetype = GetEventInt(event, "type");
 		if(damagetype != 64 && damagetype != 128 && damagetype != 268435464)
@@ -185,10 +196,9 @@ public Action:AnInfectedGotHurt(Handle:event, const String:name[], bool:dontBroa
 		}
 	}
 	
-	if (HasDumDumAmmo[client])
+	else if (HasDumDumAmmo[client])
 	{
-		decl Float:FiringAngles[3];
-		decl Float:PushforceAngles[3];
+		decl Float:FiringAngles[3], Float:PushforceAngles[3];
 		new Float:force = GetConVarFloat(DumDumForce);
 		
 		GetClientEyeAngles(client, FiringAngles);
@@ -219,14 +229,14 @@ public Action:OutOfAmmo(Handle:hTimer, any:client)
 		HasFieryAmmo[client]=false;
 		SDKCall(RemoveUpgrade, client, 19); // remove recoil dampener
 	}
-	if(HasHighdamageAmmo[client])
+	else if(HasHighdamageAmmo[client])
 	{
 		PrintToChat(client, "\x05You've run out of hollow-point ammo.");
 		SDKCall(RemoveUpgrade, client, 21);
 		HasHighdamageAmmo[client]=false;
 		SDKCall(RemoveUpgrade, client, 19); // remove recoil dampener
 	}
-	if(HasDumDumAmmo[client])
+	else if(HasDumDumAmmo[client])
 	{
 		PrintToChat(client, "\x05You've run out of DumDum ammo.");
 		HasDumDumAmmo[client]=false;
