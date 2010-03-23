@@ -3,7 +3,7 @@
 #include <sdktools>
 #include <left4downtown>
 
-#define PLUGIN_VERSION "1.0.1"
+#define PLUGIN_VERSION "1.0.2"
 
 #define TEST_DEBUG 0
 #define TEST_DEBUG_LOG 1
@@ -77,6 +77,13 @@ public Action:TS_CMD_TakeTank(client, args)
 		return Plugin_Handled;
 	}
 	
+	if (CancelClientMenu(target))
+	{
+		DebugPrintToAll("TakeTank Command used while client menu was active, shutting down client menu");
+		withinTimeLimit = false;
+		surrenderMenu = INVALID_HANDLE;
+	}
+	
 	if (IsPlayerAlive(client) && !IsPlayerGhost(client))
 	{
 		L4D2_ReplaceWithBot(client, true);
@@ -120,6 +127,10 @@ public Action:TS_DisplayNotificationToTank(Handle:timer)
 public Action:TS_TimeLimitIsOver(Handle:timer)
 {
 	withinTimeLimit = false;
+	if (surrenderMenu != INVALID_HANDLE)
+	{
+		surrenderMenu = INVALID_HANDLE;
+	}
 }
 
 static FindHumanTankPlayer()

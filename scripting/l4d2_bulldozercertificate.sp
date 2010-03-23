@@ -1,10 +1,27 @@
-#pragma semicolon 1
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.7"
+#define PLUGIN_VERSION		"1.0.8"
+#pragma semicolon			1
+#define TEST_DEBUG			0
+#define TEST_DEBUG_LOG		0
 
-#define DEBUG 0
+
+static const Float:UNINCAP_TIME_ON_IMPACT			= 1.0;
+static const Float:CHARGE_CHECKING_INTERVAL			= 0.4;
+static const Float:CHARGER_COLLISION_RADIUS			= 150.0;
+static const Float:HEALTH_SET_DELAY					= 0.3;
+
+static const String:ENTPROP_HANGING_FROM_LEDGE[]	= "m_isHangingFromLedge";
+static const String:ENTPROP_FALLING_FROM_LEDGE[]	= "m_isFallingFromLedge";
+
+static const L4D2_TEAM_SURVIVOR						= 2;
+
+
+static Handle:ReinCapTimerArray[MAXPLAYERS+1]		= INVALID_HANDLE;
+static Handle:ChargerTimer							= INVALID_HANDLE;
+static IncappedHealth[MAXPLAYERS+1]					= 0;
+
 
 public Plugin:myinfo =
 {
@@ -19,21 +36,18 @@ public OnPluginStart()
 {
 	CreateConVar("l4d2_bulldozercertificate_version", PLUGIN_VERSION, "L4D2 Bulldozer Certification Version on this server", FCVAR_PLUGIN | FCVAR_SPONLY | FCVAR_NOTIFY | FCVAR_DONTRECORD);
 
-	HookEvent("charger_charge_start", Event_Charge);
-	HookEvent("charger_charge_end", Event_ChargeEnd);
-	HookEvent("charger_killed", Event_ChargeEnd);
-	HookEvent("charger_impact", Event_Impact);
-	
-	HookEvent("round_end", Event_ChargeEnd);
+	HookEvent("charger_charge_start", BC_Event_Charge);
+	HookEvent("charger_impact", BC_Event_Impact);
+
+	HookEvent("charger_charge_end", BC_Event_ChargeEnd);
+	HookEvent("charger_killed", BC_Event_ChargeEnd);	
+	HookEvent("round_end", BC_Event_ChargeEnd);
 }
 
-new Handle:ReinCapTimerArray[MAXPLAYERS+1] = INVALID_HANDLE;
-new Handle:ChargerTimer = INVALID_HANDLE;
-new IncappedHealth[MAXPLAYERS+1];
-
-public Action:Event_Charge(Handle:event, String:event_name[], bool:dontBroadcast)
+public Action:BC_Event_Charge(Handle:event, String:event_name[], bool:dontBroadcast)
 {
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));	
+	new client = GetClientOfUserId(GetEventInt(event, "userid"));
+	if (!client || !IsClientInGame(client)) return;
 	
 	if (ChargerTimer != INVALID_HANDLE)
 	{
@@ -41,15 +55,13 @@ public Action:Event_Charge(Handle:event, String:event_name[], bool:dontBroadcast
 		ChargerTimer = INVALID_HANDLE;
 	}
 	
-	ChargerTimer = CreateTimer(0.4, CheckForIncapped, client, TIMER_REPEAT);
+	ChargerTimer = CreateTimer(CHARGE_CHECKING_INTERVAL, BC_CheckForIncapped, client, TIMER_REPEAT);
 	TriggerTimer(ChargerTimer, true);
 	
-	#if DEBUG
-	PrintToChatAll("Charge caught, starting ChargerTimer");
-	#endif
+	DebugPrintToAll("Charge caught, starting ChargerTimer");
 }
 
-public Action:Event_ChargeEnd(Handle:event, String:event_name[], bool:dontBroadcast)
+public Action:BC_Event_ChargeEnd(Handle:event, String:event_name[], bool:dontBroadcast)
 {
 	if (ChargerTimer != INVALID_HANDLE)
 	{
@@ -57,11 +69,8 @@ public Action:Event_ChargeEnd(Handle:event, String:event_name[], bool:dontBroadc
 		ChargerTimer = INVALID_HANDLE;
 	}
 	
-	#if DEBUG
-	PrintToChatAll("Charge(r) end caught, killing ChargerTimer");
-	#endif
-	
-	CreateTimer(1.0, WipeHealthArray);
+	DebugPrintToAll("Charge(r) end caught, killing ChargerTimer");
+	CreateTimer(UNINCAP_TIME_ON_IMPACT, BC_WipeHealthArray);
 }
 
 public OnMapEnd()
@@ -73,85 +82,105 @@ public OnMapEnd()
 	}
 }
 
-public Action:Event_Impact(Handle:event, String:event_name[], bool:dontBroadcast)
+public Action:BC_Event_Impact(Handle:event, String:event_name[], bool:dontBroadcast)
 {
 	new target = GetClientOfUserId(GetEventInt(event, "victim"));	
 	if (ReinCapTimerArray[target] != INVALID_HANDLE)
 	{
 		KillTimer(ReinCapTimerArray[target]);
 		ReinCapTimerArray[target] = INVALID_HANDLE;
-		ReinCapTimerArray[target] = CreateTimer(2.0, Reincap, target);
+		ReinCapTimerArray[target] = CreateTimer(UNINCAP_TIME_ON_IMPACT*2, BC_Reincap, target);
 		
-		#if DEBUG
-		PrintToChatAll("Charger hit a temporary unincapped, extended timer");
-		#endif
+		DebugPrintToAll("Charger hit a temporary unincapped, extended timer");
 	}
 }
 
-public Action:CheckForIncapped(Handle:timer, any:client)
+public Action:BC_CheckForIncapped(Handle:timer, any:client)
 {
+	if (!client || !IsClientInGame(client)) return Plugin_Stop;
 	decl Float:targetpos[3], Float:chargerpos[3];
 	
 	for (new target = 1; target <= MaxClients; target++)
 	{
 		if (target == client) continue;
 		if (!IsClientInGame(target)) continue;
-		if (GetClientTeam(target) != 2) continue;
+		if (GetClientTeam(target) != L4D2_TEAM_SURVIVOR) continue;
 		if (!IsPlayerIncapped(target)) continue;
-		if (GetEntProp(target, Prop_Send, "m_isHangingFromLedge") || GetEntProp(target, Prop_Send, "m_isFallingFromLedge")) continue;
+		if (GetEntProp(target, Prop_Send, ENTPROP_HANGING_FROM_LEDGE) || GetEntProp(target, Prop_Send, ENTPROP_FALLING_FROM_LEDGE)) continue;
 		
 		GetClientAbsOrigin(target, targetpos);
 		GetClientAbsOrigin(client, chargerpos);
 		
-		if (GetVectorDistance(targetpos, chargerpos) < 150)
+		if (GetVectorDistance(targetpos, chargerpos) < CHARGER_COLLISION_RADIUS)
 		{
-			#if DEBUG
-			PrintToChatAll("Incapped %N found on way, un-incapping", target);
-			#endif
-			
+			DebugPrintToAll("Incapped %N found on way, un-incapping", target);
+		
 			if (IncappedHealth[target] == -1)
+			{
 				IncappedHealth[target] = GetClientHealth(target);
+			}
 			SetPlayerIncapState(target, false);
-			ReinCapTimerArray[target] = CreateTimer(1.0, Reincap, target);
+			ReinCapTimerArray[target] = CreateTimer(UNINCAP_TIME_ON_IMPACT, BC_Reincap, target);
 		}
 	}
+	return Plugin_Continue;
 }
 
-public Action:Reincap(Handle:timer, any:client)
+public Action:BC_Reincap(Handle:timer, any:client)
 {
 	SetPlayerIncapState(client, true);
 	
-	CreateTimer(0.3, SetHealthDelayed, client);
+	CreateTimer(HEALTH_SET_DELAY, BC_SetHealthDelayed, client);
 	
-	#if DEBUG
-	PrintToChatAll("Re-Incapped %N", client);
-	#endif
-	
+	DebugPrintToAll("Re-Incapped %N", client);
 	ReinCapTimerArray[client] = INVALID_HANDLE;
 }
 
-public Action:SetHealthDelayed(Handle:timer, any:client)
+public Action:BC_SetHealthDelayed(Handle:timer, any:client)
 {
-	if (IncappedHealth[client] > 2 && IsPlayerIncapped(client))
+	if (IncappedHealth[client] > 1 && IsPlayerIncapped(client))
+	{
 		SetEntityHealth(client, IncappedHealth[client]);
+	}
 }
 
-SetPlayerIncapState(client, bool:incap)
-{
-	if (incap) SetEntProp(client, Prop_Send, "m_isIncapacitated", 1);
-	else SetEntProp(client, Prop_Send, "m_isIncapacitated", 0);
-}
-
-bool:IsPlayerIncapped(client)
-{
-	if (GetEntProp(client, Prop_Send, "m_isIncapacitated", 1)) return true;
-	else return false;
-}
-
-public Action:WipeHealthArray(Handle:timer, any:client)
+public Action:BC_WipeHealthArray(Handle:timer, any:client)
 {
 	for (new i = 1; i <= MaxClients; i++)
 	{
 		IncappedHealth[i] = -1;
 	}
+}
+
+stock SetPlayerIncapState(client, any:incap)
+{
+	SetEntProp(client, Prop_Send, "m_isIncapacitated", incap);
+}
+
+stock bool:IsPlayerIncapped(client)
+{
+	if (GetEntProp(client, Prop_Send, "m_isIncapacitated", 1)) return true;
+	else return false;
+}
+
+stock DebugPrintToAll(const String:format[], any:...)
+{
+	#if (TEST_DEBUG || TEST_DEBUG_LOG)
+	decl String:buffer[256];
+	
+	VFormat(buffer, sizeof(buffer), format, 2);
+	
+	#if TEST_DEBUG
+	PrintToChatAll("[BULLDOZER] %s", buffer);
+	PrintToConsole(0, "[BULLDOZER] %s", buffer);
+	#endif
+	
+	LogMessage("%s", buffer);
+	#else
+	//suppress "format" never used warning
+	if(format[0])
+		return;
+	else
+		return;
+	#endif
 }
