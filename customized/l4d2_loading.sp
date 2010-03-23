@@ -207,7 +207,7 @@ public Event_RoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 			ResetReadyState(i, "round");
 		}
 
-		if (StrContains(map, "m1") == -1 || StrContains(map, "01_") == -1)
+		if (StrContains(map, "m1") == -1 && StrContains(map, "01_") == -1)
 		{
 			DirectorStop();
 			isFirstMap = false;
@@ -385,7 +385,7 @@ public Event_PlayerTeam(Handle:event, const String:name[], bool:dontBroadcast)
 			PrintDebugMessage("[DEBUG] Player %L saved on datapack for FreezingTimer()", client);
 			#endif
 			new Handle:dp = CreateDataPack();
-			CreateDataTimer(1.0, FreezingTimer, dp, TIMER_FLAG_NO_MAPCHANGE);
+			CreateDataTimer(0.3, FreezingTimer, dp, TIMER_FLAG_NO_MAPCHANGE);
 			WritePackCell(dp, client);
 		}
 	}
@@ -1800,18 +1800,21 @@ bool:IsFinishedLoading()
 					if (isFirstMap)
 					{
 						/* Use 1 sec timer to freeze players when starting a new campaign */
-						if (isFirstRound)
+						if (!GetConVarBool(scrimMode))
 						{
 							#if DEBUG_SCRIM
 							PrintDebugMessage("[DEBUG] Player %L saved on datapack for FreezingTimer()", i);
 							#endif
 							new Handle:dp = CreateDataPack();
-							CreateDataTimer(1.0, FreezingTimer, dp, TIMER_FLAG_NO_MAPCHANGE);
+							CreateDataTimer(0.3, FreezingTimer, dp, TIMER_FLAG_NO_MAPCHANGE);
 							WritePackCell(dp, i);
 						}
-						else if (GetConVarBool(scrimMode))
+						else
 						{
-							if (IsValidEntity(i) && GetClientTeam(i) == 2) SetEntityMoveType(i, MOVETYPE_NONE);
+							if (IsValidEntity(i) && GetClientTeam(i) == 2)
+							{
+								SetEntityMoveType(i, MOVETYPE_NONE);
+							}
 							#if DEBUG_SCRIM
 							else PrintDebugMessage("[DEBUG] IsFinishedLoading(): Player %L returned invalid entity", i);
 

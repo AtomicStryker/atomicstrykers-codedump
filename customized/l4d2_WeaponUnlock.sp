@@ -105,8 +105,8 @@ public Action:InitHiddenWeaponsDelay(Handle:timer, any:client)
 	index = CreateEntityByName("weapon_sniper_scout")
 	DispatchSpawn(index)
 	RemoveEdict(index)
-	//GetCurrentMap(Map, sizeof(Map))
-	//ForceChangeLevel(Map, "Hidden weapon initialization.")
+	GetCurrentMap(Map, sizeof(Map))
+	ForceChangeLevel(Map, "Hidden weapon initialization.")
 }
 
 public ConVarChange_Enabled(Handle:convar, const String:oldValue[], const String:newValue[])

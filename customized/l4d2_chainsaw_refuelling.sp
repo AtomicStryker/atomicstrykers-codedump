@@ -10,7 +10,7 @@
 #pragma semicolon 1
 
 #define PLUGIN_NAME							"Chainsaw Refuelling"
-#define PLUGIN_VERSION						"1.2"
+#define PLUGIN_VERSION						"1.3"
 #define PLUGIN_AUTHOR						"DJ_WEST"
 #define PLUGIN_FLAGS						FCVAR_PLUGIN|FCVAR_NOTIFY
 
@@ -31,6 +31,7 @@ static g_ActiveWeaponOffset					= 0;
 static g_ShotsFiredOffset					= 0;
 static g_ClientPour[MAXPLAYERS+1]			= 0;
 static bool:g_ClientInfo[MAXPLAYERS+1]		= false;
+static bool:g_b_AllowChecking[MAXPLAYERS+1]	= false;
 static g_PlayerPistol[MAXPLAYERS+1]			= 0;
 
 public Plugin:myinfo = 
@@ -66,6 +67,22 @@ public OnPluginStart()
 	HookEvent("item_pickup", EventItemPickup);
 	
 	HookConVarChange(h_CvarEnabled, CvarEnabledPlugin);
+	
+	HookEvent("player_incapacitated", EventNotAllowChecking);
+	HookEvent("lunge_pounce", EventNotAllowChecking);
+	HookEvent("jockey_ride", EventNotAllowChecking);
+	HookEvent("tongue_grab", EventNotAllowChecking);
+	HookEvent("charger_carry_start", EventNotAllowChecking);
+	HookEvent("charger_pummel_start", EventNotAllowChecking);
+	HookEvent("player_ledge_grab", EventNotAllowChecking);
+	HookEvent("player_death", EventNotAllowChecking);
+	HookEvent("revive_success", EventAllowChecking);
+	HookEvent("defibrillator_used", EventAllowChecking);
+	HookEvent("pounce_stopped", EventAllowChecking);
+	HookEvent("jockey_ride_end", EventAllowChecking);
+	HookEvent("tongue_release", EventAllowChecking);
+	HookEvent("charger_carry_end", EventAllowChecking);
+	HookEvent("charger_pummel_end", EventAllowChecking);
 }
 
 public CvarEnabledPlugin(Handle:h_Cvar, const String:s_OldValue[], const String:s_NewValue[])
@@ -80,6 +97,40 @@ public CvarEnabledPlugin(Handle:h_Cvar, const String:s_OldValue[], const String:
 		HookEvent("gascan_pour_completed", EventPourCompleted);
 		HookEvent("item_pickup", EventItemPickup);
 	}
+}
+
+public Action:EventNotAllowChecking(Handle:h_Event, const String:s_Name[], bool:b_DontBroadcast)
+{
+	decl client;
+	new i_UserID = GetEventInt(h_Event, "victim");
+	if (i_UserID)
+		client = GetClientOfUserId(i_UserID);
+	else
+	{
+		i_UserID = GetEventInt(h_Event, "userid");
+		client = GetClientOfUserId(i_UserID);
+	}
+	
+	if (!client || !IsClientInGame(client)) return;
+
+	if (GetClientTeam(client) == 2)
+		g_b_AllowChecking[client] = false;
+}
+
+public Action:EventAllowChecking(Handle:h_Event, const String:s_Name[], bool:b_DontBroadcast)
+{
+	decl i_UserID;
+	if (GetEventInt(h_Event, "victim"))
+		i_UserID = GetEventInt(h_Event, "victim");
+	else if (GetEventInt(h_Event, "subject"))
+		i_UserID = GetEventInt(h_Event, "subject");
+	else
+		i_UserID = GetEventInt(h_Event, "userid");
+	
+	new client = GetClientOfUserId(i_UserID);
+	if (!client || !IsClientInGame(client)) return;
+	if (GetClientTeam(client) == 2)
+		g_b_AllowChecking[client] = true;
 }
 
 public Action:EventItemPickup(Handle:h_Event, const String:s_Name[], bool:b_DontBroadcast)
@@ -125,6 +176,18 @@ public OnClientPostAdminCheck(client)
 	g_ClientPour[client] = 0;
 	g_PlayerPistol[client] = 0;
 	g_ClientInfo[client] = false;
+	g_b_AllowChecking[client] = true;
+}
+
+public OnMapStart()
+{
+	for (new client=1; client <= MaxClients; client++)
+	{
+		g_ClientPour[client] = 0;
+		g_PlayerPistol[client] = 0;
+		g_ClientInfo[client] = false;
+		g_b_AllowChecking[client] = true;
+	}
 }
 
 static CheckTarget(client)
@@ -242,7 +305,7 @@ public Action:OnPlayerRunCmd(client, &i_Buttons, &i_Impulse, Float:f_Velocity[3]
 	if (!GetConVarBool(h_CvarEnabled))
 		return Plugin_Continue;
 		
-	if (GetClientTeam(client) != 2 || IsFakeClient(client) || !IsPlayerAlive(client))
+	if (!g_b_AllowChecking[client] || GetClientTeam(client) != 2 || IsFakeClient(client) || !IsPlayerAlive(client))
 		return Plugin_Continue;
 		
 	if (g_ClientPour[client])
