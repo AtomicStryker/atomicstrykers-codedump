@@ -9,7 +9,6 @@
 #define TEST_DEBUG_LOG 0
 
 
-
 public OnPluginStart()
 {
 	RegAdminCmd("sm_takeover", Cmd1, ADMFLAG_CHEATS, "Take Over Zombie Bot <player>");
@@ -19,6 +18,8 @@ public OnPluginStart()
 	RegAdminCmd("sm_cull", Cmd3, ADMFLAG_CHEATS, "CullZombie <player>");
 	
 	RegAdminCmd("sm_replacetank", Cmd4, ADMFLAG_CHEATS, "ReplaceTank <player> <player>");
+	
+	RegAdminCmd("sm_spawnas", Cmd5, ADMFLAG_CHEATS, "sm_spawnas <player> <infectedclass>");
 }
 
 public Action:Cmd1(client, args)
@@ -138,6 +139,73 @@ public Action:Cmd4(client, args)
 	return Plugin_Handled;
 }
 
+public Action:Cmd5(client, args)
+{
+	if (!client || !args) return Plugin_Handled;
+	
+	if (args < 2)
+	{
+		ReplyToCommand(client, "Usage: sm_spawnas <player> <infectedclass>");
+		return Plugin_Handled;
+	}
+	
+	decl String:arg[256];
+	new bool:targetall;
+	GetCmdArg(1, arg, sizeof(arg));
+	new target = FindTarget(client, arg, false, false);
+	
+	if (target < 1)
+	{
+		if (StrContains(arg, "inf", false) == -1)
+		{
+			ReplyToCommand(client, "Invalid target specified");
+			return Plugin_Handled;
+		}
+		else
+		{
+			targetall = true;
+		}
+	}
+	
+	/*
+	#define ZOMBIECLASS_SMOKER	1
+	#define ZOMBIECLASS_BOOMER	2
+	#define ZOMBIECLASS_HUNTER	3
+	#define ZOMBIECLASS_SPITTER	4
+	#define ZOMBIECLASS_JOCKEY	5
+	#define ZOMBIECLASS_CHARGER	6
+	#define ZOMBIECLASS_TANK	8
+	*/
+	GetCmdArg(2, arg, sizeof(arg));
+	decl class;
+	if (StrContains(arg, "smo", false) != -1) class = 1;
+	else if (StrContains(arg, "b", false) != -1) class = 2;
+	else if (StrContains(arg, "h", false) != -1) class = 3;
+	else if (StrContains(arg, "sp", false) != -1) class = 4;
+	else if (StrContains(arg, "j", false) != -1) class = 5;
+	else if (StrContains(arg, "c", false) != -1) class = 6;
+	else if (StrContains(arg, "ta", false) != -1) class = 8;
+	else
+	{
+		ReplyToCommand(client, "Invalid class specified");
+		return Plugin_Handled;
+	}
+	
+	if (!targetall)
+	{
+		L4D2_RespawnAsClassGhost(client, class)
+	}
+	else
+	{
+		for (new i = 1; i <= MaxClients; i++)
+		{
+			if (!IsClientInGame(i) || GetClientTeam(i) != 3 || IsFakeClient(i)) continue;
+			L4D2_RespawnAsClassGhost(i, class)
+		}
+	}
+	return Plugin_Handled;
+}
+
 // CTerrorPlayer::TakeOverZombieBot(CTerrorPlayer*)
 // Client takes control of an Infected Bot - Tank included. Causes odd shit to happen if client current SI class doesnt match the taken over one, exception tank
 L4D2_TakeOverZombieBot(client, target)
@@ -244,6 +312,107 @@ L4D2_ReplaceTank(client, target)
 	}
 	
 	SDKCall(MySDKCall, g_pZombieManager, client, target);
+}
+
+L4D2_RespawnAsClassGhost(client, class)
+{
+	DebugPrintToAll("RespawnAsClassGhost being called, client %N targetclass %d", client, class);
+
+	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
+	
+	new Handle:SDK_BecomeGhost = INVALID_HANDLE;
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "BecomeGhost");
+	PrepSDKCall_AddParameter(SDKType_PlainOldData , SDKPass_Plain);
+	SDK_BecomeGhost = EndPrepSDKCall();
+	if (SDK_BecomeGhost == INVALID_HANDLE)
+	{
+		LogError("BecomeGhost Signature missing or broken");
+		return;
+	}
+	
+	new Handle:SDK_State_Transition = INVALID_HANDLE;
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "State_Transition");
+	PrepSDKCall_AddParameter(SDKType_PlainOldData , SDKPass_Plain);
+	SDK_State_Transition = EndPrepSDKCall();
+	if (SDK_State_Transition == INVALID_HANDLE)
+	{
+		LogError("State_Transition Signature missing or broken");
+		return;
+	}
+	
+	SDKCall(SDK_State_Transition, client, 8);
+	SDKCall(SDK_BecomeGhost, client, 1);
+	SDKCall(SDK_State_Transition, client, 6);
+	SDKCall(SDK_BecomeGhost, client, 1);
+	
+	new Handle:data = CreateDataPack();
+	WritePackCell(data, client);
+	WritePackCell(data, class);
+	CreateTimer(0.1, TEST_DelayedClassChange, data);
+}
+
+public Action:TEST_DelayedClassChange(Handle:timer, Handle:data)
+{
+	ResetPack(data);
+	new client = ReadPackCell(data);
+	new class = ReadPackCell(data);
+	CloseHandle(data);
+
+	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
+	
+	new Platform = GameConfGetOffset(ConfigFile, "Platform");
+	new AbilityOffset;
+	if (Platform == 1) // WINDOWS
+	{
+		AbilityOffset = 0x390;
+	}
+	else if (Platform == 2) // LINUX
+	{
+		AbilityOffset = 0x3a4;
+	}
+	else
+	{
+		LogError("Unsupported Platform or missing gamedata file, FAIL");
+		return Plugin_Stop;
+	}
+	
+	new Handle:SDK_SetClass = INVALID_HANDLE;
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "SetClass");
+	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
+	SDK_SetClass = EndPrepSDKCall();
+	if (SDK_SetClass == INVALID_HANDLE)
+	{
+		LogError("SetClass Signature missing or broken");
+		return Plugin_Stop;
+	}
+	
+	SDKCall(SDK_SetClass, client, class);
+	
+	new Handle:SDK_CreateAbility = INVALID_HANDLE;
+	StartPrepSDKCall(SDKCall_Static);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "CreateAbility");
+	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+	PrepSDKCall_SetReturnInfo(SDKType_CBaseEntity, SDKPass_Pointer);
+	SDK_CreateAbility = EndPrepSDKCall();
+	if (SDK_CreateAbility == INVALID_HANDLE)
+	{
+		LogError("CreateAbility Signature missing or broken");
+		return Plugin_Stop;
+	}
+	
+	new WeaponIndex;
+	while ((WeaponIndex = GetPlayerWeaponSlot(client, 0)) != -1)
+	{
+		RemovePlayerItem(client, WeaponIndex);
+		RemoveEdict(WeaponIndex);
+	}
+	
+	AcceptEntityInput(MakeCompatEntRef(GetEntProp(client, Prop_Send, "m_customAbility")), "Kill");
+	SetEntProp(client, Prop_Send, "m_customAbility", GetEntData(SDKCall(SDK_CreateAbility, client), AbilityOffset));
+	return Plugin_Stop;
 }
 
 stock DebugPrintToAll(const String:format[], any:...)

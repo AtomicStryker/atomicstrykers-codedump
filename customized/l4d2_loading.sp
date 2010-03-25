@@ -10,7 +10,7 @@
 
 #define PLUGIN_VERSION "1.0.1"
 #define DEBUG_SCRIM 0
-#define DEBUG_DOOR 1
+#define DEBUG_DOOR 0
 #define DEBUG_CHMAP 0
 #define DEBUG_PLAYERS 0
 #define DEBUG_DIRECTOR 0
