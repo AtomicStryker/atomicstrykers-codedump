@@ -38,13 +38,14 @@
 #include <sdktools>
 
 #define TEST_DEBUG 0
-#define TEST_DEBUG_LOG 0
-
+#define TEST_DEBUG_LOG 1
 
 public OnPluginStart()
 {
 	RegConsoleCmd("sm_voc", Cmd_Vocalize_Random);
 	RegConsoleCmd("sm_voc_this", Cmd_Vocalize_Specified);
+	RegAdminCmd("sm_player_voc", Cmd_Player_Vocalize_Random, ADMFLAG_CHEATS, "Prompt target player to vocalize something randomly");
+	RegAdminCmd("sm_player_voc_this", Cmd_Player_Vocalize_Specified, ADMFLAG_CHEATS, "Prompt target player to vocalize something specified");
 }
 
 public Action:Cmd_Vocalize_Random(client, args)
@@ -146,7 +147,6 @@ public Action:Cmd_Vocalize_Random(client, args)
 	SetEntPropEnt(tempent, Prop_Data, "m_hOwner", client);
 	ActivateEntity(tempent);
 	AcceptEntityInput(tempent, "Start", client, client);
-	HookSingleEntityOutput(tempent, "OnCompletion", EntityOutput:OnSceneCompletion, true);
 
 	return Plugin_Handled;
 }
@@ -213,14 +213,194 @@ public Action:Cmd_Vocalize_Specified(client, args)
 	SetEntPropEnt(tempent, Prop_Data, "m_hOwner", client);
 	ActivateEntity(tempent);
 	AcceptEntityInput(tempent, "Start", client, client);
-	HookSingleEntityOutput(tempent, "OnCompletion", EntityOutput:OnSceneCompletion, true);
 
 	return Plugin_Handled;
 }
 
-public OnSceneCompletion(const String:s_Output[], i_Caller, i_Activator, Float:f_Delay)
+public Action:Cmd_Player_Vocalize_Random(admin, args)
 {
-	RemoveEdict(i_Caller);
+	if (args < 2)
+	{
+		ReplyToCommand(admin, "Usage: sm_player_voc <player> <string>");
+		return Plugin_Handled;
+	}
+	
+	decl String:arg[256];
+	GetCmdArg(1, arg, sizeof(arg));
+	
+	new client = FindTarget(GetAnyClient(), arg);
+	
+	if (!client || !IsClientInGame(client))
+	{
+		ReplyToCommand(admin, "Invalid target specified");
+		return Plugin_Handled;
+	}
+	
+	GetCmdArg(2, arg, sizeof(arg));
+	
+	DebugPrintToAll("SM Vocalize caught by %N, command: %s", client, arg);
+	
+	// STEP 1: FIGURE OUT WHICH SURVIVOR WERE DEALING WITH
+	
+	decl String:model[256];
+	GetEntPropString(client, Prop_Data, "m_ModelName", model, sizeof(model));
+	
+	if (StrContains(model, "gambler") != -1)
+	{
+		FormatEx(model, sizeof(model), "gambler");
+	}
+	else if (StrContains(model, "coach") != -1)
+	{
+		FormatEx(model, sizeof(model), "coach");
+	}
+	else if (StrContains(model, "mechanic") != -1)
+	{
+		FormatEx(model, sizeof(model), "mechanic");
+	}
+	else if (StrContains(model, "producer") != -1)
+	{
+		FormatEx(model, sizeof(model), "producer");
+	}
+	
+	// STEP 2: SCAN SCENES FOLDER WITH VOCALIZE ARGUMENT AND NUMBERS FOR FILES
+	
+	decl String:scenefile[256], String:checknumber[3];
+	new foundfilescounter;
+	decl validfiles[71];
+	
+	for (new i = 1; i <= 70; i++)
+	{
+		if (i < 10)
+		{
+			FormatEx(checknumber, sizeof(checknumber), "0%i", i);
+		}
+		else
+		{
+			FormatEx(checknumber, sizeof(checknumber), "%i", i);
+		}
+		
+		FormatEx(scenefile, sizeof(scenefile), "scenes/%s/%s%s.vcd", model, arg, checknumber); // example "scenes/mechanic/grenade01.vcd"
+		
+		if (!FileExists(scenefile)) continue;
+		
+		foundfilescounter++;
+		validfiles[foundfilescounter] = i;
+		
+		DebugPrintToAll("Found valid file at %s, index:%i", scenefile, foundfilescounter);
+	}
+	
+	if (!foundfilescounter)
+	{
+		ReplyToCommand(admin, "No valid files found for arg %s", arg);
+		return Plugin_Handled;
+	}
+	
+	// STEP 3: SELECT ONE OF THE FOUND SCENE FILES
+	
+	new randomint = GetRandomInt(1, foundfilescounter);
+	DebugPrintToAll("Valid Files Count: %i, randomly chosen index: %i", foundfilescounter, randomint);
+	
+	if (validfiles[randomint] < 10)
+	{
+		FormatEx(checknumber, sizeof(checknumber), "0%i", validfiles[randomint]);
+	}
+	else
+	{
+		FormatEx(checknumber, sizeof(checknumber), "%i", validfiles[randomint]);
+	}
+	FormatEx(scenefile, sizeof(scenefile), "scenes/%s/%s%s.vcd", model, arg, checknumber);
+	
+	DebugPrintToAll("Chose Scenefile: %s, attempting to vocalize now", scenefile);
+	
+	// STEP 4: CALL SCENE AND THUS VOCALIZE
+	
+	new tempent = CreateEntityByName("instanced_scripted_scene");
+	DispatchKeyValue(tempent, "SceneFile", scenefile);
+	DispatchSpawn(tempent);
+	SetEntPropEnt(tempent, Prop_Data, "m_hOwner", client);
+	ActivateEntity(tempent);
+	AcceptEntityInput(tempent, "Start", client, client);
+
+	return Plugin_Handled;
+}
+
+public Action:Cmd_Player_Vocalize_Specified(admin, args)
+{
+	if (args < 2)
+	{
+		ReplyToCommand(admin, "Usage: sm_player_voc_this <player> <string>");
+		return Plugin_Handled;
+	}
+	
+	decl String:arg[256];
+	GetCmdArg(1, arg, sizeof(arg));
+	
+	new client = FindTarget(GetAnyClient(), arg);
+	
+	if (!client || !IsClientInGame(client))
+	{
+		ReplyToCommand(admin, "Invalid target specified");
+		return Plugin_Handled;
+	}
+	
+	GetCmdArg(2, arg, sizeof(arg));
+	
+	DebugPrintToAll("SM Vocalize caught by %N, command: %s", client, arg);
+	
+	// STEP 1: FIGURE OUT WHICH SURVIVOR WERE DEALING WITH
+	
+	decl String:model[256];
+	GetEntPropString(client, Prop_Data, "m_ModelName", model, sizeof(model));
+	
+	if (StrContains(model, "gambler") != -1)
+	{
+		FormatEx(model, sizeof(model), "gambler");
+	}
+	else if (StrContains(model, "coach") != -1)
+	{
+		FormatEx(model, sizeof(model), "coach");
+	}
+	else if (StrContains(model, "mechanic") != -1)
+	{
+		FormatEx(model, sizeof(model), "mechanic");
+	}
+	else if (StrContains(model, "producer") != -1)
+	{
+		FormatEx(model, sizeof(model), "producer");
+	}
+	
+	// STEP 2: INPUT CHOSEN SCENE IN MASK
+	
+	decl String:scenefile[256];
+	FormatEx(scenefile, sizeof(scenefile), "scenes/%s/%s.vcd", model, arg);
+	
+	if (!FileExists(scenefile))
+	{
+		ReplyToCommand(admin, "Specified Scenefile: %s does not exist, aborting", scenefile);
+		return Plugin_Handled;
+	}
+	
+	DebugPrintToAll("Specified Scenefile: %s, attempting to vocalize now", scenefile);
+	
+	// STEP 3: CALL SCENE AND THUS VOCALIZE
+	
+	new tempent = CreateEntityByName("instanced_scripted_scene");
+	DispatchKeyValue(tempent, "SceneFile", scenefile);
+	DispatchSpawn(tempent);
+	SetEntPropEnt(tempent, Prop_Data, "m_hOwner", client);
+	ActivateEntity(tempent);
+	AcceptEntityInput(tempent, "Start", client, client);
+
+	return Plugin_Handled;
+}
+
+stock GetAnyClient()
+{
+	for (new i = 1; i <= MaxClients; i++)
+	{
+		if (IsClientInGame(i)) return i;
+	}
+	return -1;
 }
 
 stock DebugPrintToAll(const String:format[], any:...)

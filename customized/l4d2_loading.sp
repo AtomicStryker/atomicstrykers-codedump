@@ -8,7 +8,7 @@
 #define DEBUG_LOG 0
 #define DEBUG_CHAT 0
 
-#define PLUGIN_VERSION "1.0.1"
+#define PLUGIN_VERSION "1.0.2"
 #define DEBUG_SCRIM 0
 #define DEBUG_DOOR 0
 #define DEBUG_CHMAP 0
@@ -129,7 +129,7 @@ public OnPluginStart()
 	AutoExecConfig(true, "l4d2_loading");
 }
 
-public OnClientPutInServer(client)
+public OnClientPostAdminCheck(client)
 {
 	if (!IsFakeClient(client) && IsCountDownStoppedOrRunning())
 	{
@@ -531,7 +531,7 @@ public Event_PlayerFirstSpawn(Handle:event, const String:name[], bool:dontBroadc
 
 	if (GetConVarBool(awaitSpawn))
 	{
-		if (IsCountDownStoppedOrRunning() && GetClientTeam(client) == 3)
+		if (IsCountDownStoppedOrRunning() && GetClientTeam(client) == 3 && !IsFakeClient(client))
 		{
 			isClientSpawning[client] = false;
 			PrintToChatAll("Player %N ready to spawn", client);
@@ -1577,7 +1577,8 @@ ResetReadyState(client, String:cbipt[])
 UpdateReadyCount()
 {
 	rdyCount = {0,0,0,0};
-	for (new i = 1; i <= MaxClients; i++) {
+	for (new i = 1; i <= MaxClients; i++)
+	{
 		if (scrimReady[i] == 1) rdyCount[GetClientTeam(i)]++;
 	}
 }
@@ -1650,7 +1651,8 @@ bool:IsInfectedTeamReady()
 
 bool:IsAnyClientLoading()
 {
-	for (new i = 1; i <= MaxClients; i++) {
+	for (new i = 1; i <= MaxClients; i++)
+	{
 		if (isClientLoading[i]) return true;
 	}
 
@@ -1781,10 +1783,13 @@ bool:IsFinishedLoading()
 			if (!IsClientInGame(i) && !IsFakeClient(i))
 			{
 				clientTimeout[i]++;
-				if (isClientLoading[i] && clientTimeout[i] == 1)
+				if (isClientLoading[i])
 				{
-					PrintToChatAll("Waiting for player %N to join the game", i);
-					isClientLoading[i] = true;
+					if (clientTimeout[i] == 1)
+					{
+						PrintToChatAll("Waiting for player %N to join the game", i);
+						isClientLoading[i] = true;
+					}
 				}
 				else if (clientTimeout[i] == GetConVarInt(waitOnTimeOut))
 				{
@@ -1832,7 +1837,126 @@ bool:IsFinishedLoading()
 		}
 		else isClientLoading[i] = false;
 	}
+	
+	ShowStatusPanel();
+	
 	return !IsAnyClientLoading();
+}
+
+ShowStatusPanel()
+{
+	new Handle:panel = CreatePanel();
+	decl String:readyPlayers[1024];
+	
+	new timelimit = GetConVarInt(waitOnTimeOut);
+	
+	new connected;
+	new loading;
+	new failed;
+	
+	decl i;	
+	for (i = 1; i <= MaxClients; i++) 
+	{
+		if(IsClientConnected(i) && !IsFakeClient(i)) 
+		{
+			if(isClientLoading[i]) 
+				loading++;
+			else if (clientTimeout[i] >= timelimit)
+				failed++;
+			else
+				connected++;
+		}
+	}
+	
+	if(loading)
+	{
+		DrawPanelText(panel, "CONNECTING");
+		loading = 0;
+		
+		for(i = 1; i <= MaxClients; i++) 
+		{
+			if(IsClientConnected(i) && !IsFakeClient(i))
+			{
+				if(isClientLoading[i])
+				{
+					loading++;
+					Format(readyPlayers, sizeof(readyPlayers), "->%d. %N", loading, i);
+					DrawPanelText(panel, readyPlayers);
+				}
+			}
+		}
+	}
+	
+	if(connected)
+	{
+		DrawPanelText(panel, "INGAME");
+		connected = 0;
+		
+		for(i = 1; i <= MaxClients; i++) 
+		{
+			if(IsClientConnected(i) && !IsFakeClient(i))
+			{
+				if(!isClientLoading[i] && clientTimeout[i] < timelimit)
+				{
+					connected++;
+					Format(readyPlayers, sizeof(readyPlayers), "->%d. %N", connected, i);
+					DrawPanelText(panel, readyPlayers);
+				}
+			}
+		}
+	}
+	
+	if(failed)
+	{
+		DrawPanelText(panel, "FAIL");
+		failed = 0;
+		
+		for(i = 1; i <= MaxClients; i++) 
+		{
+			if(IsClientConnected(i) && !IsFakeClient(i))
+			{
+				if(!isClientLoading[i] && clientTimeout[i] < timelimit)
+				{
+					failed++;
+					Format(readyPlayers, sizeof(readyPlayers), "->%d. %N", failed, i);
+					DrawPanelText(panel, readyPlayers);
+				}
+			}
+		}
+	}
+	
+	decl String:versionInfo[128];
+	static scrollingText;
+	if (scrollingText == 1)
+	{
+		Format(versionInfo, sizeof(versionInfo), "Mods by AtomicStryker");
+	}
+	else if (scrollingText == 2)
+	{
+		Format(versionInfo, sizeof(versionInfo), "L4D2 Loading Plugin v%s", PLUGIN_VERSION);
+	}
+	else if (scrollingText == 3)
+	{
+		Format(versionInfo, sizeof(versionInfo), "Waiting for People to load");
+	}
+	
+	scrollingText++;
+	if (scrollingText == 4) scrollingText = 1;
+	
+	DrawPanelText(panel, versionInfo);
+	
+	for(i = 1; i <= MaxClients; i++) 
+	{
+		if(IsClientConnected(i) && !IsFakeClient(i))
+		{
+			SendPanelToClient(panel, i, blankhandler, 5);
+		}
+	}
+}
+
+public blankhandler(Handle:menu, MenuAction:action, param1, param2) 
+{
+
 }
 
 GetCheckPointDoorIds()
