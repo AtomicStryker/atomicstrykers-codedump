@@ -114,17 +114,17 @@ public OnPluginStart()
 
 	CreateConVar("l4d2_loadingVersion", PLUGIN_VERSION, "Version of the loading plugin", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_REPLICATED);
 	freezeOn1st = CreateConVar("l4d2_freezeOn1st", "0", "Freeze survivors on first chapter (0 = no, 1 = freeze survivors until all players have loaded; 2 = use countdown like on the other chapters)");
-	prepareTime1st = CreateConVar("l4d2_prepare1st", "30", "Wait this many seconds after all clients have loaded before starting first round on a map");
-	prepareTime2nd = CreateConVar("l4d2_prepare2nd", "30", "Wait this many seconds after all clients have loaded before starting second round on a map");
+	prepareTime1st = CreateConVar("l4d2_prepare1st", "10", "Wait this many seconds after all clients have loaded before starting first round on a map");
+	prepareTime2nd = CreateConVar("l4d2_prepare2nd", "10", "Wait this many seconds after all clients have loaded before starting second round on a map");
 	prepareTimeScrim = CreateConVar("l4d2_prepareScrim", "5", "Wait this many seconds after all clients are ready until going live (first chapter)");
-	playerAfk = CreateConVar("l4d2_afkTime", "25", "Wait this many seconds while countdown is stopped or running before moving a client to spectators");
+	playerAfk = CreateConVar("l4d2_afkTime", "15", "Wait this many seconds while countdown is stopped or running before moving a client to spectators");
 	waitOnTimeOut = CreateConVar("l4d2_timeout", "70", "Wait this many seconds after a map starts before giving up on waiting for a client (timeout)");
 	scrimMode = CreateConVar("l4d2_scrim", "0", "Activate scrim mode; players have to type !ready or !rdy in chat to unlock the door, use !urdy or !unready to reset ready state (new ready-up on next round)");
 	scrimMasters = CreateConVar("l4d2_scrimMasters", "1", "How many players have to set ready state on each team to start a round in scrim mode");
 	scrimType = CreateConVar("l4d2_scrimType", "round", "Set the type of scrim match (match = players ready-up on start of match, then each round is started by the default timer; map = players ready-up on each map, second round is started by a timer; round = players ready-up on each round)");
 	awaitSpawn = CreateConVar("l4d2_infectedSpawn", "1", "Wait for infected to be ready to spawn before starting countdown");
 	gameMode = CreateConVar("l4d2_gameModeActive", "versus,teamversus", "Set the game mode for which the plugin should be activated (same usage as sv_gametypes, i.e. add all game modes where you want it active separated by comma)");
-	displayMode = CreateConVar("l4d2_displayMode", "center", "Set the display mode how the countdown will be displayed (hint = countdown is displayed in hint messages; center = countdown is displayed in the screen center; chat = countdown is displayed in the chat)");
+	displayMode = CreateConVar("l4d2_displayMode", "hint", "Set the display mode how the countdown will be displayed (hint = countdown is displayed in hint messages; center = countdown is displayed in the screen center; chat = countdown is displayed in the chat)");
 
 	AutoExecConfig(true, "l4d2_loading");
 }
@@ -335,20 +335,22 @@ public Event_PlayerHurt(Handle:event, const String:name[], bool:dontBroadcast)
 	if (IsCountDownStoppedOrRunning())
 	{
 		new userid0 = GetEventInt(event, "userid");
-		new userid1 = GetEventInt(event, "attacker");
+		//new userid1 = GetEventInt(event, "attacker");
 		new health = GetEventInt(event, "health");
 		new dmg_health = GetEventInt(event, "dmg_health");
 		new victim = GetClientOfUserId(userid0);
-		new attacker = GetClientOfUserId(userid1);
+		//new attacker = GetClientOfUserId(userid1);
 
 		#if DEBUG_SCRIM
 		PrintDebugMessage("[DEBUG] Player %L hurt %L [health = %d | dmg_health = %d]", attacker, victim, health, dmg_health);
 		#endif
 
+		/*
 		if ((attacker != 0 && victim != 0) && !GetConVarBool(scrimMode) && GetClientTeam(attacker) == GetClientTeam(victim))
 		{
 			PrintToChatAll("[%s] Player %N hurt %N [TA warning]", TAG, attacker, victim);
 		}
+		*/
 
 		SetEntityHealth(victim, health + dmg_health);
 	}

@@ -2,23 +2,23 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.4"
+#define PLUGIN_VERSION "1.0.5"
 #define PLUGIN_NAME "L4D2 Special Ammo"
 
 #define TEST_DEBUG 0
 #define TEST_DEBUG_LOG 0
 
-new bool:HasDumDumAmmo[MAXPLAYERS+1];
+static bool:HasDumDumAmmo[MAXPLAYERS+1];
 
-new Handle:SpecialAmmoAmount = INVALID_HANDLE;
+static Handle:SpecialAmmoAmount = INVALID_HANDLE;
 
-new SpecialAmmoUsed[MAXPLAYERS+1];
-new killcount[MAXPLAYERS+1];
+static SpecialAmmoUsed[MAXPLAYERS+1];
+static killcount[MAXPLAYERS+1];
 
-new Handle:KillCountLimitSetting = INVALID_HANDLE;
-new Handle:DumDumForce = INVALID_HANDLE;
+static Handle:KillCountLimitSetting = INVALID_HANDLE;
+static Handle:DumDumForce = INVALID_HANDLE;
 
-new bool:NoDoubleEventFire;
+static bool:NoDoubleEventFire;
 
 
 public Plugin:myinfo = {
@@ -161,6 +161,8 @@ public Action:AnInfectedGotHurt(Handle:event, const String:name[], bool:dontBroa
 
 public Action:OutOfAmmo(Handle:hTimer, any:client)
 {
+	if (!HasDumDumAmmo[client]) return;
+
 	PrintToChat(client, "\x05You've run out of DumDum ammo.");
 	HasDumDumAmmo[client] = false;
 	
