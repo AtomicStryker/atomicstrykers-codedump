@@ -1,0 +1,219 @@
+#pragma semicolon 1
+#include <sourcemod>
+#include <sdktools>
+#define PLUGIN_VERSION "1.0.1"
+
+public Plugin:myinfo =
+{
+	name = "L4D2 Routing Plugin",
+	author = " AtomicStryker",
+	description = " To work with Stripper configs ",
+	version = PLUGIN_VERSION,
+	url = ""
+};
+
+
+static bool:MapHasConfig	= false;
+static bool:MapHandled 		= true;
+static bool:RoundHandled 	= false;
+static MapRoute 			= 1;
+
+
+public OnPluginStart()
+{
+	RequireL4D2();
+
+	CreateConVar("l4d2_routing_version", PLUGIN_VERSION, " Version of L4D2 Routing Plugin on this server ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+
+	HookEvent("round_start", RoundStart_Event, EventHookMode_PostNoCopy);
+	CreateTimer(5.0, CheckForNeededActions, 0, TIMER_REPEAT);
+	
+	RegAdminCmd("sm_forcepath", ForcePath_Command, ADMFLAG_CHEATS);
+}
+
+public Action:RoundStart_Event(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	RoundHandled = false;
+}
+
+public OnMapStart()
+{
+	MapHandled = false;
+	MapHasConfig = false;
+
+	// the following code checks for the existence of Atomic-Compliant *gg* pathing
+	new ent = -1;
+	new previousent = 0;
+	decl String:relayname[56];
+	
+	while ((ent = FindEntityByClassname(ent, "logic_director_query")) != -1)
+	{
+		if (previousent)
+		{
+			GetEntPropString(previousent, Prop_Data, "m_iName", relayname, sizeof(relayname));
+			if (StrEqual(relayname, "map_has_routing"))
+			{
+				MapHasConfig = true;
+			}
+		}
+		
+		previousent = ent;
+	}
+
+	if (previousent) // last valid entity
+	{
+		GetEntPropString(previousent, Prop_Data, "m_iName", relayname, sizeof(relayname));
+		if (StrEqual(relayname, "map_has_routing"))
+		{
+			MapHasConfig = true;
+		}
+	}
+}
+
+public Action:CheckForNeededActions(Handle:timer)
+{
+	if (!MapHasConfig) return Plugin_Continue;
+
+	if (HasASurvivorLeftSaferoom() && IsVersus())
+	{
+		if (!MapHandled)
+		{
+			CheatCommand(_, "ent_fire", "relay_routing_init trigger"); // destroys Valve routing entities
+			MapRoute = GetRandomInt(1,3); // picks a path for the map, both rounds. 1 is easy, 3 is hard
+			
+			decl String:Difficulty[12];
+			switch (MapRoute)
+			{
+				case 1: Format(Difficulty, sizeof(Difficulty), "Easy");
+				case 2: Format(Difficulty, sizeof(Difficulty), "Medium");
+				case 3: Format(Difficulty, sizeof(Difficulty), "Hard");
+			}
+			
+			PrintToChatAll("\x04[Pathing Plugin]\x01 Chose \x03%s\x01 Pathing Option for both teams", Difficulty);
+			MapHandled = true;
+		}
+		
+		if (!RoundHandled)
+		{
+			CheatCommand(_, "ent_fire", "relay_routing_init trigger"); // destroys Valve routing entities if respawned
+			CheatCommand(_, "ent_fire", "relay_routing_wipe trigger");
+		
+			switch (MapRoute)
+			{
+				case 1: CheatCommand(_, "ent_fire", "relay_easy_route_spawn trigger");
+				case 2: CheatCommand(_, "ent_fire", "relay_medium_route_spawn trigger");
+				case 3: CheatCommand(_, "ent_fire", "relay_hard_route_spawn trigger");
+			}
+			
+			PrintToChatAll("\x04[Pathing Plugin]\x01 Spawning current Round path NOW");
+			RoundHandled = true;
+		}
+	}
+	return Plugin_Continue;
+}
+
+public Action:ForcePath_Command(client, args)
+{
+	if (args < 1)
+	{
+		ReplyToCommand(client, "[SM] Usage: sm_forcepath <easy, medium or hard>");
+		return Plugin_Handled;
+	}
+	
+	if (!MapHasConfig)
+	{
+		ReplyToCommand(client, "[SM] This Map doesnt have routing");
+		return Plugin_Handled;
+	}
+	
+	decl String:command[24];
+	GetCmdArg(1, command, sizeof(command));
+	
+	if (StrEqual(command, "easy", false))
+	{
+		MapRoute = 1;
+		CheatCommand(_, "ent_fire", "relay_routing_wipe trigger");
+		CheatCommand(_, "ent_fire", "relay_easy_route_spawn trigger");
+		PrintToChatAll("\x04[Pathing Plugin]\x01 Admin overrode Pathing, \x03Easy\x01 path enforced");
+	}
+	else if (StrEqual(command, "medium", false))
+	{
+		MapRoute = 2;
+		CheatCommand(_, "ent_fire", "relay_routing_wipe trigger");
+		CheatCommand(_, "ent_fire", "relay_medium_route_spawn trigger");
+		PrintToChatAll("\x04[Pathing Plugin]\x01 Admin overrode Pathing, \x03Medium\x01 path enforced");
+	}
+	else if (StrEqual(command, "hard", false))
+	{
+		MapRoute = 3;
+		CheatCommand(_, "ent_fire", "relay_routing_wipe trigger");
+		CheatCommand(_, "ent_fire", "relay_hard_route_spawn trigger");
+		PrintToChatAll("\x04[Pathing Plugin]\x01 Admin overrode Pathing, \x03Hard\x01 path enforced");
+	}
+	else
+	{
+		ReplyToCommand(client, "[SM] Usage: sm_forcepath <easy|medium|hard>");
+	}
+	
+	return Plugin_Handled;
+}
+
+stock CheatCommand(client = 0, String:command[], String:arguments[]="")
+{
+	if (!client || !IsClientInGame(client))
+	{
+		for (new target = 1; target <= MaxClients; target++)
+		{
+			if (IsClientInGame(target))
+			{
+				client = target;
+				break;
+			}
+		}
+		
+		if (!IsClientInGame(client)) return;
+	}
+	
+	new userflags = GetUserFlagBits(client);
+	SetUserFlagBits(client, ADMFLAG_ROOT);
+	new flags = GetCommandFlags(command);
+	SetCommandFlags(command, flags & ~FCVAR_CHEAT);
+	FakeClientCommand(client, "%s %s", command, arguments);
+	SetCommandFlags(command, flags);
+	SetUserFlagBits(client, userflags);
+}
+
+stock bool:HasASurvivorLeftSaferoom()
+{
+	new ent = FindEntityByClassname(-1, "terror_player_manager");
+	
+	if (ent > -1)
+	{
+		new offset = FindSendPropInfo("CTerrorPlayerResource", "m_hasAnySurvivorLeftSafeArea");
+		if (offset > 0)
+		{
+			if (GetEntData(ent, offset))
+			{
+				if (GetEntData(ent, offset) == 1) return true;
+			}
+		}
+	}
+	return false;
+}
+
+stock bool:IsVersus()
+{
+	decl String:gamemode[24];
+	GetConVarString(FindConVar("mp_gamemode"), gamemode, sizeof(gamemode));
+	return (StrContains(gamemode, "versus", false) > -1);
+}
+
+stock RequireL4D2()
+{
+	decl String:gameName[24];
+	GetGameFolderName(gameName, sizeof(gameName));
+	if (!StrEqual(gameName, "left4dead2", .caseSensitive = false))
+	{
+		SetFailState("Plugin supports Left 4 Dead 2 only.");
+	}
+}
