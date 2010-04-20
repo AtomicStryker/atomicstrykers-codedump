@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.1.2"
+#define PLUGIN_VERSION "1.1.3"
 
 new bool:buttondelay[MAXPLAYERS+1];
 new bool:IsBeingPwnt[MAXPLAYERS+1];
@@ -160,8 +160,10 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 			return Plugin_Continue;
 		}
 		
-		RemovePlayerItem(client, Meds);
-		FakeClientCommand(client, "vocalize PlayerImWithYou");
+		if (IsValidEntity(Meds))
+		{
+			RemovePlayerItem(client, Meds);
+		}
 		
 		if (StrEqual(medstring, "weapon_pain_pills", false)) CheatCommand(target, "give", "pain_pills", "");
 		else if (StrEqual(medstring, "weapon_adrenaline", false)) CheatCommand(target, "give", "adrenaline", "");
@@ -217,7 +219,10 @@ InterruptMunch(client)
 		decl String:medstring[256];
 		GetEdictClassname(Meds, medstring, sizeof(medstring));
 		
-		RemovePlayerItem(client, Meds);
+		if (IsValidEntity(Meds))
+		{
+			RemovePlayerItem(client, Meds);
+		}
 		
 		new droppedstuff = CreateEntityByName(medstring);
 		new ticktime = RoundToNearest( FloatDiv( GetGameTime() , GetTickInterval() ) ) + 5;
@@ -274,7 +279,10 @@ public Action:MunchFinished(Handle:timer, any:client)
 ReviveClient(client)
 {
 	new Meds = GetPlayerWeaponSlot(client, 4);
-	RemovePlayerItem(client, Meds);
+	if (IsValidEntity(Meds))
+	{
+		RemovePlayerItem(client, Meds);
+	}
 	
 	PrintToChatAll("\x04%N\x01 used his \x04pills/adrenaline\x01 and revived himself!", client);
 	
@@ -299,7 +307,7 @@ public Action:SetHP1(Handle:timer, any:client)
 
 stock bool:IsPlayerIncapped(client)
 {
-	if (GetEntProp(client, Prop_Send, "m_isIncapacitated", 1)) return true;
+	if (GetEntProp(client, Prop_Send, "m_isIncapacitated", 1) && (GetEntProp(client, Prop_Send, "m_isHangingFromLedge") != 1)) return true;
 	return false;
 }
 

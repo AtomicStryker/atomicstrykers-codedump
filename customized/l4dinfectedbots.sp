@@ -1,6 +1,6 @@
 /********************************************************************************************
-* Plugin	: L4D & L4D2 InfectedBots with Coop/Survival playable SI spawns
-* Version	: 1.9.0
+* Plugin	: L4D/L4D2 InfectedBots with Coop/Survival playable SI spawns
+* Version	: 1.9.1 V3
 * Game		: Left 4 Dead 1 & 2
 * Author	: djromero (SkyDavid, David) and MI 5
 * Testers	: Myself, MI 5
@@ -10,6 +10,26 @@
 * 			  there isn't enough real players. Also allows playable special infected on coop/survival modes.
 * 
 * WARNING	: Please use sourcemod's latest 1.3 branch snapshot.
+* 
+* Version 1.9.1 V3
+* 	   - Fixed bug with bot spawns (especially with 4+ infected bots)
+* 	   - Fixed an error that was caused when the plugin was unloaded
+* 
+* Version 1.9.1 V2
+* 	   - Fixed bug with server hibernation that was caused by rewrite of round start code (thanks Lexantis)
+* 
+* Version 1.9.1
+* 	   - Changed Round start code which fixed a bug with survival (and possibly other gamemodes)
+* 	   - Changed how the class limit cvars work, they can now be used to alter director spawning cvars (z_smoker_limit, z_hunter_limit, etc.)
+* 	   - l4d_infectedbots_hunter_limit cvar added to L4D
+* 	   - Added cvar l4d_infectedbots_instant_spawns, allows the plugin to instantly spawn the infected at the start of a map and the start of finales
+* 	   - Fixed bug where survivors were slayed for no reason
+* 	   - Fixed bug where Valve's bots would still spawn on certain maps
+* 	   - Added cvar l4d_infectedbots_human_coop_survival_limit
+* 	   - Added cvar l4d_infectedbots_admins_only
+* 	   - Changed how the "!js" function worked, no longer uses jointeam (NEW GAMEDATA FILE BECAUSE OF THIS)
+* 	   - Class limit cvars by this plugin no longer affect z_versus class player limits (l4d_infectedbots_smoker_limit for example no longer affects z_versus_smoker_limit)
+*	   - Altered descriptions of the class limit cvars
 * 
 * Version 1.9.0
 *      - Workaround implemented to get around Coop Limit (L4D2)
@@ -327,7 +347,7 @@
 
 #pragma semicolon 1
 
-#define PLUGIN_VERSION "1.9.0"
+#define PLUGIN_VERSION "1.9.1 V3"
 
 #define DEBUG 0
 #define DEBUGTANK 0
@@ -348,7 +368,7 @@
 new Handle:FightOrDieTimer[MAXPLAYERS+1]; // kill idle bots
 
 // Variables
-new InfectedRealCount; // Holds the amount of real infected players in versus
+new InfectedRealCount; // Holds the amount of real infected players
 new InfectedBotCount; // Holds the amount of infected bots in any gamemode
 new InfectedBotQueue; // Holds the amount of bots that are going to spawn
 
@@ -415,6 +435,9 @@ new Handle:h_JoinableTeamsAnnounce;
 new Handle:h_Coordination;
 new Handle:h_idletime_b4slay;
 new Handle:h_timerafterhurt_b4slay;
+new Handle:h_InstantSpawn;
+new Handle:h_HumanCoopLimit;
+new Handle:h_AdminJoinInfected;
 
 // Stuff related to Durzel's HUD (Panel was redone)
 new respawnDelay[MAXPLAYERS+1]; 			// Used to store individual player respawn delays after death
@@ -438,7 +461,7 @@ new Handle:h_Announce 	= INVALID_HANDLE;
 
 public Plugin:myinfo = 
 {
-	name = "[L4D & L4D2] Infected Bots",
+	name = "[L4D/L4D2] Infected Bots",
 	author = "djromero (SkyDavid), MI 5",
 	description = "Spawns infected bots in versus, allows playable special infected in coop/survival, and changable z_max_player_zombies limit",
 	version = PLUGIN_VERSION,
@@ -479,9 +502,10 @@ public OnPluginStart()
 	// and found out that it removed the spheres, and implemented it into the plugin. The spheres are no longer shown, and they were useless anyway as infected still spawn 
 	// within it.
 	
-	
-	// Removes the boundaries for z_max_player_zombies
+	// Removes the boundaries for z_max_player_zombies and notify flag
+	new flags = GetConVarFlags(FindConVar("z_max_player_zombies"));
 	SetConVarBounds(FindConVar("z_max_player_zombies"), ConVarBound_Upper, false);
+	SetConVarFlags(FindConVar("z_max_player_zombies"), flags & ~FCVAR_NOTIFY);
 	
 	// Notes on the sourcemod commands:
 	// JoinSpectator is actually a developer command I used to see if the bots spawn correctly with and without a player. It was incredibly useful for this purpose, but it
@@ -506,20 +530,24 @@ public OnPluginStart()
 	h_Difficulty = FindConVar("z_difficulty");
 	
 	// console variables
-	h_BoomerLimit = CreateConVar("l4d_infectedbots_boomer_limit", "1", "Sets the limit for boomers spawned by the plugin", FCVAR_PLUGIN|FCVAR_SPONLY);
-	h_SmokerLimit = CreateConVar("l4d_infectedbots_smoker_limit", "1", "Sets the limit for smokers spawned by the plugin", FCVAR_PLUGIN|FCVAR_SPONLY);
+	h_BoomerLimit = CreateConVar("l4d_infectedbots_boomer_limit", "1", "Sets the limit for boomers spawned by the plugin and those spawned by the director", FCVAR_PLUGIN|FCVAR_SPONLY);
+	h_SmokerLimit = CreateConVar("l4d_infectedbots_smoker_limit", "1", "Sets the limit for smokers spawned by the plugin and and those spawned by the director", FCVAR_PLUGIN|FCVAR_SPONLY);
 	if (L4DVersion)
 	{
-		h_HunterLimit = CreateConVar("l4d_infectedbots_hunter_limit", "1", "Sets the limit for hunters spawned by the plugin", FCVAR_PLUGIN|FCVAR_SPONLY);
-		h_SpitterLimit = CreateConVar("l4d_infectedbots_spitter_limit", "1", "Sets the limit for spitters spawned by the plugin", FCVAR_PLUGIN|FCVAR_SPONLY);
-		h_JockeyLimit = CreateConVar("l4d_infectedbots_jockey_limit", "1", "Sets the limit for jockeys spawned by the plugin", FCVAR_PLUGIN|FCVAR_SPONLY);
-		h_ChargerLimit = CreateConVar("l4d_infectedbots_charger_limit", "1", "Sets the limit for chargers spawned by the plugin", FCVAR_PLUGIN|FCVAR_SPONLY);
+		h_SpitterLimit = CreateConVar("l4d_infectedbots_spitter_limit", "1", "Sets the limit for spitters spawned by the plugin and those spawned by the director", FCVAR_PLUGIN|FCVAR_SPONLY);
+		h_JockeyLimit = CreateConVar("l4d_infectedbots_jockey_limit", "1", "Sets the limit for jockeys spawned by the plugin and those spawned by the director", FCVAR_PLUGIN|FCVAR_SPONLY);
+		h_ChargerLimit = CreateConVar("l4d_infectedbots_charger_limit", "1", "Sets the limit for chargers spawned by the plugin and those spawned by the director", FCVAR_PLUGIN|FCVAR_SPONLY);
+		h_HunterLimit = CreateConVar("l4d_infectedbots_hunter_limit", "1", "Sets the limit for hunters spawned by the plugin and those spawned by the director", FCVAR_PLUGIN|FCVAR_SPONLY);
+	}
+	else
+	{
+		h_HunterLimit = CreateConVar("l4d_infectedbots_hunter_limit", "2", "Sets the limit for hunters spawned by the plugin and those spawned by the director", FCVAR_PLUGIN|FCVAR_SPONLY);
 	}
 	h_MaxPlayerZombies = CreateConVar("l4d_infectedbots_max_specials", "4", "Defines how many special infected can be on the map on all gamemodes", FCVAR_PLUGIN|FCVAR_SPONLY); 
 	h_InfectedSpawnTimeMax = CreateConVar("l4d_infectedbots_spawn_time_max", "30", "Sets the max spawn time for special infected spawned by the plugin in seconds", FCVAR_PLUGIN|FCVAR_SPONLY);
 	h_InfectedSpawnTimeMin = CreateConVar("l4d_infectedbots_spawn_time_min", "25", "Sets the minimum spawn time for special infected spawned by the plugin in seconds", FCVAR_PLUGIN|FCVAR_SPONLY);
 	h_DirectorSpawn = CreateConVar("l4d_infectedbots_director_spawn", "0", "If 1, the plugin will use the director's timing of the spawns, if versus it will use Valve's bots", FCVAR_PLUGIN|FCVAR_SPONLY, true, 0.0, true, 1.0);
-	h_CoopPlayableTank = CreateConVar("l4d_infectedbots_coop_survival_tank_playable", "0", "If 1, tank will be playable in coop/survival, only one player can take control of a tank at a time", FCVAR_PLUGIN|FCVAR_NOTIFY|FCVAR_SPONLY, true, 0.0, true, 1.0);
+	h_CoopPlayableTank = CreateConVar("l4d_infectedbots_coop_survival_tank_playable", "0", "If 1, tank will be playable in coop/survival", FCVAR_PLUGIN|FCVAR_NOTIFY|FCVAR_SPONLY, true, 0.0, true, 1.0);
 	h_JoinableTeams = CreateConVar("l4d_infectedbots_infected_team_joinable", "1", "If 1, players can join the infected team in coop/survival", FCVAR_PLUGIN|FCVAR_SPONLY, true, 0.0, true, 1.0);
 	if (!L4DVersion)
 	{
@@ -532,15 +560,18 @@ public OnPluginStart()
 	h_Announce = CreateConVar("l4d_infectedbots_infhud_announce", "1", "Toggle whether L4D Infected HUD announces itself to clients.", FCVAR_PLUGIN|FCVAR_SPONLY, true, 0.0, true, 1.0);
 	h_idletime_b4slay = CreateConVar("l4d_infectedbots_idle_time_before_slay", "40", "Amount of seconds before a special infected is slain", FCVAR_PLUGIN|FCVAR_SPONLY);
 	h_timerafterhurt_b4slay = CreateConVar("l4d_infectedbots_timer_hurt_before_slay", "20", "Amount of seconds a new timer will start for specials that get hurt before they are slain", FCVAR_PLUGIN|FCVAR_SPONLY);
+	h_InstantSpawn = CreateConVar("l4d_infectedbots_instant_spawns", "1", "If 1, plugin will instantly spawn infected when necessary (start of map, start of finales)", FCVAR_PLUGIN|FCVAR_SPONLY, true, 0.0, true, 1.0);
+	h_HumanCoopLimit = CreateConVar("l4d_infectedbots_human_coop_survival_limit", "4", "Sets the limit for the amount of humans that can join the infected team in coop/survival", FCVAR_PLUGIN|FCVAR_SPONLY);
+	h_AdminJoinInfected = CreateConVar("l4d_infectedbots_admins_only", "0", "If 1, only admins can join the infected team in coop/survival.", FCVAR_PLUGIN|FCVAR_SPONLY, true, 0.0, true, 1.0);
 	
 	HookConVarChange(h_BoomerLimit, ConVarBoomerLimit);
 	BoomerLimit = GetConVarInt(h_BoomerLimit);
 	HookConVarChange(h_SmokerLimit, ConVarSmokerLimit);
 	SmokerLimit = GetConVarInt(h_SmokerLimit);
+	HookConVarChange(h_HunterLimit, ConVarHunterLimit);
+	HunterLimit = GetConVarInt(h_HunterLimit);
 	if (L4DVersion)
 	{
-		HookConVarChange(h_HunterLimit, ConVarHunterLimit);
-		HunterLimit = GetConVarInt(h_HunterLimit);
 		HookConVarChange(h_SpitterLimit, ConVarSpitterLimit);
 		SpitterLimit = GetConVarInt(h_SpitterLimit);
 		HookConVarChange(h_JockeyLimit, ConVarJockeyLimit);
@@ -559,8 +590,8 @@ public OnPluginStart()
 	// Such as PlayerDeath, PlayerSpawn and others.
 	
 	// We hook the round_start (and round_end) event on plugin start, since it occurs before map_start
-	HookEvent("round_start", evtRoundStart);
-	HookEvent("round_end", evtRoundEnd);
+	HookEvent("item_pickup", evtRoundStart);
+	HookEvent("round_end", evtRoundEnd, EventHookMode_Pre);
 	// We hook some events ...
 	HookEvent("player_death", evtPlayerDeath, EventHookMode_Pre);
 	HookEvent("player_team", evtPlayerTeam);
@@ -652,36 +683,59 @@ public OnPluginStart()
 public ConVarBoomerLimit(Handle:convar, const String:oldValue[], const String:newValue[])
 {
 	BoomerLimit = GetConVarInt(h_BoomerLimit);
-	SetConVarInt(FindConVar("z_versus_boomer_limit"), BoomerLimit);
+	//SetConVarInt(FindConVar("z_versus_boomer_limit"), BoomerLimit);
+	if (DirectorSpawn)
+	{
+		if (L4DVersion)
+			SetConVarInt(FindConVar("z_boomer_limit"), BoomerLimit);
+		else
+		SetConVarInt(FindConVar("z_exploding_limit"), BoomerLimit);
+	}
 }
 public ConVarSmokerLimit(Handle:convar, const String:oldValue[], const String:newValue[])
 {
 	SmokerLimit = GetConVarInt(h_SmokerLimit);
-	SetConVarInt(FindConVar("z_versus_smoker_limit"), SmokerLimit);
+	//SetConVarInt(FindConVar("z_versus_smoker_limit"), SmokerLimit);
+	if (DirectorSpawn)
+	{
+		if (L4DVersion)
+			SetConVarInt(FindConVar("z_smoker_limit"), SmokerLimit);
+		else
+		SetConVarInt(FindConVar("z_gas_limit"), SmokerLimit);
+	}
 }
 
 public ConVarHunterLimit(Handle:convar, const String:oldValue[], const String:newValue[])
 {
 	HunterLimit = GetConVarInt(h_HunterLimit);
-	SetConVarInt(FindConVar("z_versus_hunter_limit"), HunterLimit);
+	//if (L4DVersion)
+	//SetConVarInt(FindConVar("z_versus_hunter_limit"), HunterLimit);
+	if (DirectorSpawn)
+		SetConVarInt(FindConVar("z_hunter_limit"), HunterLimit);
 }
 
 public ConVarSpitterLimit(Handle:convar, const String:oldValue[], const String:newValue[])
 {
 	SpitterLimit = GetConVarInt(h_SpitterLimit);
-	SetConVarInt(FindConVar("z_versus_spitter_limit"), SpitterLimit);
+	//SetConVarInt(FindConVar("z_versus_spitter_limit"), SpitterLimit);
+	if (DirectorSpawn)
+		SetConVarInt(FindConVar("z_spitter_limit"), SpitterLimit);
 }
 
 public ConVarJockeyLimit(Handle:convar, const String:oldValue[], const String:newValue[])
 {
 	JockeyLimit = GetConVarInt(h_JockeyLimit);
-	SetConVarInt(FindConVar("z_versus_jockey_limit"), JockeyLimit);
+	//SetConVarInt(FindConVar("z_versus_jockey_limit"), JockeyLimit);
+	if (DirectorSpawn)
+		SetConVarInt(FindConVar("z_jockey_limit"), JockeyLimit);
 }
 
 public ConVarChargerLimit(Handle:convar, const String:oldValue[], const String:newValue[])
 {
 	ChargerLimit = GetConVarInt(h_ChargerLimit);
-	SetConVarInt(FindConVar("z_versus_charger_limit"), ChargerLimit);
+	//SetConVarInt(FindConVar("z_versus_charger_limit"), ChargerLimit);
+	if (DirectorSpawn)
+		SetConVarInt(FindConVar("z_charger_limit"), ChargerLimit);
 }
 
 public ConVarMaxPlayerZombies(Handle:convar, const String:oldValue[], const String:newValue[])
@@ -695,11 +749,16 @@ public ConVarDirectorSpawn(Handle:convar, const String:oldValue[], const String:
 	DirectorSpawn = GetConVarBool(h_DirectorSpawn);
 	if (!DirectorSpawn)
 	{
+		//ResetCvars();
 		TweakSettings();
-		CheckIfBotsNeeded(true);
+		if (GetConVarBool(h_InstantSpawn))
+			CheckIfBotsNeeded(true);
+		else
+		CheckIfBotsNeeded(false);
 	}
 	else
 	{
+		//ResetCvarsDirector();
 		DirectorStuff();
 	}
 }
@@ -707,6 +766,17 @@ public ConVarDirectorSpawn(Handle:convar, const String:oldValue[], const String:
 public ConVarGameMode(Handle:convar, const String:oldValue[], const String:newValue[])
 {
 	GameModeCheck();
+	
+	if (!DirectorSpawn)
+	{
+		//ResetCvars();
+		TweakSettings();
+	}
+	else
+	{
+		//ResetCvarsDirector();
+		DirectorStuff();
+	}
 }
 
 public ConVarDifficulty(Handle:convar, const String:oldValue[], const String:newValue[])
@@ -722,214 +792,336 @@ TweakSettings()
 	// due to the fact that the coop class limits were not being reset (I didn't think they were linked at all, but I should have known better). This bug has been fixed
 	// with the coop class limits being reset on every gamemode except coop of course.
 	
-	if (!DirectorSpawn)
+	switch (GameMode)
 	{
-		switch (GameMode)
+		case 1: // Coop, We turn off the ability for the director to spawn the bots, and have the plugin do it while allowing the director to spawn tanks and witches, 
+		// MI 5
 		{
-			case 1: // Coop, We turn off the ability for the director to spawn the bots, and have the plugin do it while allowing the director to spawn tanks and witches, 
-			// MI 5
+			// Reset Special Infected AI
+			ResetConVar(FindConVar("boomer_vomit_delay"), true, true);
+			ResetConVar(FindConVar("smoker_tongue_delay"), true, true);
+			ResetConVar(FindConVar("hunter_leap_away_give_up_range"), true, true);
+			ResetConVar(FindConVar("boomer_exposed_time_tolerance"), true, true);
+			ResetConVar(FindConVar("z_hunter_lunge_distance"), true, true);
+			ResetConVar(FindConVar("hunter_pounce_ready_range"), true, true);
+			ResetConVar(FindConVar("hunter_pounce_loft_rate"), true, true);
+			ResetConVar(FindConVar("z_hunter_lunge_stagger_time"), true, true);
+			// If the game is L4D 2...
+			if (L4DVersion)
 			{
-				ResetConVar(FindConVar("director_no_specials"), true, true);
-				ResetConVar(FindConVar("boomer_vomit_delay"), true, true);
-				ResetConVar(FindConVar("smoker_tongue_delay"), true, true);
-				ResetConVar(FindConVar("hunter_leap_away_give_up_range"), true, true);
-				ResetConVar(FindConVar("boomer_exposed_time_tolerance"), true, true);
-				ResetConVar(FindConVar("z_hunter_lunge_distance"), true, true);
-				ResetConVar(FindConVar("hunter_pounce_ready_range"), true, true);
-				ResetConVar(FindConVar("hunter_pounce_loft_rate"), true, true);
-				ResetConVar(FindConVar("z_hunter_lunge_stagger_time"), true, true);
-				SetConVarInt(FindConVar("vs_max_team_switches"), 9999);
-				// If the game is L4D 2...
-				if (L4DVersion)
-				{
-					ResetConVar(FindConVar("survival_max_smokers"), true, true);
-					ResetConVar(FindConVar("survival_max_boomers"), true, true);
-					ResetConVar(FindConVar("survival_max_hunters"), true, true);
-					ResetConVar(FindConVar("survival_max_spitters"), true, true);
-					ResetConVar(FindConVar("survival_max_jockeys"), true, true);
-					ResetConVar(FindConVar("survival_max_chargers"), true, true);
-					ResetConVar(FindConVar("survival_max_specials"), true, true);
-					SetConVarInt(FindConVar("z_smoker_limit"), 0);
-					SetConVarInt(FindConVar("z_boomer_limit"), 0);
-					SetConVarInt(FindConVar("z_hunter_limit"), 0);
-					SetConVarInt(FindConVar("z_spitter_limit"), 0);
-					SetConVarInt(FindConVar("z_jockey_limit"), 0);
-					SetConVarInt(FindConVar("z_charger_limit"), 0);
-				}
-				else
-				{
-					ResetConVar(FindConVar("holdout_max_smokers"), true, true);
-					ResetConVar(FindConVar("holdout_max_boomers"), true, true);
-					ResetConVar(FindConVar("holdout_max_hunters"), true, true);
-					ResetConVar(FindConVar("holdout_max_specials"), true, true);
-					SetConVarInt(FindConVar("z_gas_limit"), 0);
-					SetConVarInt(FindConVar("z_exploding_limit"), 0);
-					SetConVarInt(FindConVar("z_hunter_limit"), 0);
-				}
+				SetConVarInt(FindConVar("z_smoker_limit"), 0);
+				SetConVarInt(FindConVar("z_boomer_limit"), 0);
+				SetConVarInt(FindConVar("z_hunter_limit"), 0);
+				SetConVarInt(FindConVar("z_spitter_limit"), 0);
+				SetConVarInt(FindConVar("z_jockey_limit"), 0);
+				SetConVarInt(FindConVar("z_charger_limit"), 0);
 			}
-			case 2: // Versus, Better Versus Infected AI, reset if not versus, MI 5
+			else
 			{
-				// If the game is L4D 2...
-				if (L4DVersion)
-				{
-					SetConVarInt(FindConVar("z_smoker_limit"), 0);
-					SetConVarInt(FindConVar("z_boomer_limit"), 0);
-					SetConVarInt(FindConVar("z_hunter_limit"), 0);
-					SetConVarInt(FindConVar("z_spitter_limit"), 0);
-					SetConVarInt(FindConVar("z_jockey_limit"), 0);
-					SetConVarInt(FindConVar("z_charger_limit"), 0);
-					ResetConVar(FindConVar("survival_max_smokers"), true, true);
-					ResetConVar(FindConVar("survival_max_boomers"), true, true);
-					ResetConVar(FindConVar("survival_max_hunters"), true, true);
-					ResetConVar(FindConVar("survival_max_spitters"), true, true);
-					ResetConVar(FindConVar("survival_max_jockeys"), true, true);
-					ResetConVar(FindConVar("survival_max_chargers"), true, true);
-					ResetConVar(FindConVar("survival_max_specials"), true, true);
-				}
-				else
-				{
-					SetConVarInt(FindConVar("z_gas_limit"), 999);
-					SetConVarInt(FindConVar("z_exploding_limit"), 999);
-					SetConVarInt(FindConVar("z_hunter_limit"), 999);
-					ResetConVar(FindConVar("holdout_max_smokers"), true, true);
-					ResetConVar(FindConVar("holdout_max_boomers"), true, true);
-					ResetConVar(FindConVar("holdout_max_hunters"), true, true);
-					ResetConVar(FindConVar("holdout_max_specials"), true, true);
-				}
-				ResetConVar(FindConVar("director_no_specials"), true, true);
-				ResetConVar(FindConVar("vs_max_team_switches"), true, true);
-				SetConVarFloat(FindConVar("smoker_tongue_delay"), 0.0);
-				SetConVarFloat(FindConVar("boomer_vomit_delay"), 0.0);
-				SetConVarFloat(FindConVar("boomer_exposed_time_tolerance"), 0.0);
-				SetConVarInt(FindConVar("hunter_leap_away_give_up_range"), 0);
-				SetConVarInt(FindConVar("z_hunter_lunge_distance"), 5000);
-				SetConVarInt(FindConVar("hunter_pounce_ready_range"), 1500);
-				SetConVarFloat(FindConVar("hunter_pounce_loft_rate"), 0.055);
-				SetConVarFloat(FindConVar("z_hunter_lunge_stagger_time"), 0.0);
-			}
-			case 3: // Survival, Turns off the ability for the director to spawn infected bots in survival, MI 5
-			{
-				if (L4DVersion)
-				{
-					ResetConVar(FindConVar("z_smoker_limit"), true, true);
-					ResetConVar(FindConVar("z_boomer_limit"), true, true);
-					ResetConVar(FindConVar("z_hunter_limit"), true, true);
-					ResetConVar(FindConVar("z_spitter_limit"), true, true);
-					ResetConVar(FindConVar("z_jockey_limit"), true, true);
-					ResetConVar(FindConVar("z_charger_limit"), true, true);
-					SetConVarInt(FindConVar("survival_max_smokers"), 0);
-					SetConVarInt(FindConVar("survival_max_boomers"), 0);
-					SetConVarInt(FindConVar("survival_max_hunters"), 0);
-					SetConVarInt(FindConVar("survival_max_spitters"), 0);
-					SetConVarInt(FindConVar("survival_max_jockeys"), 0);
-					SetConVarInt(FindConVar("survival_max_chargers"), 0);
-					SetConVarInt(FindConVar("survival_max_specials"), MaxPlayerZombies);
-				}
-				else
-				{
-					ResetConVar(FindConVar("z_gas_limit"), true, true);
-					ResetConVar(FindConVar("z_exploding_limit"), true, true);
-					ResetConVar(FindConVar("z_hunter_limit"), true, true);
-					SetConVarInt(FindConVar("holdout_max_smokers"), 0);
-					SetConVarInt(FindConVar("holdout_max_boomers"), 0);
-					SetConVarInt(FindConVar("holdout_max_hunters"), 0);
-					SetConVarInt(FindConVar("holdout_max_specials"), MaxPlayerZombies);
-				}
-				ResetConVar(FindConVar("boomer_vomit_delay"), true, true);
-				ResetConVar(FindConVar("director_no_specials"), true, true);
-				ResetConVar(FindConVar("smoker_tongue_delay"), true, true);
-				ResetConVar(FindConVar("hunter_leap_away_give_up_range"), true, true);
-				ResetConVar(FindConVar("boomer_exposed_time_tolerance"), true, true);
-				ResetConVar(FindConVar("z_hunter_lunge_distance"), true, true);
-				ResetConVar(FindConVar("hunter_pounce_ready_range"), true, true);
-				ResetConVar(FindConVar("hunter_pounce_loft_rate"), true, true);
-				ResetConVar(FindConVar("z_hunter_lunge_stagger_time"), true, true);
-				SetConVarInt(FindConVar("vs_max_team_switches"), 9999);
+				SetConVarInt(FindConVar("z_gas_limit"), 0);
+				SetConVarInt(FindConVar("z_exploding_limit"), 0);
+				SetConVarInt(FindConVar("z_hunter_limit"), 0);
 			}
 		}
-		
-		//Some cvar tweaks
-		SetConVarInt(FindConVar("z_attack_flow_range"), 50000);
-		SetConVarInt(FindConVar("director_spectate_specials"), 1);
-		SetConVarInt(FindConVar("z_spawn_safety_range"), 0);
-		SetConVarInt(FindConVar("z_spawn_flow_limit"), 50000);
-		SetConVarInt(FindConVar("z_versus_boomer_limit"), BoomerLimit);
-		SetConVarInt(FindConVar("z_versus_smoker_limit"), SmokerLimit);
-		if (L4DVersion)
+		case 2: // Versus, Better Versus Infected AI, reset if not versus, MI 5
 		{
-			SetConVarInt(FindConVar("z_versus_hunter_limit"), HunterLimit);
-			SetConVarInt(FindConVar("z_versus_spitter_limit"), SpitterLimit);
-			SetConVarInt(FindConVar("z_versus_jockey_limit"), JockeyLimit);
-			SetConVarInt(FindConVar("z_versus_charger_limit"), ChargerLimit);
+			// If the game is L4D 2...
+			if (L4DVersion)
+			{
+				SetConVarInt(FindConVar("z_smoker_limit"), 0);
+				SetConVarInt(FindConVar("z_boomer_limit"), 0);
+				SetConVarInt(FindConVar("z_hunter_limit"), 0);
+				SetConVarInt(FindConVar("z_spitter_limit"), 0);
+				SetConVarInt(FindConVar("z_jockey_limit"), 0);
+				SetConVarInt(FindConVar("z_charger_limit"), 0);
+			}
+			else
+			{
+				SetConVarInt(FindConVar("z_gas_limit"), 999);
+				SetConVarInt(FindConVar("z_exploding_limit"), 999);
+				SetConVarInt(FindConVar("z_hunter_limit"), 999);
+			}
+			// Enhance Special Infected AI
+			SetConVarFloat(FindConVar("smoker_tongue_delay"), 0.0);
+			SetConVarFloat(FindConVar("boomer_vomit_delay"), 0.0);
+			SetConVarFloat(FindConVar("boomer_exposed_time_tolerance"), 0.0);
+			SetConVarInt(FindConVar("hunter_leap_away_give_up_range"), 0);
+			SetConVarInt(FindConVar("z_hunter_lunge_distance"), 5000);
+			SetConVarInt(FindConVar("hunter_pounce_ready_range"), 1500);
+			SetConVarFloat(FindConVar("hunter_pounce_loft_rate"), 0.055);
+			SetConVarFloat(FindConVar("z_hunter_lunge_stagger_time"), 0.0);
 		}
-		#if DEBUG
-		LogMessage("Tweaking Settings");
-		#endif
+		case 3: // Survival, Turns off the ability for the director to spawn infected bots in survival, MI 5
+		{
+			// Reset Special Infected AI
+			ResetConVar(FindConVar("boomer_vomit_delay"), true, true);
+			ResetConVar(FindConVar("smoker_tongue_delay"), true, true);
+			ResetConVar(FindConVar("hunter_leap_away_give_up_range"), true, true);
+			ResetConVar(FindConVar("boomer_exposed_time_tolerance"), true, true);
+			ResetConVar(FindConVar("z_hunter_lunge_distance"), true, true);
+			ResetConVar(FindConVar("hunter_pounce_ready_range"), true, true);
+			ResetConVar(FindConVar("hunter_pounce_loft_rate"), true, true);
+			ResetConVar(FindConVar("z_hunter_lunge_stagger_time"), true, true);
+			if (L4DVersion)
+			{
+				SetConVarInt(FindConVar("survival_max_smokers"), 0);
+				SetConVarInt(FindConVar("survival_max_boomers"), 0);
+				SetConVarInt(FindConVar("survival_max_hunters"), 0);
+				SetConVarInt(FindConVar("survival_max_spitters"), 0);
+				SetConVarInt(FindConVar("survival_max_jockeys"), 0);
+				SetConVarInt(FindConVar("survival_max_chargers"), 0);
+				SetConVarInt(FindConVar("survival_max_specials"), MaxPlayerZombies);
+				SetConVarInt(FindConVar("z_smoker_limit"), 0);
+				SetConVarInt(FindConVar("z_boomer_limit"), 0);
+				SetConVarInt(FindConVar("z_hunter_limit"), 0);
+				SetConVarInt(FindConVar("z_spitter_limit"), 0);
+				SetConVarInt(FindConVar("z_jockey_limit"), 0);
+				SetConVarInt(FindConVar("z_charger_limit"), 0);
+			}
+			else
+			{
+				SetConVarInt(FindConVar("holdout_max_smokers"), 0);
+				SetConVarInt(FindConVar("holdout_max_boomers"), 0);
+				SetConVarInt(FindConVar("holdout_max_hunters"), 0);
+				SetConVarInt(FindConVar("holdout_max_specials"), MaxPlayerZombies);
+				SetConVarInt(FindConVar("z_gas_limit"), 0);
+				SetConVarInt(FindConVar("z_exploding_limit"), 0);
+				SetConVarInt(FindConVar("z_hunter_limit"), 0);
+			}
+		}
 	}
+	
+	//Some cvar tweaks
+	SetConVarInt(FindConVar("z_attack_flow_range"), 50000);
+	SetConVarInt(FindConVar("director_spectate_specials"), 1);
+	SetConVarInt(FindConVar("z_spawn_safety_range"), 0);
+	SetConVarInt(FindConVar("z_spawn_flow_limit"), 50000);
+	//SetConVarInt(FindConVar("z_versus_boomer_limit"), BoomerLimit);
+	//SetConVarInt(FindConVar("z_versus_smoker_limit"), SmokerLimit);
+	if (L4DVersion)
+	{
+		//SetConVarInt(FindConVar("z_versus_hunter_limit"), HunterLimit);
+		//SetConVarInt(FindConVar("z_versus_spitter_limit"), SpitterLimit);
+		//SetConVarInt(FindConVar("z_versus_jockey_limit"), JockeyLimit);
+		//SetConVarInt(FindConVar("z_versus_charger_limit"), ChargerLimit);
+		SetConVarInt(FindConVar("versus_special_respawn_interval"), 99999999);
+	}
+	#if DEBUG
+	LogMessage("Tweaking Settings");
+	#endif
+	
 }
+/*
+ResetCvars()
+{
+#if DEBUG
+LogMessage("Plugin Cvars Reset");
+#endif
+if (GameMode == 1)
+{
+ResetConVar(FindConVar("director_no_specials"), true, true);
+ResetConVar(FindConVar("boomer_vomit_delay"), true, true);
+ResetConVar(FindConVar("smoker_tongue_delay"), true, true);
+ResetConVar(FindConVar("hunter_leap_away_give_up_range"), true, true);
+ResetConVar(FindConVar("boomer_exposed_time_tolerance"), true, true);
+ResetConVar(FindConVar("z_hunter_lunge_distance"), true, true);
+ResetConVar(FindConVar("hunter_pounce_ready_range"), true, true);
+ResetConVar(FindConVar("hunter_pounce_loft_rate"), true, true);
+ResetConVar(FindConVar("z_hunter_lunge_stagger_time"), true, true);
+if (L4DVersion)
+{
+ResetConVar(FindConVar("survival_max_smokers"), true, true);
+ResetConVar(FindConVar("survival_max_boomers"), true, true);
+ResetConVar(FindConVar("survival_max_hunters"), true, true);
+ResetConVar(FindConVar("survival_max_spitters"), true, true);
+ResetConVar(FindConVar("survival_max_jockeys"), true, true);
+ResetConVar(FindConVar("survival_max_chargers"), true, true);
+ResetConVar(FindConVar("survival_max_specials"), true, true);
+}
+else
+{
+ResetConVar(FindConVar("holdout_max_smokers"), true, true);
+ResetConVar(FindConVar("holdout_max_boomers"), true, true);
+ResetConVar(FindConVar("holdout_max_hunters"), true, true);
+ResetConVar(FindConVar("holdout_max_specials"), true, true);
+}
+}
+else if (GameMode == 2)
+{
+if (L4DVersion)
+{
+ResetConVar(FindConVar("survival_max_smokers"), true, true);
+ResetConVar(FindConVar("survival_max_boomers"), true, true);
+ResetConVar(FindConVar("survival_max_hunters"), true, true);
+ResetConVar(FindConVar("survival_max_spitters"), true, true);
+ResetConVar(FindConVar("survival_max_jockeys"), true, true);
+ResetConVar(FindConVar("survival_max_chargers"), true, true);
+ResetConVar(FindConVar("survival_max_specials"), true, true);
+}
+else
+{
+ResetConVar(FindConVar("holdout_max_smokers"), true, true);
+ResetConVar(FindConVar("holdout_max_boomers"), true, true);
+ResetConVar(FindConVar("holdout_max_hunters"), true, true);
+ResetConVar(FindConVar("holdout_max_specials"), true, true);
+}
+}
+else if (GameMode == 3)
+{
+if (L4DVersion)
+{
+ResetConVar(FindConVar("z_smoker_limit"), true, true);
+ResetConVar(FindConVar("z_boomer_limit"), true, true);
+ResetConVar(FindConVar("z_hunter_limit"), true, true);
+ResetConVar(FindConVar("z_spitter_limit"), true, true);
+ResetConVar(FindConVar("z_jockey_limit"), true, true);
+ResetConVar(FindConVar("z_charger_limit"), true, true);
+}
+else
+{
+ResetConVar(FindConVar("z_gas_limit"), true, true);
+ResetConVar(FindConVar("z_exploding_limit"), true, true);
+ResetConVar(FindConVar("z_hunter_limit"), true, true);
+}
+ResetConVar(FindConVar("boomer_vomit_delay"), true, true);
+ResetConVar(FindConVar("director_no_specials"), true, true);
+ResetConVar(FindConVar("smoker_tongue_delay"), true, true);
+ResetConVar(FindConVar("hunter_leap_away_give_up_range"), true, true);
+ResetConVar(FindConVar("boomer_exposed_time_tolerance"), true, true);
+ResetConVar(FindConVar("z_hunter_lunge_distance"), true, true);
+ResetConVar(FindConVar("hunter_pounce_ready_range"), true, true);
+ResetConVar(FindConVar("hunter_pounce_loft_rate"), true, true);
+ResetConVar(FindConVar("z_hunter_lunge_stagger_time"), true, true);
+}
+}
+
+
+ResetCvarsDirector()
+{
+#if DEBUG
+LogMessage("Director Cvars Reset");
+#endif
+if (GameMode != 2)
+{
+if (L4DVersion)
+{
+ResetConVar(FindConVar("z_smoker_limit"), true, true);
+ResetConVar(FindConVar("z_boomer_limit"), true, true);
+ResetConVar(FindConVar("z_hunter_limit"), true, true);
+ResetConVar(FindConVar("z_spitter_limit"), true, true);
+ResetConVar(FindConVar("z_jockey_limit"), true, true);
+ResetConVar(FindConVar("z_charger_limit"), true, true);
+ResetConVar(FindConVar("survival_max_smokers"), true, true);
+ResetConVar(FindConVar("survival_max_boomers"), true, true);
+ResetConVar(FindConVar("survival_max_hunters"), true, true);
+ResetConVar(FindConVar("survival_max_spitters"), true, true);
+ResetConVar(FindConVar("survival_max_jockeys"), true, true);
+ResetConVar(FindConVar("survival_max_chargers"), true, true);
+ResetConVar(FindConVar("survival_max_specials"), true, true);
+}
+else
+{
+ResetConVar(FindConVar("z_hunter_limit"), true, true);
+ResetConVar(FindConVar("z_exploding_limit"), true, true);
+ResetConVar(FindConVar("z_gas_limit"), true, true);
+ResetConVar(FindConVar("holdout_max_smokers"), true, true);
+ResetConVar(FindConVar("holdout_max_boomers"), true, true);
+ResetConVar(FindConVar("holdout_max_hunters"), true, true);
+ResetConVar(FindConVar("holdout_max_specials"), true, true);
+}
+}
+else
+{
+if (L4DVersion)
+{
+//ResetConVar(FindConVar("z_smoker_limit"), true, true);
+SetConVarInt(FindConVar("z_smoker_limit"), 2);
+ResetConVar(FindConVar("z_boomer_limit"), true, true);
+//ResetConVar(FindConVar("z_hunter_limit"), true, true);
+SetConVarInt(FindConVar("z_hunter_limit"), 2);
+ResetConVar(FindConVar("z_spitter_limit"), true, true);
+ResetConVar(FindConVar("z_jockey_limit"), true, true);
+ResetConVar(FindConVar("z_charger_limit"), true, true);
+}
+else
+{
+ResetConVar(FindConVar("z_hunter_limit"), true, true);
+ResetConVar(FindConVar("z_exploding_limit"), true, true);
+ResetConVar(FindConVar("z_gas_limit"), true, true);
+}
+}
+}
+*/
 
 public Action:evtRoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 {
+	// If round has started ...
+	if (b_HasRoundStarted)
+		return;
+	
 	//Check the GameMode
 	GameModeCheck();
 	
-	if (GameMode != 0)
+	if (GameMode == 0)
+		return;
+	
+	#if DEBUG
+	PrintToChatAll("Round Started");
+	LogMessage("Round Started");
+	#endif
+	
+	b_LeftSaveRoom = false;
+	b_HasRoundEnded = false;
+	b_HasRoundStarted = true;
+	
+	// Added a delay to setting MaxSpecials so that it would set correctly when the server first starts up
+	CreateTimer(0.4, MaxSpecialsSet);
+	
+	//reset some variables
+	InfectedBotQueue = 0;
+	TanksPlaying = 0;
+	BotReady = 0;
+	TankFrustStop = false;
+	FinaleStarted = false;
+	SpecialHalt = false;
+	InitialSpawn = false;
+	TempBotSpawned = false;
+	
+	// Zero all respawn times ready for the next round and any other arrays
+	for (new i = 1; i <= MaxClients; i++)
 	{
-		// Added a delay to setting MaxSpecials so that it would set correctly when the server first starts up
-		CreateTimer(0.4, MaxSpecialsSet);
-		
-		//reset some variables
-		InfectedBotQueue = 0;
-		TanksPlaying = 0;
-		BotReady = 0;
-		TankFrustStop = false;
-		FinaleStarted = false;
-		SpecialHalt = false;
-		InitialSpawn = false;
-		TempBotSpawned = false;
-		
-		// execute the director spawning settings, won't go through if director spawning is off
-		
-		// If round haven't started ...
-		if (!b_HasRoundStarted)
-		{
-			// Kill all infected ghosts at start if it isn't versus
-			if (GameMode != 2)
-			{
-				KillInfected();
-			}
-			// Zero all respawn times ready for the next round and any other arrays
-			for (new i = 1; i <= MaxClients; i++)
-			{
-				respawnDelay[i] = 0;
-				PlayerLifeState[i] = false;
-				isTankOnFire[i] = false;
-				burningTankTimeLeft[i] = 0;
-				TankWasSeen[i] = false;
-				AlreadyGhosted[i] = false;
-			}
-			// Show the HUD to the connected clients.
-			roundInProgress = true;
-			if (infHUDTimer == INVALID_HANDLE)
-			{
-				infHUDTimer = CreateTimer(5.0, showInfHUD, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
-			}
-			// and we reset some variables ...
-			b_LeftSaveRoom = false;
-			b_HasRoundEnded = false;
-			b_HasRoundStarted = true;
-			TankHealthCheck();
-			// Start up TweakSettings or Director Stuff
-			if (!DirectorSpawn)
-				TweakSettings();
-			else
-			DirectorStuff();
-			
-			if (GameMode != 3)
-			{
-				CreateTimer(1.0, PlayerLeftStart);
-			}
-		}
+		respawnDelay[i] = 0;
+		PlayerLifeState[i] = false;
+		isTankOnFire[i] = false;
+		burningTankTimeLeft[i] = 0;
+		TankWasSeen[i] = false;
+		AlreadyGhosted[i] = false;
+	}
+	// Show the HUD to the connected clients.
+	roundInProgress = true;
+	if (infHUDTimer == INVALID_HANDLE)
+	{
+		infHUDTimer = CreateTimer(5.0, showInfHUD, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+	}
+	TankHealthCheck();
+	// Start up TweakSettings or Director Stuff
+	if (!DirectorSpawn)
+		TweakSettings();
+	else
+	DirectorStuff();
+	
+	// Kill all infected ghosts at start if it isn't versus
+	if (GameMode != 2)
+	{
+		CreateTimer(0.1, KillInfected);
+	}
+	
+	if (GameMode != 3)
+	{
+		#if DEBUG
+		LogMessage("Starting the Coop/Versus PlayerLeft Start Timer");
+		#endif
+		CreateTimer(1.0, PlayerLeftStart, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
 
@@ -950,7 +1142,7 @@ GameModeCheck()
 	else
 	{
 		GameMode = 0;
-		CreateTimer(30.0, IncorrectGameMode);
+		CreateTimer(30.0, IncorrectGameMode, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
 	
 	TankHealthCheck();
@@ -1005,7 +1197,7 @@ public Action:IncorrectGameMode(Handle:Timer)
 	PrintToChatAll("\x04[SM] \x03INFECTED BOTS: \x03mp_gamemode \x04has been set \x03INCORRECTLY! PLUGIN WILL NOT START!");
 }
 
-KillInfected()
+public Action:KillInfected(Handle:Timer)
 {
 	for (new i=1; i<=MaxClients; i++)
 	{
@@ -1036,56 +1228,30 @@ DirectorStuff()
 	SpecialHalt = false;
 	SetConVarInt(FindConVar("z_spawn_safety_range"), 0);
 	SetConVarInt(FindConVar("director_spectate_specials"), 1);
-	if (GameMode != 2)
+	
+	if (L4DVersion)
 	{
-		SetConVarInt(FindConVar("vs_max_team_switches"), 9999);
-		if (L4DVersion)
-		{
-			ResetConVar(FindConVar("z_smoker_limit"), true, true);
-			ResetConVar(FindConVar("z_boomer_limit"), true, true);
-			ResetConVar(FindConVar("z_hunter_limit"), true, true);
-			ResetConVar(FindConVar("z_spitter_limit"), true, true);
-			ResetConVar(FindConVar("z_jockey_limit"), true, true);
-			ResetConVar(FindConVar("z_charger_limit"), true, true);
-			ResetConVar(FindConVar("survival_max_smokers"), true, true);
-			ResetConVar(FindConVar("survival_max_boomers"), true, true);
-			ResetConVar(FindConVar("survival_max_hunters"), true, true);
-			ResetConVar(FindConVar("survival_max_spitters"), true, true);
-			ResetConVar(FindConVar("survival_max_jockeys"), true, true);
-			ResetConVar(FindConVar("survival_max_chargers"), true, true);
-			ResetConVar(FindConVar("survival_max_specials"), true, true);
-		}
-		else
-		{
-			ResetConVar(FindConVar("z_hunter_limit"), true, true);
-			ResetConVar(FindConVar("z_exploding_limit"), true, true);
-			ResetConVar(FindConVar("z_gas_limit"), true, true);
-			ResetConVar(FindConVar("holdout_max_smokers"), true, true);
-			ResetConVar(FindConVar("holdout_max_boomers"), true, true);
-			ResetConVar(FindConVar("holdout_max_hunters"), true, true);
-			ResetConVar(FindConVar("holdout_max_specials"), true, true);
-		}
+		SetConVarInt(FindConVar("z_smoker_limit"), SmokerLimit);
+		SetConVarInt(FindConVar("z_boomer_limit"), BoomerLimit);
+		SetConVarInt(FindConVar("z_hunter_limit"), HunterLimit);
+		SetConVarInt(FindConVar("z_spitter_limit"), SpitterLimit);
+		SetConVarInt(FindConVar("z_jockey_limit"), JockeyLimit);
+		SetConVarInt(FindConVar("z_charger_limit"), ChargerLimit);
+		SetConVarInt(FindConVar("survival_max_hunters"), HunterLimit);
+		SetConVarInt(FindConVar("survival_max_smokers"), SmokerLimit);
+		SetConVarInt(FindConVar("survival_max_boomers"), BoomerLimit);
+		SetConVarInt(FindConVar("survival_max_spitters"), SpitterLimit);
+		SetConVarInt(FindConVar("survival_max_jockeys"), JockeyLimit);
+		SetConVarInt(FindConVar("survival_max_chargers"), ChargerLimit);
 	}
-	else if (GameMode == 2)
+	else
 	{
-		if (L4DVersion)
-		{
-			//ResetConVar(FindConVar("z_smoker_limit"), true, true);
-			SetConVarInt(FindConVar("z_smoker_limit"), 2);
-			ResetConVar(FindConVar("z_boomer_limit"), true, true);
-			//ResetConVar(FindConVar("z_hunter_limit"), true, true);
-			SetConVarInt(FindConVar("z_hunter_limit"), 2);
-			ResetConVar(FindConVar("z_spitter_limit"), true, true);
-			ResetConVar(FindConVar("z_jockey_limit"), true, true);
-			ResetConVar(FindConVar("z_charger_limit"), true, true);
-		}
-		else
-		{
-			ResetConVar(FindConVar("z_hunter_limit"), true, true);
-			ResetConVar(FindConVar("z_exploding_limit"), true, true);
-			ResetConVar(FindConVar("z_gas_limit"), true, true);
-		}
-		ResetConVar(FindConVar("vs_max_team_switches"), true, true);
+		SetConVarInt(FindConVar("z_gas_limit"), SmokerLimit);
+		SetConVarInt(FindConVar("z_exploding_limit"), BoomerLimit);
+		SetConVarInt(FindConVar("z_hunter_limit"), HunterLimit);
+		SetConVarInt(FindConVar("holdout_max_hunters"), HunterLimit);
+		SetConVarInt(FindConVar("holdout_max_smokers"), SmokerLimit);
+		SetConVarInt(FindConVar("holdout_max_boomers"), BoomerLimit);
 	}
 	
 	#if DEBUG
@@ -1164,14 +1330,18 @@ public Action:PlayerLeftStart(Handle:Timer)
 		// We don't care who left, just that at least one did
 		if (!b_LeftSaveRoom)
 		{
+			#if DEBUG
+			LogMessage("A player left the start area, spawning bots");
+			PrintToChatAll("A player left the start area, spawning bots");
+			#endif
 			b_LeftSaveRoom = true;
 			
 			// We reset some settings
 			canSpawnBoomer = true;
 			canSpawnSmoker = true;
+			canSpawnHunter = true;
 			if (L4DVersion)
 			{
-				canSpawnHunter = true;
 				canSpawnSpitter = true;
 				canSpawnJockey = true;
 				canSpawnCharger = true;
@@ -1179,16 +1349,19 @@ public Action:PlayerLeftStart(Handle:Timer)
 			InitialSpawn = true;
 			
 			// We check if we need to spawn bots
-			CheckIfBotsNeeded(true);
+			if (GetConVarBool(h_InstantSpawn))
+				CheckIfBotsNeeded(true);
+			else
+			CheckIfBotsNeeded(false);
 			#if DEBUG
 			LogMessage("Checking to see if we need bots");
 			#endif
-			CreateTimer(3.0, InitialSpawnReset);
+			CreateTimer(3.0, InitialSpawnReset, _, TIMER_FLAG_NO_MAPCHANGE);
 		}
 	}
 	else
 	{
-		CreateTimer(1.0, PlayerLeftStart);
+		CreateTimer(1.0, PlayerLeftStart, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
 	return Plugin_Continue;
 }
@@ -1204,14 +1377,18 @@ public Action:evtSurvivalStart(Handle:event, const String:name[], bool:dontBroad
 		// We don't care who left, just that at least one did
 		if (!b_LeftSaveRoom)
 		{
+			#if DEBUG
+			LogMessage("A player triggered the survival event, spawning bots");
+			PrintToChatAll("A player triggered the survival event, spawning bots");
+			#endif
 			b_LeftSaveRoom = true;
 			
 			// We reset some settings
 			canSpawnBoomer = true;
 			canSpawnSmoker = true;
+			canSpawnHunter = true;
 			if (L4DVersion)
 			{
-				canSpawnHunter = true;
 				canSpawnSpitter = true;
 				canSpawnJockey = true;
 				canSpawnCharger = true;
@@ -1219,11 +1396,14 @@ public Action:evtSurvivalStart(Handle:event, const String:name[], bool:dontBroad
 			InitialSpawn = true;
 			
 			// We check if we need to spawn bots
-			CheckIfBotsNeeded(true);
+			if (GetConVarBool(h_InstantSpawn))
+				CheckIfBotsNeeded(true);
+			else
+			CheckIfBotsNeeded(false);
 			#if DEBUG
 			LogMessage("Checking to see if we need bots");
 			#endif
-			CreateTimer(3.0, InitialSpawnReset);
+			CreateTimer(3.0, InitialSpawnReset, _, TIMER_FLAG_NO_MAPCHANGE);
 		}
 	}
 	return Plugin_Continue;
@@ -1278,7 +1458,7 @@ public Action:InfectedPlayerJoiner(Handle:Timer, any:client)
 		}
 		else
 		{
-			FakeClientCommand(client, "jointeam 2");
+			SwitchToSurvivors(client);
 			PrintHintText(client, "IBP: Placing you on the Survivor team");
 		}
 	}
@@ -1392,14 +1572,14 @@ public OnClientPutInServer(client)
 	
 	if ((client) && (GameMode != 2) && (GetConVarBool(h_JoinableTeams)))
 	{
-		CreateTimer(30.0, AnnounceJoinInfected, client);
-		CreateTimer(15.0, InfectedPlayerJoiner, client);
+		CreateTimer(30.0, AnnounceJoinInfected, client, TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(15.0, InfectedPlayerJoiner, client, TIMER_FLAG_NO_MAPCHANGE);
 	}
 	
 	// This sets sb_all_bot_team to 1 when a player comes into the server, and stop the bots from moving so that they don't run out of the safe room
 	if (!b_LeftSaveRoom && GetConVarBool(h_JoinableTeams))
 	{
-		//SetConVarInt(FindConVar("sb_all_bot_team"), 1);
+		SetConVarInt(FindConVar("sb_all_bot_team"), 1);
 		SetConVarInt(FindConVar("sb_stop"), 1);
 		CreateTimer(0.1, CheckForPlayers);
 	}
@@ -1412,9 +1592,11 @@ public OnClientPutInServer(client)
 public Action:CheckForPlayers(Handle:timer)
 {
 	if (RealPlayersOnSurvivors() || RealPlayersOnInfected())
+	{
 		SetConVarInt(FindConVar("sb_stop"), 0);
+	}
 	else
-	CreateTimer(1.0, CheckForPlayers);
+	CreateTimer(1.0, CheckForPlayers, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public Action:CheckGameMode(client, args)
@@ -1440,7 +1622,28 @@ public Action:CheckQueue(client, args)
 
 public Action:JoinInfected(client, args)
 {
+	decl String:gamemode[24];
+	GetConVarString(h_GameMode, gamemode, sizeof(gamemode));
 	if (client && (GameMode == 1 || GameMode == 3) && GetConVarBool(h_JoinableTeams))
+	{
+		if (GetConVarBool(h_AdminJoinInfected))
+		{
+			if (GetUserFlagBits(client) > 0)
+				ChangeClientTeam(client, TEAM_INFECTED);
+			else
+			{
+				PrintHintText(client, "Only admins can join the infected.");
+			}
+		}
+		else
+		{
+			if (HumansOnInfected() < GetConVarInt(h_HumanCoopLimit))
+				ChangeClientTeam(client, TEAM_INFECTED);
+			else
+			PrintHintText(client, "The Infected Team is full.");
+		}
+	}
+	else if (client && StrEqual(gamemode, "teamversus", false))
 	{
 		ChangeClientTeam(client, TEAM_INFECTED);
 	}
@@ -1448,9 +1651,11 @@ public Action:JoinInfected(client, args)
 
 public Action:JoinSurvivors(client, args)
 {
-	if (client && (GameMode == 1 || GameMode == 3))
+	decl String:gamemode[24];
+	GetConVarString(h_GameMode, gamemode, sizeof(gamemode));
+	if (client && ((GameMode == 1 || GameMode == 3) || StrEqual(gamemode, "teamversus", false)))
 	{
-		FakeClientCommand(client, "jointeam 2");
+		SwitchToSurvivors(client);
 	}
 }
 
@@ -1485,428 +1690,429 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 	// If client is valid
 	if (!client || !IsClientInGame(client)) return Plugin_Continue;
 	
-	// If player spawned on infected's team ...
-	if (GetClientTeam(client) == TEAM_INFECTED)
+	if (GetClientTeam(client) != TEAM_INFECTED)
+		return Plugin_Continue;
+	
+	if (DirectorSpawn && GameMode != 2)
 	{
-		if (DirectorSpawn && GameMode != 2)
+		if (IsPlayerSmoker(client))
 		{
-			if (IsPlayerSmoker(client))
+			if (IsFakeClient(client))
 			{
-				if (IsFakeClient(client))
+				if (!SpecialHalt)
 				{
-					if (!SpecialHalt)
-					{
-						CreateTimer(0.1, kickbot, client);
-						
-						#if DEBUG
-						LogMessage("Smoker kicked");
-						#endif
-						
-						new BotNeeded = 1;
-						
-						CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
-						
-						
-						#if DEBUG
-						LogMessage("Spawned Smoker");
-						#endif
-					}
-				}
-			}
-			else if (IsPlayerBoomer(client))
-			{
-				if (IsFakeClient(client))
-				{
-					if (!SpecialHalt)
-					{
-						CreateTimer(0.1, kickbot, client);
-						
-						#if DEBUG
-						LogMessage("Boomer kicked");
-						#endif
-						
-						new BotNeeded = 2;
-						CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
-						
-						
-						#if DEBUG
-						LogMessage("Spawned Booomer");
-						#endif
-					}
-				}
-			}
-			else if (IsPlayerHunter(client))
-			{
-				if (IsFakeClient(client))
-				{
-					if (!SpecialHalt)
-					{
-						CreateTimer(0.1, kickbot, client);
-						
-						#if DEBUG
-						LogMessage("Hunter Kicked");
-						#endif
-						
-						new BotNeeded = 3;
-						
-						CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
-						
-						
-						#if DEBUG
-						LogMessage("Hunter Spawned");
-						#endif
-					}
-				}
-			}
-			else if (IsPlayerSpitter(client) && L4DVersion)
-			{
-				if (IsFakeClient(client))
-				{
-					if (!SpecialHalt)
-					{
-						CreateTimer(0.1, kickbot, client);
-						
-						#if DEBUG
-						LogMessage("Spitter Kicked");
-						#endif
-						
-						new BotNeeded = 4;
-						
-						CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
-						
-						
-						#if DEBUG
-						LogMessage("Spitter Spawned");
-						#endif
-					}
-				}
-			}
-			else if (IsPlayerJockey(client) && L4DVersion)
-			{
-				if (IsFakeClient(client))
-				{
-					if (!SpecialHalt)
-					{
-						CreateTimer(0.1, kickbot, client);
-						
-						#if DEBUG
-						LogMessage("Jockey Kicked");
-						#endif
-						
-						new BotNeeded = 5;
-						
-						CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
-						
-						
-						#if DEBUG
-						LogMessage("Jockey Spawned");
-						#endif
-					}
-				}
-			}
-			else if (IsPlayerCharger(client) && L4DVersion)
-			{
-				if (IsFakeClient(client))
-				{
-					if (!SpecialHalt)
-					{
-						CreateTimer(0.1, kickbot, client);
-						
-						#if DEBUG
-						LogMessage("Charger Kicked");
-						#endif
-						
-						new BotNeeded = 6;
-						
-						CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
-						
-						
-						#if DEBUG
-						LogMessage("Charger Spawned");
-						#endif
-					}
-				}
-			}
-		}
-		
-		if (IsPlayerTank(client))
-		{
-			if (b_LeftSaveRoom)
-			{
-				#if DEBUG
-				LogMessage("Tank Event Triggered");
-				#endif
-				if (!TankFrustStop)
-				{
-					TanksPlaying = 0;
-					MaxPlayerTank = 0;
-					for (new i=1;i<=MaxClients;i++)
-					{
-						// We check if player is in game
-						if (!IsClientInGame(i)) continue;
-						
-						// Check if client is infected ...
-						if (GetClientTeam(i)==TEAM_INFECTED)
-						{
-							// If player is a tank
-							if (IsPlayerTank(i) && GetClientHealth(i) > 1)
-							{
-								TanksPlaying++;
-								MaxPlayerTank++;
-							}
-						}
-					}
+					CreateTimer(0.1, kickbot, client);
 					
-					MaxPlayerTank = MaxPlayerTank + MaxPlayerZombies;
-					SetConVarInt(FindConVar("z_max_player_zombies"), MaxPlayerTank);
 					#if DEBUG
-					LogMessage("Incremented Max Zombies from Tank Spawn EVENT");
+					LogMessage("Smoker kicked");
 					#endif
 					
-					if (GameMode == 3)
-					{
-						if (IsFakeClient(client) && RealPlayersOnInfected() && GetConVarBool(h_CoopPlayableTank))
-						{
-							CreateTimer(0.5, TankSpawner, client);
-							CreateTimer(0.6, kickbot, client);
-						}
-					}
-					else
-					{
-						MaxPlayerTank = MaxPlayerZombies;
-						SetConVarInt(FindConVar("z_max_player_zombies"), MaxPlayerZombies);
-					}
+					new BotNeeded = 1;
+					
+					CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
+					
+					
+					#if DEBUG
+					LogMessage("Spawned Smoker");
+					#endif
 				}
 			}
 		}
-		else if (IsFakeClient(client) && GetClientTeam(client) == TEAM_INFECTED)
+		else if (IsPlayerBoomer(client))
 		{
-			FightOrDieTimer[client] = CreateTimer(GetConVarFloat(h_idletime_b4slay), DisposeOfCowards, client, TIMER_FLAG_NO_MAPCHANGE);
+			if (IsFakeClient(client))
+			{
+				if (!SpecialHalt)
+				{
+					CreateTimer(0.1, kickbot, client);
+					
+					#if DEBUG
+					LogMessage("Boomer kicked");
+					#endif
+					
+					new BotNeeded = 2;
+					CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
+					
+					
+					#if DEBUG
+					LogMessage("Spawned Booomer");
+					#endif
+				}
+			}
 		}
-		
-		// Turn infected player into a ghost if Free Spawning is on
-		
-		if (L4DVersion && !AlreadyGhosted[client])
+		else if (IsPlayerHunter(client))
 		{
-			AlreadyGhosted[client] = true;
-			InfectedForceGhost(client);
+			if (IsFakeClient(client))
+			{
+				if (!SpecialHalt)
+				{
+					CreateTimer(0.1, kickbot, client);
+					
+					#if DEBUG
+					LogMessage("Hunter Kicked");
+					#endif
+					
+					new BotNeeded = 3;
+					
+					CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
+					
+					
+					#if DEBUG
+					LogMessage("Hunter Spawned");
+					#endif
+				}
+			}
 		}
-		else if (!L4DVersion && GameMode != 2 && !IsFakeClient(client) && !IsPlayerTank(client) && (GetConVarBool(h_FreeSpawn) && !AlreadyGhosted[client] || FreeSpawnReset[client]))
+		else if (IsPlayerSpitter(client) && L4DVersion)
 		{
-			AlreadyGhosted[client] = true;
-			SetEntProp(client,Prop_Send,"m_isCulling",1);
-			ClientCommand(client, "+use");
-			CreateTimer(0.1, FreeSpawnEnsure, client);
-			if (FreeSpawnReset[client] == true)
-				FreeSpawnReset[client] = false;
+			if (IsFakeClient(client))
+			{
+				if (!SpecialHalt)
+				{
+					CreateTimer(0.1, kickbot, client);
+					
+					#if DEBUG
+					LogMessage("Spitter Kicked");
+					#endif
+					
+					new BotNeeded = 4;
+					
+					CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
+					
+					
+					#if DEBUG
+					LogMessage("Spitter Spawned");
+					#endif
+				}
+			}
 		}
-		
-		// Turn on Flashlight for Infected player
-		TurnFlashlightOn(client);
-		
-		// This fixes the music glitch thats been bothering me and many players for a long time. The music keeps playing over and over when it shouldn't. Doesn't execute
-		// on versus.
-		if (!L4DVersion && GameMode != 2 && !IsFakeClient(client))
+		else if (IsPlayerJockey(client) && L4DVersion)
 		{
-			ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Hospital");
-			ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Airport");
-			ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Farm");
-			ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Small_Town");
-			ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Garage");
-			ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Hospital");
-			ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Airport");
-			ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Small_Town");
-			ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Farm");
-			ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Garage");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A2");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A3");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Tank");
-			ClientCommand(client, "music_dynamic_stop_playing Event.TankMidpoint");
-			ClientCommand(client, "music_dynamic_stop_playing Event.TankBrothers");
-			ClientCommand(client, "music_dynamic_stop_playing Event.WitchAttack");
-			ClientCommand(client, "music_dynamic_stop_playing Event.WitchBurning");
-			ClientCommand(client, "music_dynamic_stop_playing Event.WitchRage");
-			ClientCommand(client, "music_dynamic_stop_playing Event.HunterPounce");
-			ClientCommand(client, "music_dynamic_stop_playing Event.SmokerChoke");
-			ClientCommand(client, "music_dynamic_stop_playing Event.SmokerDrag");
-			ClientCommand(client, "music_dynamic_stop_playing Event.VomitInTheFace");
-			ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangTwoHands");
-			ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangOneHand");
-			ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangFingers");
-			ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangAboutToFall");
-			ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangFalling");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Down");
-			ClientCommand(client, "music_dynamic_stop_playing Event.BleedingOut");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Down");
+			if (IsFakeClient(client))
+			{
+				if (!SpecialHalt)
+				{
+					CreateTimer(0.1, kickbot, client);
+					
+					#if DEBUG
+					LogMessage("Jockey Kicked");
+					#endif
+					
+					new BotNeeded = 5;
+					
+					CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
+					
+					
+					#if DEBUG
+					LogMessage("Jockey Spawned");
+					#endif
+				}
+			}
 		}
-		else if (L4DVersion && GameMode != 2 && !IsFakeClient(client))
+		else if (IsPlayerCharger(client) && L4DVersion)
 		{
-			// Music when Mission Starts
-			ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Mall");
-			ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Fairgrounds");
-			ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Plankcountry");
-			ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Milltown");
-			ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_BigEasy");
-			
-			// Checkpoints
-			ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Mall");
-			ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Fairgrounds");
-			ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Plankcountry");
-			ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Milltown");
-			ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_BigEasy");
-			
-			// Zombat
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_1");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_1");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_1");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_2");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_2");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_2");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_3");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_3");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_3");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_4");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_4");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_4");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_5");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_5");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_5");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_6");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_6");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_6");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_7");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_7");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_7");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_8");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_8");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_8");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_9");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_9");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_9");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_10");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_10");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_10");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_11");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_11");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_11");
-			
-			// Zombat specific maps
-			
-			// C1 Mall
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat2_Intro_Mall");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_Intro_Mall");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_A_Mall");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_B_Mall");
-			
-			// A2 Fairgrounds
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_Intro_Fairgrounds");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_Fairgrounds");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_Fairgrounds");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_Fairgrounds");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_Fairgrounds");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat2_Intro_Fairgrounds");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_Intro_Fairgrounds");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_A_Fairgrounds");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_B_Fairgrounds");
-			
-			// C3 Plankcountry
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_PlankCountry");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_PlankCountry");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_PlankCountry");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat2_Intro_Plankcountry");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_Intro_Plankcountry");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_A_Plankcountry");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_B_Plankcountry");
-			
-			// A2 Milltown
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat2_Intro_Milltown");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_Intro_Milltown");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_A_Milltown");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_B_Milltown");
-			
-			// C5 BigEasy
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat2_Intro_BigEasy");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_Intro_BigEasy");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_A_BigEasy");
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_B_BigEasy");
-			
-			// A2 Clown
-			ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_Intro_Clown");
-			
-			// Death
-			
-			// ledge hang
-			ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangTwoHands");
-			ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangOneHand");
-			ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangFingers");
-			ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangAboutToFall");
-			ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangFalling");
-			
-			// Down
-			// Survivor is down and being beaten by infected
-			
-			ClientCommand(client, "music_dynamic_stop_playing Event.Down");
-			ClientCommand(client, "music_dynamic_stop_playing Event.BleedingOut");
-			
-			// Survivor death
-			// This is for the death of an individual survivor to be played after the health meter has reached zero
-			
-			ClientCommand(client, "music_dynamic_stop_playing Event.SurvivorDeath");
-			ClientCommand(client, "music_dynamic_stop_playing Event.ScenarioLose");
-			
-			// Bosses
-			
-			// Tank
-			ClientCommand(client, "music_dynamic_stop_playing Event.Tank");
-			ClientCommand(client, "music_dynamic_stop_playing Event.TankMidpoint");
-			ClientCommand(client, "music_dynamic_stop_playing Event.TankBrothers");
-			ClientCommand(client, "music_dynamic_stop_playing C2M5.RidinTank1");
-			ClientCommand(client, "music_dynamic_stop_playing C2M5.RidinTank2");
-			ClientCommand(client, "music_dynamic_stop_playing C2M5.BadManTank1");
-			ClientCommand(client, "music_dynamic_stop_playing C2M5.BadManTank2");
-			
-			// Witch
-			ClientCommand(client, "music_dynamic_stop_playing Event.WitchAttack");
-			ClientCommand(client, "music_dynamic_stop_playing Event.WitchBurning");
-			ClientCommand(client, "music_dynamic_stop_playing Event.WitchRage");
-			ClientCommand(client, "music_dynamic_stop_playing Event.WitchDead");
-			
-			// mobbed
-			ClientCommand(client, "music_dynamic_stop_playing Event.Mobbed");
-			
-			// Hunter
-			ClientCommand(client, "music_dynamic_stop_playing Event.HunterPounce");
-			
-			// Smoker
-			ClientCommand(client, "music_dynamic_stop_playing Event.SmokerChoke");
-			ClientCommand(client, "music_dynamic_stop_playing Event.SmokerDrag");
-			
-			// Boomer
-			ClientCommand(client, "music_dynamic_stop_playing Event.VomitInTheFace");
-			
-			// Charger
-			ClientCommand(client, "music_dynamic_stop_playing Event.ChargerSlam");
-			
-			// Jockey
-			ClientCommand(client, "music_dynamic_stop_playing Event.JockeyRide");
-			
-			// Spitter
-			ClientCommand(client, "music_dynamic_stop_playing Event.SpitterSpit");
-			ClientCommand(client, "music_dynamic_stop_playing Event.SpitterBurn");
+			if (IsFakeClient(client))
+			{
+				if (!SpecialHalt)
+				{
+					CreateTimer(0.1, kickbot, client);
+					
+					#if DEBUG
+					LogMessage("Charger Kicked");
+					#endif
+					
+					new BotNeeded = 6;
+					
+					CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
+					
+					
+					#if DEBUG
+					LogMessage("Charger Spawned");
+					#endif
+				}
+			}
 		}
 	}
+	
+	if (IsPlayerTank(client))
+	{
+		if (b_LeftSaveRoom)
+		{
+			#if DEBUG
+			LogMessage("Tank Event Triggered");
+			#endif
+			if (!TankFrustStop)
+			{
+				TanksPlaying = 0;
+				MaxPlayerTank = 0;
+				for (new i=1;i<=MaxClients;i++)
+				{
+					// We check if player is in game
+					if (!IsClientInGame(i)) continue;
+					
+					// Check if client is infected ...
+					if (GetClientTeam(i)==TEAM_INFECTED)
+					{
+						// If player is a tank
+						if (IsPlayerTank(i) && GetClientHealth(i) > 1)
+						{
+							TanksPlaying++;
+							MaxPlayerTank++;
+						}
+					}
+				}
+				
+				MaxPlayerTank = MaxPlayerTank + MaxPlayerZombies;
+				SetConVarInt(FindConVar("z_max_player_zombies"), MaxPlayerTank);
+				#if DEBUG
+				LogMessage("Incremented Max Zombies from Tank Spawn EVENT");
+				#endif
+				
+				if (GameMode == 3)
+				{
+					if (IsFakeClient(client) && RealPlayersOnInfected() && GetConVarBool(h_CoopPlayableTank))
+					{
+						CreateTimer(0.5, TankSpawner, client);
+						CreateTimer(0.6, kickbot, client);
+					}
+				}
+				else
+				{
+					MaxPlayerTank = MaxPlayerZombies;
+					SetConVarInt(FindConVar("z_max_player_zombies"), MaxPlayerZombies);
+				}
+			}
+		}
+	}
+	else if (IsFakeClient(client))
+	{
+		FightOrDieTimer[client] = CreateTimer(GetConVarFloat(h_idletime_b4slay), DisposeOfCowards, client, TIMER_FLAG_NO_MAPCHANGE);
+	}
+	
+	// Turn infected player into a ghost if Free Spawning is on
+	
+	if (L4DVersion && !AlreadyGhosted[client])
+	{
+		AlreadyGhosted[client] = true;
+		InfectedForceGhost(client);
+	}
+	else if (!L4DVersion && GameMode != 2 && !IsFakeClient(client) && !IsPlayerTank(client) && (GetConVarBool(h_FreeSpawn) && !AlreadyGhosted[client] || FreeSpawnReset[client]))
+	{
+		AlreadyGhosted[client] = true;
+		SetEntProp(client,Prop_Send,"m_isCulling",1);
+		ClientCommand(client, "+use");
+		CreateTimer(0.1, FreeSpawnEnsure, client, TIMER_FLAG_NO_MAPCHANGE);
+		if (FreeSpawnReset[client] == true)
+			FreeSpawnReset[client] = false;
+	}
+	
+	// Turn on Flashlight for Infected player
+	TurnFlashlightOn(client);
+	
+	// This fixes the music glitch thats been bothering me and many players for a long time. The music keeps playing over and over when it shouldn't. Doesn't execute
+	// on versus.
+	if (!L4DVersion && GameMode != 2 && !IsFakeClient(client))
+	{
+		ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Hospital");
+		ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Airport");
+		ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Farm");
+		ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Small_Town");
+		ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Garage");
+		ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Hospital");
+		ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Airport");
+		ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Small_Town");
+		ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Farm");
+		ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Garage");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A2");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A3");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Tank");
+		ClientCommand(client, "music_dynamic_stop_playing Event.TankMidpoint");
+		ClientCommand(client, "music_dynamic_stop_playing Event.TankBrothers");
+		ClientCommand(client, "music_dynamic_stop_playing Event.WitchAttack");
+		ClientCommand(client, "music_dynamic_stop_playing Event.WitchBurning");
+		ClientCommand(client, "music_dynamic_stop_playing Event.WitchRage");
+		ClientCommand(client, "music_dynamic_stop_playing Event.HunterPounce");
+		ClientCommand(client, "music_dynamic_stop_playing Event.SmokerChoke");
+		ClientCommand(client, "music_dynamic_stop_playing Event.SmokerDrag");
+		ClientCommand(client, "music_dynamic_stop_playing Event.VomitInTheFace");
+		ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangTwoHands");
+		ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangOneHand");
+		ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangFingers");
+		ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangAboutToFall");
+		ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangFalling");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Down");
+		ClientCommand(client, "music_dynamic_stop_playing Event.BleedingOut");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Down");
+	}
+	else if (L4DVersion && GameMode != 2 && !IsFakeClient(client))
+	{
+		// Music when Mission Starts
+		ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Mall");
+		ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Fairgrounds");
+		ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Plankcountry");
+		ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_Milltown");
+		ClientCommand(client, "music_dynamic_stop_playing Event.MissionStart_BaseLoop_BigEasy");
+		
+		// Checkpoints
+		ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Mall");
+		ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Fairgrounds");
+		ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Plankcountry");
+		ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_Milltown");
+		ClientCommand(client, "music_dynamic_stop_playing Event.CheckPointBaseLoop_BigEasy");
+		
+		// Zombat
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_1");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_1");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_1");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_2");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_2");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_2");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_3");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_3");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_3");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_4");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_4");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_4");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_5");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_5");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_5");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_6");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_6");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_6");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_7");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_7");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_7");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_8");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_8");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_8");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_9");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_9");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_9");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_10");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_10");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_10");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_11");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_11");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_11");
+		
+		// Zombat specific maps
+		
+		// C1 Mall
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat2_Intro_Mall");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_Intro_Mall");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_A_Mall");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_B_Mall");
+		
+		// A2 Fairgrounds
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_Intro_Fairgrounds");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_Fairgrounds");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_Fairgrounds");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_Fairgrounds");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_Fairgrounds");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat2_Intro_Fairgrounds");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_Intro_Fairgrounds");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_A_Fairgrounds");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_B_Fairgrounds");
+		
+		// C3 Plankcountry
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_PlankCountry");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_A_PlankCountry");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat_B_PlankCountry");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat2_Intro_Plankcountry");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_Intro_Plankcountry");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_A_Plankcountry");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_B_Plankcountry");
+		
+		// A2 Milltown
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat2_Intro_Milltown");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_Intro_Milltown");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_A_Milltown");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_B_Milltown");
+		
+		// C5 BigEasy
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat2_Intro_BigEasy");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_Intro_BigEasy");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_A_BigEasy");
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_B_BigEasy");
+		
+		// A2 Clown
+		ClientCommand(client, "music_dynamic_stop_playing Event.Zombat3_Intro_Clown");
+		
+		// Death
+		
+		// ledge hang
+		ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangTwoHands");
+		ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangOneHand");
+		ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangFingers");
+		ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangAboutToFall");
+		ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangFalling");
+		
+		// Down
+		// Survivor is down and being beaten by infected
+		
+		ClientCommand(client, "music_dynamic_stop_playing Event.Down");
+		ClientCommand(client, "music_dynamic_stop_playing Event.BleedingOut");
+		
+		// Survivor death
+		// This is for the death of an individual survivor to be played after the health meter has reached zero
+		
+		ClientCommand(client, "music_dynamic_stop_playing Event.SurvivorDeath");
+		ClientCommand(client, "music_dynamic_stop_playing Event.ScenarioLose");
+		
+		// Bosses
+		
+		// Tank
+		ClientCommand(client, "music_dynamic_stop_playing Event.Tank");
+		ClientCommand(client, "music_dynamic_stop_playing Event.TankMidpoint");
+		ClientCommand(client, "music_dynamic_stop_playing Event.TankBrothers");
+		ClientCommand(client, "music_dynamic_stop_playing C2M5.RidinTank1");
+		ClientCommand(client, "music_dynamic_stop_playing C2M5.RidinTank2");
+		ClientCommand(client, "music_dynamic_stop_playing C2M5.BadManTank1");
+		ClientCommand(client, "music_dynamic_stop_playing C2M5.BadManTank2");
+		
+		// Witch
+		ClientCommand(client, "music_dynamic_stop_playing Event.WitchAttack");
+		ClientCommand(client, "music_dynamic_stop_playing Event.WitchBurning");
+		ClientCommand(client, "music_dynamic_stop_playing Event.WitchRage");
+		ClientCommand(client, "music_dynamic_stop_playing Event.WitchDead");
+		
+		// mobbed
+		ClientCommand(client, "music_dynamic_stop_playing Event.Mobbed");
+		
+		// Hunter
+		ClientCommand(client, "music_dynamic_stop_playing Event.HunterPounce");
+		
+		// Smoker
+		ClientCommand(client, "music_dynamic_stop_playing Event.SmokerChoke");
+		ClientCommand(client, "music_dynamic_stop_playing Event.SmokerDrag");
+		
+		// Boomer
+		ClientCommand(client, "music_dynamic_stop_playing Event.VomitInTheFace");
+		
+		// Charger
+		ClientCommand(client, "music_dynamic_stop_playing Event.ChargerSlam");
+		
+		// Jockey
+		ClientCommand(client, "music_dynamic_stop_playing Event.JockeyRide");
+		
+		// Spitter
+		ClientCommand(client, "music_dynamic_stop_playing Event.SpitterSpit");
+		ClientCommand(client, "music_dynamic_stop_playing Event.SpitterBurn");
+	}
+	
 	return Plugin_Continue;
 }
 
 public Action:DisposeOfCowards(Handle:timer, any:coward)
 {
-	if (IsClientInGame(coward) && IsFakeClient(coward) && !IsPlayerTank(coward) && GetClientHealth(coward)>1)
+	if (IsClientInGame(coward) && IsFakeClient(coward) && GetClientTeam(coward) == TEAM_INFECTED && !IsPlayerTank(coward) && GetClientHealth(coward)>1)
+	{
+		#if DEBUG
+		LogMessage("Slayed bot %N for not attacking", coward);
+		#endif
 		ForcePlayerSuicide(coward);
-	
-	#if DEBUG
-	LogMessage("Slayed bot %N for not attacking", coward);
-	#endif
+	}
 	
 	FightOrDieTimer[coward] = INVALID_HANDLE;
 }
@@ -1919,7 +2125,7 @@ public Action:FreeSpawnEnsure(Handle:timer, any:client)
 	ClientCommand(client, "-use");
 	
 	if (!IsPlayerGhost(client))
-		CreateTimer(0.1, FreeSpawnEnsure2, client);
+		CreateTimer(0.1, FreeSpawnEnsure2, client, TIMER_FLAG_NO_MAPCHANGE);
 	
 }
 
@@ -1930,7 +2136,7 @@ public Action:FreeSpawnEnsure2(Handle:timer, any:client)
 		SetEntProp(client,Prop_Send,"m_isCulling",1);
 		ClientCommand(client, "+use");
 		
-		CreateTimer(0.1, FreeSpawnEnsure, client);
+		CreateTimer(0.1, FreeSpawnEnsure, client, TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
 
@@ -2029,7 +2235,6 @@ public Action:evtPlayerDeath(Handle:event, const String:name[], bool:dontBroadca
 	// This spawns a bot in coop/survival regardless if the special that died was controlled by a player, MI 5
 	else if ((GameMode != 2) && (!DirectorSpawn))
 	{
-		
 		if (!GetConVarBool(h_CoopPlayableTank) && !IsPlayerTank(client) || GetConVarBool(h_CoopPlayableTank))
 		{
 			new SpawnTime = GetURandomIntRange(GetConVarInt(h_InfectedSpawnTimeMin), GetConVarInt(h_InfectedSpawnTimeMax));
@@ -2042,17 +2247,22 @@ public Action:evtPlayerDeath(Handle:event, const String:name[], bool:dontBroadca
 		PrintToChatAll("An infected bot has been added to the spawn queue...");
 		#endif
 	}
+	else if (GameMode != 2 && DirectorSpawn)
+	{
+		new SpawnTime = GetURandomIntRange(GetConVarInt(h_InfectedSpawnTimeMin), GetConVarInt(h_InfectedSpawnTimeMax));
+		GetSpawnTime[client] = SpawnTime;
+	}
 	
 	//This will prevent the stats board from coming up if the cvar was set to 1 (L4D 1 only)
 	if (!L4DVersion && !IsFakeClient(client) && !GetConVarBool(h_StatsBoard) && GameMode != 2)
 	{
-		CreateTimer(1.0, ZombieClassTimer, client);
+		CreateTimer(1.0, ZombieClassTimer, client, TIMER_FLAG_NO_MAPCHANGE);
 	}
 	
 	// Removes Sphere bubbles in the map when a player dies
 	if (GameMode != 2)
 	{
-		CreateTimer(0.1, ScrimmageTimer, client);
+		CreateTimer(0.1, ScrimmageTimer, client, TIMER_FLAG_NO_MAPCHANGE);
 	}
 	
 	// This fixes the spawns when the spawn timer is set to 5 or below
@@ -2206,7 +2416,7 @@ public Action:evtPlayerTeam(Handle:event, const String:name[], bool:dontBroadcas
 		if (newteam == 3)
 		{
 			//Kick Timer
-			CreateTimer(1.0, InfectedBotBooterVersus);
+			CreateTimer(1.0, InfectedBotBooterVersus, _, TIMER_FLAG_NO_MAPCHANGE);
 			#if DEBUG
 			LogMessage("A player switched to infected, attempting to boot a bot");
 			#endif
@@ -2216,7 +2426,7 @@ public Action:evtPlayerTeam(Handle:event, const String:name[], bool:dontBroadcas
 	{
 		// Removes Sphere bubbles in the map when a player joins the infected team, or spectator team
 		
-		CreateTimer(0.1, ScrimmageTimer, client);
+		CreateTimer(0.1, ScrimmageTimer, client, TIMER_FLAG_NO_MAPCHANGE);
 	}
 	return Plugin_Continue;
 }
@@ -2245,7 +2455,7 @@ public OnClientDisconnect(client)
 	// If no real players are left in game ... and we restore sb_all_bot_team, MI 5
 	if (!RealPlayersInGame(client))
 	{	
-		//SetConVarInt(FindConVar("sb_all_bot_team"), 0);
+		SetConVarInt(FindConVar("sb_all_bot_team"), 0);
 		GameEnded();
 	}
 }
@@ -2285,7 +2495,7 @@ GameEnded()
 
 public Action:ScrimmageTimer (Handle:timer, any:client)
 {
-	if (client)
+	if (client && IsValidEntity(client))
 	{
 		SetEntData(client, FindSendPropInfo("CTerrorPlayer", "m_scrimmageType"), 0, 1, false);
 	}
@@ -2448,7 +2658,7 @@ public Action:evtTankFrustrated(Handle:event, const String:name[], bool:dontBroa
 	#if DEBUG
 	LogMessage("Tank is frustrated!");
 	#endif
-	CreateTimer(2.0, TankFrustratedTimer);
+	CreateTimer(2.0, TankFrustratedTimer, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 // The main Tank code, it allows a player to take over the tank when if allowed, and adds additional tanks if the tanks per spawn cvar was set.
@@ -2644,7 +2854,7 @@ public Action:TankSpawner(Handle:timer, any:client)
 		}
 		
 		// Start the Tank Halt Timer
-		CreateTimer(2.0, TankHaltTimer);
+		CreateTimer(2.0, TankHaltTimer, _, TIMER_FLAG_NO_MAPCHANGE);
 		
 		// We restore the player's status
 		for (new i=1;i<=MaxClients;i++)
@@ -2662,7 +2872,7 @@ public Action:TankSpawner(Handle:timer, any:client)
 					TeleportEntity(i, position, NULL_VECTOR, NULL_VECTOR);
 					SetEntityHealth(i, tankhealth);
 					if (tankonfire)
-						CreateTimer(0.1, PutTankOnFireTimer, i);
+						CreateTimer(0.1, PutTankOnFireTimer, i, TIMER_FLAG_NO_MAPCHANGE);
 					if (GetConVarBool(h_CoopPlayableTank))
 						TankWasSeen[i] = true;
 				}
@@ -2731,7 +2941,10 @@ public Action:HookSound_Callback(Clients[64], &NumClients, String:StrSample[PLAT
 public Action:evtFinaleStart(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	FinaleStarted = true;
-	CreateTimer(1.0, CheckIfBotsNeededLater, true);
+	if (GetConVarBool(h_InstantSpawn))
+		CreateTimer(1.0, CheckIfBotsNeededLater, true);
+	else
+	CreateTimer(1.0, CheckIfBotsNeededLater, false);
 }
 
 // This code was to fix an unintentional bug in Left 4 Dead. If it is coop, and the finale started with the survivors lost, the screen will stay stuck looking at the 
@@ -2792,7 +3005,7 @@ BotTypeNeeded()
 					smokers++;
 				else if (IsPlayerBoomer(i) && GetClientHealth(i) > 1)
 					boomers++;	
-				else if (L4DVersion && IsPlayerHunter(i) && GetClientHealth(i) > 1)
+				else if (IsPlayerHunter(i) && GetClientHealth(i) > 1)
 					hunters++;	
 				else if (L4DVersion && IsPlayerSpitter(i) && GetClientHealth(i) > 1)
 					spitters++;	
@@ -2897,10 +3110,13 @@ BotTypeNeeded()
 		}
 		else if (random == 1)
 		{
-			#if DEBUG
-			LogMessage("Returning Hunter");
-			#endif
-			return 1;
+			if (hunters < HunterLimit && canSpawnHunter)
+			{
+				#if DEBUG
+				LogMessage("Returning Hunter");
+				#endif
+				return 1;
+			}
 		}
 		
 		return BotTypeNeeded();
@@ -2935,7 +3151,7 @@ public Action:Spawn_InfectedBot(Handle:timer)
 		
 		if (BotReady >= Infected)
 		{
-			CreateTimer(3.0, BotReadyReset);
+			CreateTimer(3.0, BotReadyReset, _, TIMER_FLAG_NO_MAPCHANGE);
 		}
 		else
 		{
@@ -3115,7 +3331,6 @@ public Action:Spawn_InfectedBot(Handle:timer)
 	InfectedBotQueue--;
 	
 	CreateTimer(1.0, CheckIfBotsNeededLater, true);
-	return;
 }
 
 stock GetAnyClient()
@@ -3226,14 +3441,16 @@ SetLifeState (client, bool:ready)
 
 bool:RealPlayersInGame (client)
 {
+	
 	for (new i=1;i<=MaxClients;i++)
 	{
 		if (i != client)
 		{
-			if (IsClientInGame(i) && !IsFakeClient(i))
+			if (IsClientConnected(i) && IsClientInGame(i) && !IsFakeClient(i))
 				return true;
 		}
 	}
+	
 	return false;
 }
 
@@ -3258,6 +3475,17 @@ TrueNumberOfSurvivors ()
 				TotalSurvivors++;
 		}
 	return TotalSurvivors;
+}
+
+HumansOnInfected ()
+{
+	new TotalHumans;
+	for (new i=1;i<=MaxClients;i++)
+	{
+		if (IsClientInGame(i) && GetClientTeam(i) == TEAM_INFECTED && !IsFakeClient(i))
+			TotalHumans++;
+	}
+	return TotalHumans;
 }
 
 bool:AllSurvivorsDeadOrIncapacitated ()
@@ -3350,8 +3578,6 @@ MoreThanFivePlayers()
 
 PlayerReady()
 {
-	// This function is used for coordination between the bots
-	
 	// First we count the ammount of infected real players
 	for (new i=1;i<=MaxClients;i++)
 	{
@@ -3372,6 +3598,27 @@ PlayerReady()
 		}
 	}
 	return false;
+}
+
+FindBotToTakeOver()
+{
+	// First we find a survivor bot
+	for (new i=1;i<=MaxClients;i++)
+	{
+		// We check if player is in game
+		if (!IsClientInGame(i)) continue;
+		
+		// Check if client is survivor ...
+		if (GetClientTeam(i) == TEAM_SURVIVORS)
+		{
+			// If player is a bot and is alive...
+			if (IsFakeClient(i) && GetClientHealth(i) > 1)
+			{
+				return i;
+			}
+		}
+	}
+	return 0;
 }
 
 bool:LeftStartArea()
@@ -3425,10 +3672,10 @@ public OnPluginEnd()
 		ResetConVar(FindConVar("z_spitter_limit"), true, true);
 		ResetConVar(FindConVar("z_jockey_limit"), true, true);
 		ResetConVar(FindConVar("z_charger_limit"), true, true);
-		ResetConVar(FindConVar("z_versus_spitter_limit"), true, true);
-		ResetConVar(FindConVar("z_versus_jockey_limit"), true, true);
-		ResetConVar(FindConVar("z_versus_charger_limit"), true, true);
-		ResetConVar(FindConVar("z_versus_hunter_limit"), true, true);
+		//ResetConVar(FindConVar("z_versus_spitter_limit"), true, true);
+		//ResetConVar(FindConVar("z_versus_jockey_limit"), true, true);
+		//ResetConVar(FindConVar("z_versus_charger_limit"), true, true);
+		//ResetConVar(FindConVar("z_versus_hunter_limit"), true, true);
 	}
 	else
 	{
@@ -3440,7 +3687,6 @@ public OnPluginEnd()
 		ResetConVar(FindConVar("z_exploding_limit"), true, true);
 		ResetConVar(FindConVar("z_hunter_limit"), true, true);
 	}
-	
 	ResetConVar(FindConVar("director_no_specials"), true, true);
 	ResetConVar(FindConVar("boomer_vomit_delay"), true, true);
 	ResetConVar(FindConVar("smoker_tongue_delay"), true, true);
@@ -3450,15 +3696,14 @@ public OnPluginEnd()
 	ResetConVar(FindConVar("hunter_pounce_ready_range"), true, true);
 	ResetConVar(FindConVar("hunter_pounce_loft_rate"), true, true);
 	ResetConVar(FindConVar("z_hunter_lunge_stagger_time"), true, true);
-	ResetConVar(FindConVar("vs_max_team_switches"), true, true);
 	ResetConVar(FindConVar("z_attack_flow_range"), true, true);
 	ResetConVar(FindConVar("director_spectate_specials"), true, true);
 	ResetConVar(FindConVar("z_spawn_safety_range"), true, true);
 	ResetConVar(FindConVar("z_spawn_flow_limit"), true, true);
 	//ResetConVar(FindConVar("z_max_player_zombies"), true, true);
-	//ResetConVar(FindConVar("sb_all_bot_team"), true, true);
-	ResetConVar(FindConVar("z_versus_boomer_limit"), true, true);
-	ResetConVar(FindConVar("z_versus_smoker_limit"), true, true);
+	ResetConVar(FindConVar("sb_all_bot_team"), true, true);
+	//ResetConVar(FindConVar("z_versus_boomer_limit"), true, true);
+	//ResetConVar(FindConVar("z_versus_smoker_limit"), true, true);
 	
 	// Destroy the persistent storage for client HUD preferences
 	if (usrHUDPref != INVALID_HANDLE)
@@ -3745,6 +3990,9 @@ public ShowInfectedHUD(src)
 	
 	// Display information panel to infected clients
 	pInfHUD = CreatePanel(GetMenuStyleHandle(MenuStyle_Radio));
+	if (GameMode == 2 && !MoreThanFivePlayers())
+		SetPanelTitle(pInfHUD, "INFECTED BOTS:");
+	else
 	SetPanelTitle(pInfHUD, "INFECTED TEAM:");
 	DrawPanelItem(pInfHUD, " ", ITEMDRAW_SPACER|ITEMDRAW_RAWLINE);
 	
@@ -4197,5 +4445,51 @@ stock TurnFlashlightOn(client)
 	return;
 }
 
+stock SwitchToSurvivors(client)
+{
+	if (GameMode == 2) return;
+	if (!IsClientInGame(client)) return;
+	if (GetClientTeam(client) == 2) return;
+	if (IsFakeClient(client)) return;
+	
+	new bot = FindBotToTakeOver();
+	
+	if (bot == 0)
+	{
+		PrintHintText(client, "No survivor bots to take over.");
+		return;
+	}
+	
+	static Handle:hSpec;
+	if (hSpec == INVALID_HANDLE)
+	{
+		new Handle:hGameConf;
+		
+		hGameConf = LoadGameConfigFile("l4dinfectedbots");
+		
+		StartPrepSDKCall(SDKCall_Player);
+		PrepSDKCall_SetFromConf(hGameConf, SDKConf_Signature, "SetHumanSpec");
+		PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+		hSpec = EndPrepSDKCall();
+	}
+	
+	static Handle:hSwitch;
+	if (hSwitch == INVALID_HANDLE)
+	{
+		new Handle:hGameConf;
+		
+		hGameConf = LoadGameConfigFile("l4dinfectedbots");
+		
+		StartPrepSDKCall(SDKCall_Player);
+		PrepSDKCall_SetFromConf(hGameConf, SDKConf_Signature, "TakeOverBot");
+		PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
+		hSwitch = EndPrepSDKCall();
+	}
+	
+	SDKCall(hSpec, bot, client);
+	SDKCall(hSwitch, client, true);
+	return;
+}
 
-///////////////////////////////////
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
