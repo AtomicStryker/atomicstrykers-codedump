@@ -1,7 +1,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "0.8.1"
+#define PLUGIN_VERSION "0.8.2"
 #define PISTOL 1
 #define SMG 2
 #define PUMPSHOTGUN 3
@@ -29,7 +29,6 @@ new Handle:h_AWPEnabled
 new Handle:h_MP5Enabled
 new Handle:h_ScoutEnabled
 new Handle:h_SG552Enabled
-
 //new Handle:h_BatterUp
 //Used to store weapon spawns.
 new WeaponSpawn_ID[64]
@@ -73,7 +72,7 @@ public OnPluginStart()
 	HookConVarChange(h_Enabled, ConVarChange_Enabled)
 	//Precache hidden weapon models and initialize them after one second.
 	PrecacheWeaponModels()
-	CreateTimer(0.1, InitHiddenWeaponsDelay)
+	CreateTimer(1.0, InitHiddenWeaponsDelay)
 }
 
 PrecacheWeaponModels()
@@ -83,11 +82,14 @@ PrecacheWeaponModels()
 	if (!IsModelPrecached("models/w_models/weapons/w_smg_mp5.mdl")) PrecacheModel("models/w_models/weapons/w_smg_mp5.mdl")
 	if (!IsModelPrecached("models/w_models/weapons/w_sniper_awp.mdl")) PrecacheModel("models/w_models/weapons/w_sniper_awp.mdl")
 	if (!IsModelPrecached("models/w_models/weapons/w_sniper_scout.mdl")) PrecacheModel("models/w_models/weapons/w_sniper_scout.mdl")
-	if (!IsModelPrecached("models/w_models/weapons/w_eq_bile_flask.mld")) PrecacheModel("models/w_models/weapons/w_eq_bile_flask.mld")
+	if (!IsModelPrecached("models/w_models/weapons/w_eq_bile_flask.mdl")) PrecacheModel("models/w_models/weapons/w_eq_bile_flask.mdl")
 	if (!IsModelPrecached("models/v_models/v_rif_sg552.mdl")) PrecacheModel("models/v_models/v_rif_sg552.mdl")
 	if (!IsModelPrecached("models/v_models/v_smg_mp5.mdl")) PrecacheModel("models/v_models/v_smg_mp5.mdl")
 	if (!IsModelPrecached("models/v_models/v_snip_awp.mdl")) PrecacheModel("models/v_models/v_snip_awp.mdl")
 	if (!IsModelPrecached("models/v_models/v_snip_scout.mdl")) PrecacheModel("models/v_models/v_snip_scout.mdl")
+	
+	if (!IsModelPrecached("models/w_models/weapons/w_m60.mdl")) PrecacheModel("models/w_models/weapons/w_m60.mdl");
+	if (!IsModelPrecached("models/v_models/v_m60.mdl")) PrecacheModel("models/v_models/v_m60.mdl");
 }
 
 public Action:InitHiddenWeaponsDelay(Handle:timer, any:client)
@@ -103,6 +105,9 @@ public Action:InitHiddenWeaponsDelay(Handle:timer, any:client)
 	DispatchSpawn(index)
 	RemoveEdict(index)
 	index = CreateEntityByName("weapon_sniper_scout")
+	DispatchSpawn(index)
+	RemoveEdict(index)
+	index = CreateEntityByName("weapon_rifle_m60")
 	DispatchSpawn(index)
 	RemoveEdict(index)
 	GetCurrentMap(Map, sizeof(Map))
@@ -163,7 +168,6 @@ public Action:RoundStartDelay(Handle:timer)
 	StrEqual(Map, "c4m3_sugarmill_b") ||
 	StrEqual(Map, "c4m4_milltown_b")))
 		return
-	
 	GetWeaponSpawns()
 	SetWeaponSpawns()
 }
@@ -191,7 +195,6 @@ public Action:SpawnBatsDelay(Handle:timer)
 	}
 }
 */
-
 
 GetWeaponSpawns()
 {

@@ -21,16 +21,19 @@ On a dropped or carried weapon Prop_Send "m_iClip1" contains the primary ammo am
 On dropped weapons (only!) Prop_Send "m_iExtraPrimaryAmmo" contains the reserve ammo amount 
 
 
-weapon_rifle_m60 is the new 'The Passing' gun, ammo is not in m_iAmmo
+weapon_rifle_m60_spawn is the new 'The Passing' gun, ammo is not in m_iAmmo
 m60 ammo is stored in gun entity, in m_iClip1
 
 spawn: class "weapon_rifle_m60_spawn"
-gun: class "weapon_rifle_m60"
+gun: class "weapon_rifle_m60_spawn"
 item_pickup item id: "rifle_m60"
 
 */
 
-#define PLUGIN_VERSION "1.0.8"
+#define PLUGIN_VERSION "1.0.9"
+
+#define TEST_DEBUG			0
+#define TEST_DEBUG_LOG		1
 
 #define DEFAULT_FLAGS FCVAR_PLUGIN|FCVAR_NOTIFY
 
@@ -129,6 +132,42 @@ UpdateConVars()
 
 public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroadcast)
 {
+	new Handle:UnlockGunsPlugin = FindConVar("l4d2_WeaponUnlock");
+	if (UnlockGunsPlugin == INVALID_HANDLE) return;
+
+	decl String:version[12];
+	GetConVarString(UnlockGunsPlugin, version, sizeof(version));
+	
+	new unlockversion = ParseVersionNumber(version);
+	new neededversion = ParseVersionNumber("0.8.2");
+	if (unlockversion < neededversion) return;
+	
+	DebugPrintToAll("Unlock Plugin found, requirements for M60 exchange met, moving on");
+
+	CreateTimer(10.0, ReplaceGLWithM60Delayed);
+	if (!IsModelPrecached("models/w_models/weapons/w_m60.mdl")) PrecacheModel("models/w_models/weapons/w_m60.mdl");
+	if (!IsModelPrecached("models/v_models/v_m60.mdl")) PrecacheModel("models/v_models/v_m60.mdl");
+}
+
+stock ParseVersionNumber(const String:versionText[])
+{
+	new String:versionNumbers[4][4];
+	ExplodeString(versionText, /* split */ ".", versionNumbers, .maxStrings = 4, .maxStringLength = 4);
+	
+	new version = 0;
+	new shift = 24;
+	for(new i = 0; i < sizeof(versionNumbers); i++)
+	{
+		version = version | (StringToInt(versionNumbers[i]) << shift);
+		
+		shift -= 8;
+	}
+	
+	return version;
+}
+
+public Action:ReplaceGLWithM60Delayed(Handle:timer)
+{
 	ReplaceGrenadeLauncherWithM60(GetConVarInt(GLtoM60TransformCVAR));
 }
 
@@ -149,13 +188,16 @@ ReplaceGrenadeLauncherWithM60(chance)
 			{
 				GetEntPropVector(prev, Prop_Send, "m_vecOrigin", origin);
 				GetEntPropVector(prev, Prop_Send, "m_angRotation", angles);
-				RemoveEdict(prev);
 				
 				replacement = CreateEntityByName("weapon_rifle_m60");
+				DispatchSpawn(replacement);
+				DebugPrintToAll("Replacing weapon_grenade_launcher_spawn %i with weapon_rifle_m60 %i", prev, replacement);
 				if (!IsValidEdict(replacement)) return;
 				
-				DispatchSpawn(replacement);
 				TeleportEntity(replacement, origin, angles, NULL_VECTOR);
+				DebugPrintToAll("Teleported weapon_rifle_m60 %i into position, removing weapon_grenade_launcher_spawn now", replacement);
+				
+				RemoveEdict(prev);
 			}
 		}
 		prev = ent;
@@ -166,13 +208,16 @@ ReplaceGrenadeLauncherWithM60(chance)
 		{
 			GetEntPropVector(prev, Prop_Send, "m_vecOrigin", origin);
 			GetEntPropVector(prev, Prop_Send, "m_angRotation", angles);
-			RemoveEdict(prev);
 			
-			replacement = CreateEntityByName("weapon_rifle_m60_spawn");
+			replacement = CreateEntityByName("weapon_rifle_m60");
+			DispatchSpawn(replacement);
+			DebugPrintToAll("Replacing weapon_grenade_launcher_spawn %i with weapon_rifle_m60 %i", prev, replacement);
 			if (!IsValidEdict(replacement)) return;
 			
 			TeleportEntity(replacement, origin, angles, NULL_VECTOR);
-			DispatchSpawn(replacement);
+			DebugPrintToAll("Teleported weapon_rifle_m60 %i into position, removing weapon_grenade_launcher_spawn now", replacement);
+			
+			RemoveEdict(prev);
 		}
 	}
 }
@@ -220,7 +265,7 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 		}
 		
 		// later added m60 remunition code, where "gun" actually is an ammopile.
-		if (StrEqual(ent_name, "weapon_ammo_spawn", false) && StrEqual(currentgunname, "weapon_rifle_m60", false) && GetConVarBool(M60ResupplyCVAR))
+		if (StrEqual(ent_name, "weapon_ammo_spawn", false) && StrEqual(currentgunname, "weapon_rifle_m60_spawn", false) && GetConVarBool(M60ResupplyCVAR))
 		{
 			SetEntProp(oldgun, Prop_Data, "m_iClip1", GetConVarInt(M60AmmoCVAR), 1);
 			PrintHintText(client, "You remunitioned your M60!");
@@ -465,4 +510,26 @@ public Action:Cmd_ReadGunData(client, args)
 	PrintToChat(client, "m_iClip1 Value in gun: %i", GetEntProp(targetgun, Prop_Data, "m_iClip1", 1));
 	PrintToChat(client, "m_iExtraPrimaryAmmo Value in gun: %i", GetEntProp(targetgun, Prop_Data, "m_iExtraPrimaryAmmo", 4));
 	return Plugin_Handled;
+}
+
+stock DebugPrintToAll(const String:format[], any:...)
+{
+	#if (TEST_DEBUG || TEST_DEBUG_LOG)
+	decl String:buffer[256];
+	
+	VFormat(buffer, sizeof(buffer), format, 2);
+	
+	#if TEST_DEBUG
+	PrintToChatAll("[GUNCONTROL] %s", buffer);
+	PrintToConsole(0, "[GUNCONTROL] %s", buffer);
+	#endif
+	
+	LogMessage("%s", buffer);
+	#else
+	//suppress "format" never used warning
+	if(format[0])
+		return;
+	else
+		return;
+	#endif
 }
