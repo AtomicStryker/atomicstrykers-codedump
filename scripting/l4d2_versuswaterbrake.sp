@@ -1,7 +1,8 @@
 #pragma semicolon 1
 #include <sourcemod>
 #include <sdktools>
-#define PLUGIN_VERSION "1.1.0"
+#define PLUGIN_VERSION "1.1.1"
+#define DEFAULT_FLAGS FCVAR_PLUGIN|FCVAR_NOTIFY
 
 static const 		FRAMESKIP 				= 3;	// Our OnGameFrame function will only trigger every third Frame
 static const		JUMPFLAG				= IN_JUMP;
@@ -14,6 +15,7 @@ static const String:LIMP_HEALTH_CONVAR[]	= "survivor_limp_health";
 static const String:PLAYER_CLASSNAME[]		= "CTerrorPlayer";
 static const String:MOVE_SPEED_ENTPROP[]	= "m_flLaggedMovementValue";
 static const String:SPEED_MODIFY_ENTPROP[]	= "m_flVelocityModifier";
+static const String:CONVAR_GAMEMODE[]		= "mp_gamemode";
  
 static bool:isSlowedDown[MAXPLAYERS+1]		= false;
 static bool:isJockeyed[MAXPLAYERS+1]		= false;
@@ -32,6 +34,8 @@ static Handle:cvarWaterSlow 				= INVALID_HANDLE;
 static Handle:cvarJockeySlow 				= INVALID_HANDLE;
 static Handle:cvarLowHealthSlow				= INVALID_HANDLE;
 static Handle:cvarLimpHealth				= INVALID_HANDLE;
+static Handle:cvarGameMode					= INVALID_HANDLE;
+static Handle:cvarGameModeActive			= INVALID_HANDLE;
 
 new survivorCount							= 0;
 new survivorIndex[MAXPLAYERS+1]				= 0;
@@ -53,16 +57,19 @@ public OnPluginStart()
 {
 	RequireL4D2();
 	
-	CreateConVar("l4d2_vswaterbrake_version", PLUGIN_VERSION, " Version of L4D2 Versus Water Brake on this Server ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("l4d2_vswaterbrake_version", PLUGIN_VERSION, " Version of L4D2 Versus Water Brake on this Server ", DEFAULT_FLAGS|FCVAR_SPONLY|FCVAR_DONTRECORD);
 	
-	cvarEnabled = CreateConVar("l4d2_vswaterbrake_enabled", "1", " Turn Water Brake on or off ", FCVAR_PLUGIN|FCVAR_NOTIFY);
+	cvarEnabled = CreateConVar("l4d2_vswaterbrake_enabled", "1", " Turn Water Brake on or off ", DEFAULT_FLAGS);
 	
-	cvarWaterSlow = CreateConVar("l4d2_vswaterbrake_slow", "0.7", " How much slower will a Survivor be in water - 0.75 equals 75% speed ", FCVAR_PLUGIN|FCVAR_NOTIFY);
+	cvarWaterSlow = CreateConVar("l4d2_vswaterbrake_slow", "0.7", " How much slower will a Survivor be in water - 0.75 equals 75% speed ", DEFAULT_FLAGS);
 	
-	cvarJockeySlow = CreateConVar("l4d2_vswaterbrake_jockeyslow", "0", " Will a Jockeyed Survivor also be slowed down? ", FCVAR_PLUGIN|FCVAR_NOTIFY);
+	cvarJockeySlow = CreateConVar("l4d2_vswaterbrake_jockeyslow", "0", " Will a Jockeyed Survivor also be slowed down? ", DEFAULT_FLAGS);
 	
-	cvarLowHealthSlow = CreateConVar("l4d2_vswaterbrake_at_low_health", "0", " Enable or Disable Water Brake for low Health Survivors ", FCVAR_PLUGIN|FCVAR_NOTIFY);
-
+	cvarLowHealthSlow = CreateConVar("l4d2_vswaterbrake_at_low_health", "0", " Enable or Disable Water Brake for low Health Survivors ", DEFAULT_FLAGS);
+	
+	cvarGameModeActive = CreateConVar("l4d2_vswaterbrake_gamemodeactive", "versus,teamversus,scavenge,teamscavenge,mutation12,mutation13", " Set the game mode for which the plugin should be activated (same usage as sv_gametypes, i.e. add all game modes where you want it active separated by comma) ");
+	cvarGameMode = FindConVar(CONVAR_GAMEMODE);
+	
 	cvarLimpHealth = FindConVar(LIMP_HEALTH_CONVAR);
 	laggedMovementOffset = FindSendPropInfo(PLAYER_CLASSNAME, MOVE_SPEED_ENTPROP);
 	velocityModifierOffset = FindSendPropInfo(PLAYER_CLASSNAME, SPEED_MODIFY_ENTPROP);
@@ -71,6 +78,7 @@ public OnPluginStart()
 	HookConVarChange(cvarWaterSlow, WB_ConvarsChanged);
 	HookConVarChange(cvarLimpHealth, WB_ConvarsChanged);
 	HookConVarChange(cvarLowHealthSlow, WB_ConvarsChanged);
+	HookConVarChange(cvarGameMode, WB_ConvarsChanged);
 	
 	WB_OnPluginEnabled();
 }
@@ -81,7 +89,8 @@ public WB_ConvarsChanged(Handle:convar, const String:oldValue[], const String:ne
 	slowSetting = GetConVarFloat(cvarWaterSlow);
 	lowHealthLimitLimp = GetConVarInt(cvarLimpHealth);
 	enableLowHealthBrake = GetConVarBool(cvarLowHealthSlow);
-
+	CheckAllowedGameMode();
+	
 	if (enableBrake)
 	{
 		WB_OnPluginEnabled();
@@ -127,10 +136,18 @@ static WB_OnPluginDisabled()
 	}
 }
 
+static CheckAllowedGameMode()
+{
+	decl String:gamemode[64], String:gamemodeactive[64];
+	GetConVarString(cvarGameMode, gamemode, sizeof(gamemode));
+	GetConVarString(cvarGameModeActive, gamemodeactive, sizeof(gamemodeactive));
+	isAllowedMode = (StrContains(gamemodeactive, gamemode) != -1);
+}
+
 public WB_RoundStart_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	isAllowedMode = IsVersus();
-
+	CheckAllowedGameMode();
+	
 	for (new i = 1; i <= MaxClients; i++)
 	{
 		isJockeyed[i] = false;

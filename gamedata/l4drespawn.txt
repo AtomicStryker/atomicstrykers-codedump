@@ -2,6 +2,7 @@
 {
     "left4dead"
     {
+		/* unneeded now
         "Offsets"
         {
             "RoundRespawn"
@@ -10,22 +11,48 @@
                 "linux"        "491"
             }
         }
+		*/
+		
+		"Signatures"
+		{
+			/* CTerrorPlayer::RoundRespawn */
+			"RoundRespawn"
+			{
+				"library"	"server"
+				"linux"		"@_ZN13CTerrorPlayer12RoundRespawnEv"
+				"windows"	"\x56\x8B\xF1\xE8\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x84\xC0\x75"
+				/* 56 8B F1 E8 ? ? ? ? E8 ? ? ? ? 84 C0 75	*/
+				/* previous function in vtable has a string */
+			}
+		}
+
     }
     "left4dead2"
     {
+		/* unneeded now
         "Offsets"
         {
             "RoundRespawn"
             {
-                "windows"    "511"
-                "linux"        "512"
+                "windows"    "512"
+                "linux"        "513"
             }
-			
         }
+		*/
+		
 		"Signatures"
 		{
+			/* CTerrorPlayer::RoundRespawn */
+			"RoundRespawn"
+			{
+				"library"	"server"
+				"linux"		"@_ZN13CTerrorPlayer12RoundRespawnEv"
+				"windows"	"\x56\x8B\xF1\xE8\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x84\xC0\x75"
+				/* 56 8B F1 E8 ? ? ? ? E8 ? ? ? ? 84 C0 75	*/
+				/* previous function in vtable has a string */
+			}
+		
 			/* CTerrorPlayer::BecomeGhost(bool) is (float) in Windows Binary? Strange */
-			
 			"BecomeGhost"
 			{
 				"library"	"server"
@@ -35,7 +62,6 @@
 			}
 			
 			/* CCSPlayer::State_Transition(CSPlayerState) - Sig is not unique in Windows but Functions appear similar */
-			
 			"State_Transition"
 			{
 				"library"	"server"

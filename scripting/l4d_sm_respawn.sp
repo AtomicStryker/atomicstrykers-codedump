@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.8"
+#define PLUGIN_VERSION "1.9"
 
 
 public Plugin:myinfo =
@@ -14,14 +14,21 @@ public Plugin:myinfo =
 	url = "http://forums.alliedmods.net/showthread.php?t=96249"
 }
 
-new Float:g_pos[3];
-new Handle:hRoundRespawn = INVALID_HANDLE;
-new Handle:hBecomeGhost = INVALID_HANDLE;
-new Handle:hState_Transition = INVALID_HANDLE;
-new Handle:hGameConf = INVALID_HANDLE;
+static Float:g_pos[3];
+static Handle:hRoundRespawn = INVALID_HANDLE;
+static Handle:hBecomeGhost = INVALID_HANDLE;
+static Handle:hState_Transition = INVALID_HANDLE;
+static Handle:hGameConf = INVALID_HANDLE;
 
 public OnPluginStart()
 {
+	decl String:game_name[24];
+	GetGameFolderName(game_name, sizeof(game_name));
+	if (!StrEqual(game_name, "left4dead2", false) && !StrEqual(game_name, "left4dead", false))
+	{
+		SetFailState("Plugin supports Left 4 Dead and L4D2 only.");
+	}
+
 	LoadTranslations("common.phrases");
 	hGameConf = LoadGameConfigFile("l4drespawn");
 	
@@ -31,18 +38,21 @@ public OnPluginStart()
 	if (hGameConf != INVALID_HANDLE)
 	{
 		StartPrepSDKCall(SDKCall_Player);
-		PrepSDKCall_SetFromConf(hGameConf, SDKConf_Virtual, "RoundRespawn");
+		PrepSDKCall_SetFromConf(hGameConf, SDKConf_Signature, "RoundRespawn");
 		hRoundRespawn = EndPrepSDKCall();
+		if (hRoundRespawn == INVALID_HANDLE) SetFailState("L4D_SM_Respawn: RoundRespawn Signature broken");
 		
 		StartPrepSDKCall(SDKCall_Player);
 		PrepSDKCall_SetFromConf(hGameConf, SDKConf_Signature, "BecomeGhost");
 		PrepSDKCall_AddParameter(SDKType_PlainOldData , SDKPass_Plain);
 		hBecomeGhost = EndPrepSDKCall();
+		if (hBecomeGhost == INVALID_HANDLE) LogError("L4D_SM_Respawn: BecomeGhost Signature broken");
 
 		StartPrepSDKCall(SDKCall_Player);
 		PrepSDKCall_SetFromConf(hGameConf, SDKConf_Signature, "State_Transition");
 		PrepSDKCall_AddParameter(SDKType_PlainOldData , SDKPass_Plain);
 		hState_Transition = EndPrepSDKCall();
+		if (hState_Transition == INVALID_HANDLE) LogError("L4D_SM_Respawn: State_Transition Signature broken");
 	}
 	else
 	{
@@ -74,7 +84,7 @@ public Action:Command_Respawn(client, args)
 				CheatCommand(player_id, "give", "first_aid_kit");
 				CheatCommand(player_id, "give", "smg");
 
-				if( !SetTeleportEndPoint(client) || client == player_id)
+				if(!SetTeleportEndPoint(client) || client == player_id)
 				{
 					return Plugin_Handled;
 				}
@@ -83,6 +93,10 @@ public Action:Command_Respawn(client, args)
 			
 			case 3:
 			{
+				decl String:game_name[24];
+				GetGameFolderName(game_name, sizeof(game_name));
+				if (StrEqual(game_name, "left4dead", false)) return Plugin_Handled;
+			
 				SDKCall(hState_Transition, player_id, 8);
 				SDKCall(hBecomeGhost, player_id, 1);
 				SDKCall(hState_Transition, player_id, 6);

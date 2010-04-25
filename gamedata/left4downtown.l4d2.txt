@@ -80,9 +80,10 @@
 			 */
 			"TakeOverBot"
 			{
-                		"library"    "server"
-                		"linux"    "@_ZN13CTerrorPlayer11TakeOverBotEb"
-                		"windows" "\x81*****\x53\x55\x56\x8D***\x57\x8B\xF1\x33\xDB"
+               	"library"    "server"
+               	"linux"    "@_ZN13CTerrorPlayer11TakeOverBotEb"
+               	"windows" "\x81\x2A\x2A\x2A\x2A\x2A\x53\x55\x56\x8D\x2A\x2A\x2A\x57\x8B\xF1\x33\xDB"
+				/* 81 ? ? ? ? ? 53 55 56 8D ? ? ? 57 8B F1 33 DB */
 			}
 			
 			/* 
@@ -197,8 +198,8 @@
 			{ 
 				"library" "server"
 				"linux" "@_ZN13ZombieManager10SpawnWitchERK6VectorRK6QAngle"
-				"windows" "\x8B\x0D\x2A\x2A\x2A\x2A\x6A\xFF\x68\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x85\xC0\x7C\x2A\x8B\x0D\x2A\x2A\x2A\x2A\x39\x81\x2A\x2A\x2A\x2A\x7C\x2A\x33\xC0\xC2"
-					/* 8B 0D ? ? ? ? 6A FF 68 ? ? ? ? E8 ? ? ? ? 85 C0 7C ? 8B 0D ? ? ? ? 39 81 ? ? ? ? 7C ? 33 C0 C2 */
+				"windows" "\x8B\x0D\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x85\xC0\x75\x2A\xC2"
+					/* 8B 0D ? ? ? ? E8 ? ? ? ? 85 C0 75 ? C2 */
 			}
 			
 			
@@ -265,7 +266,8 @@
 			{
             	"library"	"server"
 				"linux"     "@_ZN13CTerrorPlayer17OnEnterGhostStateEv"
-            	"windows"	"\x53\x55\x56\x8B\xF1\x8B\x86\xB0\x3A\x00\x00\x8B\x50\x0C\x8D\x8E" //found by V10
+            	"windows"	"\x53\x55\x56\x8B\xF1\x8B\x86\x2A\x2A\x2A\x2A\x8B\x50\x2A\x8D\x8E\x2A\x2A\x2A\x2A\x57\xFF"
+			 /* 53 55 56 8B F1 8B 86 ? ? ? ? 8B 50 ? 8D 8E ? ? ? ? 57 FF */
 			}
 			
 			/*

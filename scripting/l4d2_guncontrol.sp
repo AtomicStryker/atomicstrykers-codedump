@@ -15,30 +15,41 @@ offset to add - gun(s) - control cvar
 +36: Military Sniper, AWP, Scout - ammo_sniperrifle_max
 +64: Grenade Launcher - ammo_grenadelauncher_max
 
-
 Further info:
 
 On a dropped or carried weapon Prop_Send "m_iClip1" contains the primary ammo amount
 On dropped weapons (only!) Prop_Send "m_iExtraPrimaryAmmo" contains the reserve ammo amount 
 
 
+weapon_rifle_m60 is the new 'The Passing' gun, ammo is not in m_iAmmo
+m60 ammo is stored in gun entity, in m_iClip1
+
+spawn: class "weapon_rifle_m60_spawn"
+gun: class "weapon_rifle_m60"
+item_pickup item id: "rifle_m60"
+
 */
 
-#define PLUGIN_VERSION "1.0.6"
+#define PLUGIN_VERSION "1.0.8"
 
-new Handle:AssaultAmmoCVAR = INVALID_HANDLE;
-new Handle:SMGAmmoCVAR = INVALID_HANDLE;
-new Handle:ShotgunAmmoCVAR = INVALID_HANDLE;
-new Handle:AutoShotgunAmmoCVAR = INVALID_HANDLE;
-new Handle:HRAmmoCVAR = INVALID_HANDLE;
-new Handle:SniperRifleAmmoCVAR = INVALID_HANDLE;
-new Handle:GrenadeLauncherAmmoCVAR = INVALID_HANDLE;
+#define DEFAULT_FLAGS FCVAR_PLUGIN|FCVAR_NOTIFY
 
-new Handle:GrenadeResupplyCVAR = INVALID_HANDLE;
-new Handle:IncendAmmoMultiplier = INVALID_HANDLE;
-new Handle:SplosiveAmmoMultiplier = INVALID_HANDLE;
+static Handle:AssaultAmmoCVAR = INVALID_HANDLE;
+static Handle:SMGAmmoCVAR = INVALID_HANDLE;
+static Handle:ShotgunAmmoCVAR = INVALID_HANDLE;
+static Handle:AutoShotgunAmmoCVAR = INVALID_HANDLE;
+static Handle:HRAmmoCVAR = INVALID_HANDLE;
+static Handle:SniperRifleAmmoCVAR = INVALID_HANDLE;
+static Handle:GrenadeLauncherAmmoCVAR = INVALID_HANDLE;
+static Handle:M60AmmoCVAR = INVALID_HANDLE;
 
-new bool:buttondelay[MAXPLAYERS+1];
+static Handle:GrenadeResupplyCVAR = INVALID_HANDLE;
+static Handle:M60ResupplyCVAR = INVALID_HANDLE;
+static Handle:GLtoM60TransformCVAR = INVALID_HANDLE;
+static Handle:IncendAmmoMultiplier = INVALID_HANDLE;
+static Handle:SplosiveAmmoMultiplier = INVALID_HANDLE;
+
+static bool:buttondelay[MAXPLAYERS+1];
 
 public Plugin:myinfo = 
 {
@@ -57,19 +68,22 @@ public OnPluginStart()
 	if (!StrEqual(game_name, "left4dead2", false))
 		SetFailState("Plugin supports Left 4 Dead 2 only.");
 	
-	CreateConVar("l4d2_guncontrol_version", PLUGIN_VERSION, " Version of L4D2 Gun Control on this server ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("l4d2_guncontrol_version", PLUGIN_VERSION, " Version of L4D2 Gun Control on this server ", DEFAULT_FLAGS|FCVAR_SPONLY|FCVAR_DONTRECORD);
 	
-	AssaultAmmoCVAR = CreateConVar("l4d2_guncontrol_assaultammo", "360", " How much Ammo for Assault Rifles ", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	SMGAmmoCVAR = CreateConVar("l4d2_guncontrol_smgammo", "650", " How much Ammo for SMG gun types ", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	ShotgunAmmoCVAR = CreateConVar("l4d2_guncontrol_shotgunammo", "56", " How much Ammo for Shotgun and Chrome Shotgun ", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	AutoShotgunAmmoCVAR = CreateConVar("l4d2_guncontrol_autoshotgunammo", "90", " How much Ammo for Autoshottie and SPAS ", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	HRAmmoCVAR = CreateConVar("l4d2_guncontrol_huntingrifleammo", "150", " How much Ammo for the Hunting Rifle ", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	SniperRifleAmmoCVAR = CreateConVar("l4d2_guncontrol_sniperrifleammo", "180", " How much Ammo for the Military Sniper Rifle, AWP, and Scout ", FCVAR_PLUGIN|FCVAR_NOTIFY);	
-	GrenadeLauncherAmmoCVAR = CreateConVar("l4d2_guncontrol_grenadelauncherammo", "30", " How much Ammo for the Grenade Launcher ", FCVAR_PLUGIN|FCVAR_NOTIFY);	
+	AssaultAmmoCVAR = CreateConVar("l4d2_guncontrol_assaultammo", "360", " How much Ammo for Assault Rifles ", DEFAULT_FLAGS);
+	SMGAmmoCVAR = CreateConVar("l4d2_guncontrol_smgammo", "650", " How much Ammo for SMG gun types ", DEFAULT_FLAGS);
+	ShotgunAmmoCVAR = CreateConVar("l4d2_guncontrol_shotgunammo", "56", " How much Ammo for Shotgun and Chrome Shotgun ", DEFAULT_FLAGS);
+	AutoShotgunAmmoCVAR = CreateConVar("l4d2_guncontrol_autoshotgunammo", "90", " How much Ammo for Autoshottie and SPAS ", DEFAULT_FLAGS);
+	HRAmmoCVAR = CreateConVar("l4d2_guncontrol_huntingrifleammo", "150", " How much Ammo for the Hunting Rifle ", DEFAULT_FLAGS);
+	SniperRifleAmmoCVAR = CreateConVar("l4d2_guncontrol_sniperrifleammo", "180", " How much Ammo for the Military Sniper Rifle, AWP, and Scout ", DEFAULT_FLAGS);	
+	GrenadeLauncherAmmoCVAR = CreateConVar("l4d2_guncontrol_grenadelauncherammo", "30", " How much Ammo for the Grenade Launcher ", DEFAULT_FLAGS);
+	M60AmmoCVAR = CreateConVar("l4d2_guncontrol_m60ammo", "150", " How much Ammo for the M60 ", DEFAULT_FLAGS);	
 	
-	GrenadeResupplyCVAR = CreateConVar("l4d2_guncontrol_allowgrenadereplenish", "1", " Do you allow Players to resupply the Grenadelauncher off ammospots ", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	IncendAmmoMultiplier = CreateConVar("l4d2_guncontrol_incendammomulti", "3", " Multiplier for Incendiary Ammo Pickup Amount ", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	SplosiveAmmoMultiplier = CreateConVar("l4d2_guncontrol_explosiveammomulti", "1", " Multiplier for Explosive Ammo Pickup Amount ", FCVAR_PLUGIN|FCVAR_NOTIFY);
+	GrenadeResupplyCVAR = CreateConVar("l4d2_guncontrol_allowgrenadereplenish", "1", " Do you allow Players to resupply the Grenadelauncher off ammospots ", DEFAULT_FLAGS);
+	M60ResupplyCVAR = CreateConVar("l4d2_guncontrol_allowm60replenish", "1", " Do you allow Players to resupply the M60 off ammospots ", DEFAULT_FLAGS);
+	GLtoM60TransformCVAR = CreateConVar("l4d2_guncontrol_turnGLintoM60chance", "2", " Turns GL spawns into M60 spawns. Works as chance setting. 1 is FULL chance, 2 is half chance, 3 one third and so on ", DEFAULT_FLAGS);
+	IncendAmmoMultiplier = CreateConVar("l4d2_guncontrol_incendammomulti", "3", " Multiplier for Incendiary Ammo Pickup Amount ", DEFAULT_FLAGS);
+	SplosiveAmmoMultiplier = CreateConVar("l4d2_guncontrol_explosiveammomulti", "1", " Multiplier for Explosive Ammo Pickup Amount ", DEFAULT_FLAGS);
 	
 	HookConVarChange(AssaultAmmoCVAR, CVARChanged);
 	HookConVarChange(SMGAmmoCVAR, CVARChanged);
@@ -82,6 +96,10 @@ public OnPluginStart()
 	HookEvent("upgrade_pack_added", Event_SpecialAmmo);
 	
 	RegConsoleCmd("give_ammo", Cmd_GiveAmmo, "Gives the Player you look at your current ammo clip");
+	RegAdminCmd("sm_guncontroldebug", Cmd_ReadGunData, ADMFLAG_ROOT, " Reads your current weapons data ");
+	
+	HookEvent("item_pickup", Event_Item_Pickup);
+	HookEvent("round_start", Event_Round_Start);
 	
 	AutoExecConfig(true, "l4d2_guncontrol");
 	
@@ -109,6 +127,71 @@ UpdateConVars()
 	SetConVarInt(FindConVar("ammo_grenadelauncher_max"), GetConVarInt(GrenadeLauncherAmmoCVAR));
 }
 
+public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	ReplaceGrenadeLauncherWithM60(GetConVarInt(GLtoM60TransformCVAR));
+}
+
+ReplaceGrenadeLauncherWithM60(chance)
+{
+	if (chance == 0) return;
+
+	new ent = -1;
+	new prev = 0;
+	new replacement;
+	decl Float:origin[3];
+	decl Float:angles[3];
+	while ((ent = FindEntityByClassname(ent, "weapon_grenade_launcher_spawn")) != -1)
+	{
+		if (prev)
+		{
+			if (GetRandomInt(1, chance) == 1)
+			{
+				GetEntPropVector(prev, Prop_Send, "m_vecOrigin", origin);
+				GetEntPropVector(prev, Prop_Send, "m_angRotation", angles);
+				RemoveEdict(prev);
+				
+				replacement = CreateEntityByName("weapon_rifle_m60");
+				if (!IsValidEdict(replacement)) return;
+				
+				DispatchSpawn(replacement);
+				TeleportEntity(replacement, origin, angles, NULL_VECTOR);
+			}
+		}
+		prev = ent;
+	}
+	if (prev)
+	{
+		if (GetRandomInt(1, chance) == 1)
+		{
+			GetEntPropVector(prev, Prop_Send, "m_vecOrigin", origin);
+			GetEntPropVector(prev, Prop_Send, "m_angRotation", angles);
+			RemoveEdict(prev);
+			
+			replacement = CreateEntityByName("weapon_rifle_m60_spawn");
+			if (!IsValidEdict(replacement)) return;
+			
+			TeleportEntity(replacement, origin, angles, NULL_VECTOR);
+			DispatchSpawn(replacement);
+		}
+	}
+}
+
+public Action:Event_Item_Pickup(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	new client = GetClientOfUserId(GetEventInt(event, "userid"));
+	if (!client || !IsClientInGame(client)) return;
+	
+	decl String:itemname[128];
+	GetEventString(event, "item", itemname, sizeof(itemname));
+	//PrintToChat(client, "You picked up: %s", itemname);
+	if (!StrEqual(itemname, "rifle_m60", false)) return;
+	
+	new targetgun = GetPlayerWeaponSlot(client, 0);
+	if (!IsValidEdict(targetgun)) return;
+	SetEntProp(targetgun, Prop_Data, "m_iClip1", GetConVarInt(M60AmmoCVAR), 1);
+}
+
 public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:angles[3], &weapon)
 {
 	if (buttons & IN_USE && !buttondelay[client])
@@ -134,6 +217,13 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 			new iAmmoOffset = FindDataMapOffs(client, "m_iAmmo");
 			SetEntData(client, iAmmoOffset+64, GetConVarInt(GrenadeLauncherAmmoCVAR));
 			PrintHintText(client, "You remunitioned your Grenade Launcher!");
+		}
+		
+		// later added m60 remunition code, where "gun" actually is an ammopile.
+		if (StrEqual(ent_name, "weapon_ammo_spawn", false) && StrEqual(currentgunname, "weapon_rifle_m60", false) && GetConVarBool(M60ResupplyCVAR))
+		{
+			SetEntProp(oldgun, Prop_Data, "m_iClip1", GetConVarInt(M60AmmoCVAR), 1);
+			PrintHintText(client, "You remunitioned your M60!");
 		}
 		
 		if (!StrEqual(ent_name, currentgunname)) return Plugin_Continue; //if entity and primary weapon dont have the same name theyre incompatible
@@ -347,4 +437,32 @@ stock SetSpecialAmmoInPlayerGun(client, amount)
 	new gunent = GetPlayerWeaponSlot(client, 0);
 	if (IsValidEdict(gunent))
 		SetEntProp(gunent, Prop_Send, "m_nUpgradedPrimaryAmmoLoaded", amount, 1);
+}
+
+public Action:Cmd_ReadGunData(client, args)
+{
+	if (!client || !IsClientInGame(client))
+	{
+		ReplyToCommand(client, "Can only use this command ingame");
+		return Plugin_Handled;
+	}
+	
+	new targetgun = GetPlayerWeaponSlot(client, 0); //get the players primary weapon
+	if (!IsValidEdict(targetgun)) return Plugin_Handled; //check for validity
+	
+	decl String:name[256];
+	GetEdictClassname(targetgun, name, sizeof(name));
+	PrintToChat(client, "Gun Class: %s", name);
+	
+	new iAmmoOffset = FindDataMapOffs(client, "m_iAmmo"); //get the iAmmo Offset
+	PrintToChat(client, "m_iAmmo Offset: %i", iAmmoOffset);
+	
+	for (new offset = 0; offset <= 128 ; offset += 4)
+	{
+		PrintToChat(client, "Offset %i Value: %i", offset, GetEntData(client, (iAmmoOffset + offset)));
+	}
+	
+	PrintToChat(client, "m_iClip1 Value in gun: %i", GetEntProp(targetgun, Prop_Data, "m_iClip1", 1));
+	PrintToChat(client, "m_iExtraPrimaryAmmo Value in gun: %i", GetEntProp(targetgun, Prop_Data, "m_iExtraPrimaryAmmo", 4));
+	return Plugin_Handled;
 }
