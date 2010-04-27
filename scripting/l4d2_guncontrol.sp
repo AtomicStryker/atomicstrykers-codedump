@@ -2,19 +2,35 @@
 #include <sourcemod>
 #include <sdktools>
 
-/*
+#define PLUGIN_VERSION "1.1.2"
 
+#define TEST_DEBUG			0
+#define TEST_DEBUG_LOG		1
+
+#define DEFAULT_FLAGS FCVAR_PLUGIN|FCVAR_NOTIFY
+
+/*
 Datamap m_iAmmo
 offset to add - gun(s) - control cvar
 
 +12: M4A1, AK74, Desert Rifle, also SG552 - ammo_assaultrifle_max
 +20: both SMGs, also the MP5 - ammo_smg_max
-+24: both Pump Shotguns - ammo_shotgun_max
-+28: both autoshotguns - ammo_autoshotgun_max
-+32: Hunting Rifle - ammo_huntingrifle_max
-+36: Military Sniper, AWP, Scout - ammo_sniperrifle_max
-+64: Grenade Launcher - ammo_grenadelauncher_max
++28: both Pump Shotguns - ammo_shotgun_max
++32: both autoshotguns - ammo_autoshotgun_max
++36: Hunting Rifle - ammo_huntingrifle_max
++40: Military Sniper, AWP, Scout - ammo_sniperrifle_max
++68: Grenade Launcher - ammo_grenadelauncher_max
+*/
 
+static const	ASSAULT_RIFLE_OFFSET_IAMMO		= 12;
+static const	SMG_OFFSET_IAMMO				= 20;
+static const	PUMPSHOTGUN_OFFSET_IAMMO		= 28;
+static const	AUTO_SHOTGUN_OFFSET_IAMMO		= 32;
+static const	HUNTING_RIFLE_OFFSET_IAMMO		= 36;
+static const	MILITARY_SNIPER_OFFSET_IAMMO	= 40;
+static const	GRENADE_LAUNCHER_OFFSET_IAMMO	= 68;
+
+/*
 Further info:
 
 On a dropped or carried weapon Prop_Send "m_iClip1" contains the primary ammo amount
@@ -27,15 +43,7 @@ m60 ammo is stored in gun entity, in m_iClip1
 spawn: class "weapon_rifle_m60_spawn"
 gun: class "weapon_rifle_m60_spawn"
 item_pickup item id: "rifle_m60"
-
 */
-
-#define PLUGIN_VERSION "1.0.9"
-
-#define TEST_DEBUG			0
-#define TEST_DEBUG_LOG		1
-
-#define DEFAULT_FLAGS FCVAR_PLUGIN|FCVAR_NOTIFY
 
 static Handle:AssaultAmmoCVAR = INVALID_HANDLE;
 static Handle:SMGAmmoCVAR = INVALID_HANDLE;
@@ -260,12 +268,12 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 		if (StrEqual(ent_name, "weapon_ammo_spawn", false) && StrEqual(currentgunname, "weapon_grenade_launcher", false) && GetConVarBool(GrenadeResupplyCVAR))
 		{
 			new iAmmoOffset = FindDataMapOffs(client, "m_iAmmo");
-			SetEntData(client, iAmmoOffset+64, GetConVarInt(GrenadeLauncherAmmoCVAR));
+			SetEntData(client, iAmmoOffset + GRENADE_LAUNCHER_OFFSET_IAMMO, GetConVarInt(GrenadeLauncherAmmoCVAR));
 			PrintHintText(client, "You remunitioned your Grenade Launcher!");
 		}
 		
 		// later added m60 remunition code, where "gun" actually is an ammopile.
-		if (StrEqual(ent_name, "weapon_ammo_spawn", false) && StrEqual(currentgunname, "weapon_rifle_m60_spawn", false) && GetConVarBool(M60ResupplyCVAR))
+		if (StrEqual(ent_name, "weapon_ammo_spawn", false) && StrEqual(currentgunname, "weapon_rifle_m60", false) && GetConVarBool(M60ResupplyCVAR))
 		{
 			SetEntProp(oldgun, Prop_Data, "m_iClip1", GetConVarInt(M60AmmoCVAR), 1);
 			PrintHintText(client, "You remunitioned your M60!");
@@ -278,32 +286,32 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 		
 		if (StrEqual(ent_name, "weapon_rifle", false) || StrEqual(ent_name, "weapon_rifle_ak47", false) || StrEqual(ent_name, "weapon_rifle_desert", false) || StrEqual(ent_name, "weapon_rifle_sg552", false))
 		{ //case: Assault rifles
-			offsettoadd = 12; //gun type specific offset
+			offsettoadd = ASSAULT_RIFLE_OFFSET_IAMMO; //gun type specific offset
 			maxammo = GetConVarInt(AssaultAmmoCVAR); //get max ammo as set
 		}
 		else if (StrEqual(ent_name, "weapon_smg", false) || StrEqual(ent_name, "weapon_smg_silenced", false) || StrEqual(ent_name, "weapon_smg_mp5", false))
 		{ //case: SMGS
-			offsettoadd = 20; //gun type specific offset
+			offsettoadd = SMG_OFFSET_IAMMO; //gun type specific offset
 			maxammo = GetConVarInt(SMGAmmoCVAR); //get max ammo as set
 		}		
 		else if (StrEqual(ent_name, "weapon_pumpshotgun", false) || StrEqual(ent_name, "weapon_shotgun_chrome", false))
 		{ //case: Pump Shotguns
-			offsettoadd = 24; //gun type specific offset
+			offsettoadd = PUMPSHOTGUN_OFFSET_IAMMO; //gun type specific offset
 			maxammo = GetConVarInt(ShotgunAmmoCVAR); //get max ammo as set
 		}
 		else if (StrEqual(ent_name, "weapon_autoshotgun", false) || StrEqual(ent_name, "weapon_shotgun_spas", false))
 		{ //case: Auto Shotguns
-			offsettoadd = 28; //gun type specific offset
+			offsettoadd = AUTO_SHOTGUN_OFFSET_IAMMO; //gun type specific offset
 			maxammo = GetConVarInt(AutoShotgunAmmoCVAR); //get max ammo as set
 		}
 		else if (StrEqual(ent_name, "weapon_hunting_rifle", false))
 		{ //case: Hunting Rifle
-			offsettoadd = 32; //gun type specific offset
+			offsettoadd = HUNTING_RIFLE_OFFSET_IAMMO; //gun type specific offset
 			maxammo = GetConVarInt(HRAmmoCVAR); //get max ammo as set
 		}
 		else if (StrEqual(ent_name, "weapon_sniper_military", false) || StrEqual(ent_name, "weapon_sniper_awp", false) || StrEqual(ent_name, "weapon_sniper_scout", false))
 		{ //case: Military Sniper Rifle or CSS Snipers
-			offsettoadd = 36; //gun type specific offset
+			offsettoadd = MILITARY_SNIPER_OFFSET_IAMMO; //gun type specific offset
 			maxammo = GetConVarInt(SniperRifleAmmoCVAR); //get max ammo as set
 		}
 		else
@@ -380,32 +388,32 @@ public Action:Cmd_GiveAmmo(client, args)
 	
 	if (StrEqual(currentgunname, "weapon_rifle", false) || StrEqual(currentgunname, "weapon_rifle_ak47", false) || StrEqual(currentgunname, "weapon_rifle_desert", false) || StrEqual(currentgunname, "weapon_rifle_sg552", false))
 	{ //case: Assault rifles
-		offsettoadd = 12; //gun type specific offset
+		offsettoadd = ASSAULT_RIFLE_OFFSET_IAMMO; //gun type specific offset
 		maxammo = GetConVarInt(AssaultAmmoCVAR); //get max ammo as set
 	}
 	else if (StrEqual(currentgunname, "weapon_smg", false) || StrEqual(currentgunname, "weapon_smg_silenced", false) || StrEqual(currentgunname, "weapon_smg_mp5", false))
 	{ //case: SMGS
-		offsettoadd = 20; //gun type specific offset
+		offsettoadd = SMG_OFFSET_IAMMO; //gun type specific offset
 		maxammo = GetConVarInt(SMGAmmoCVAR); //get max ammo as set
 	}		
 	else if (StrEqual(currentgunname, "weapon_pumpshotgun", false) || StrEqual(currentgunname, "weapon_shotgun_chrome", false))
 	{ //case: Pump Shotguns
-		offsettoadd = 24; //gun type specific offset
+		offsettoadd = PUMPSHOTGUN_OFFSET_IAMMO; //gun type specific offset
 		maxammo = GetConVarInt(ShotgunAmmoCVAR); //get max ammo as set
 	}
 	else if (StrEqual(currentgunname, "weapon_autoshotgun", false) || StrEqual(currentgunname, "weapon_shotgun_spas", false))
 	{ //case: Auto Shotguns
-		offsettoadd = 28; //gun type specific offset
+		offsettoadd = AUTO_SHOTGUN_OFFSET_IAMMO; //gun type specific offset
 		maxammo = GetConVarInt(AutoShotgunAmmoCVAR); //get max ammo as set
 	}
 	else if (StrEqual(currentgunname, "weapon_hunting_rifle", false))
 	{ //case: Hunting Rifle
-		offsettoadd = 32; //gun type specific offset
+		offsettoadd = HUNTING_RIFLE_OFFSET_IAMMO; //gun type specific offset
 		maxammo = GetConVarInt(HRAmmoCVAR); //get max ammo as set
 	}
 	else if (StrEqual(currentgunname, "weapon_sniper_military", false) || StrEqual(currentgunname, "weapon_sniper_awp", false) || StrEqual(currentgunname, "weapon_sniper_scout", false))
 	{ //case: Military Sniper Rifle or CSS Snipers
-		offsettoadd = 36; //gun type specific offset
+		offsettoadd = MILITARY_SNIPER_OFFSET_IAMMO; //gun type specific offset
 		maxammo = GetConVarInt(SniperRifleAmmoCVAR); //get max ammo as set
 	}
 	else

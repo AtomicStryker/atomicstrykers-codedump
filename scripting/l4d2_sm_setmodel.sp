@@ -23,7 +23,7 @@ public OnPluginStart()
 	
 	CreateConVar("l4d2_setsurvivormodel_version", PLUGIN_VERSION, "The version of L4D2 Set Survivor Model on this server", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_DONTRECORD);
 	
-	MyModelAllowedCvar = CreateConVar("l4d2_setsurvivormodel_freechoice", "0", "Do you allow players to use the sm_setmymodel command", FCVAR_PLUGIN|FCVAR_NOTIFY);	
+	MyModelAllowedCvar = CreateConVar("l4d2_setsurvivormodel_freechoice", "0", "Do you allow players to use the sm_setmymodel command", FCVAR_PLUGIN|FCVAR_NOTIFY);
 }
 
 /*
@@ -43,6 +43,14 @@ public Action:Command_GetModel(client, args)
 	return Plugin_Handled;
 }
 */
+
+public OnMapStart()
+{
+	if (!IsModelPrecached("models/survivors/survivor_teenangst.mdl")) PrecacheModel("models/survivors/survivor_teenangst.mdl", true);
+	if (!IsModelPrecached("models/survivors/survivor_biker.mdl")) PrecacheModel("models/survivors/survivor_biker.mdl", true);
+	if (!IsModelPrecached("models/survivors/survivor_manager.mdl")) PrecacheModel("models/survivors/survivor_manager.mdl", true);
+	if (!IsModelPrecached("models/survivors/survivor_namvet.mdl")) PrecacheModel("models/survivors/survivor_namvet.mdl", true);
+}
 
 public Action:Command_SetModel(client, args)
 {
@@ -80,6 +88,26 @@ public Action:Command_SetModel(client, args)
 	{
 		if (GetClientTeam(player_id) == 2) SetEntData(player_id, survoffset, 3, 1, true);
 		SetEntityModel(player_id, "models/survivors/survivor_mechanic.mdl");
+	}
+	else if (StrEqual(model, "Zoey", false))
+	{
+		if (GetClientTeam(player_id) == 2) SetEntData(player_id, survoffset, 5, 1, true);	
+		SetEntityModel(player_id, "models/survivors/survivor_teenangst.mdl");
+	}
+	else if (StrEqual(model, "Francis", false))
+	{
+		if (GetClientTeam(player_id) == 2) SetEntData(player_id, survoffset, 6, 1, true);			
+		SetEntityModel(player_id, "models/survivors/survivor_biker.mdl");
+	}
+	else if (StrEqual(model, "Louis", false))
+	{
+		if (GetClientTeam(player_id) == 2) SetEntData(player_id, survoffset, 7, 1, true);				
+		SetEntityModel(player_id, "models/survivors/survivor_manager.mdl");
+	}
+	else if (StrEqual(model, "Bill", false))
+	{
+		if (GetClientTeam(player_id) == 2) SetEntData(player_id, survoffset, 0, 1, true);
+		SetEntityModel(player_id, "models/survivors/survivor_namvet.mdl");
 	}
 	
 	return Plugin_Handled;
@@ -124,6 +152,26 @@ public Action:Command_SetMyModel(client, args)
 	{
 		if (GetClientTeam(client) == 2) SetEntData(client, survoffset, 3, 1, true);
 		SetEntityModel(client, "models/survivors/survivor_mechanic.mdl");
+	}
+	else if (StrEqual(model, "Zoey", false))
+	{
+		if (GetClientTeam(client) == 2) SetEntData(client, survoffset, 5, 1, true);	
+		SetEntityModel(client, "models/survivors/survivor_teenangst.mdl");
+	}
+	else if (StrEqual(model, "Francis", false))
+	{
+		if (GetClientTeam(client) == 2) SetEntData(client, survoffset, 6, 1, true);			
+		SetEntityModel(client, "models/survivors/survivor_biker.mdl");
+	}
+	else if (StrEqual(model, "Louis", false))
+	{
+		if (GetClientTeam(client) == 2) SetEntData(client, survoffset, 7, 1, true);				
+		SetEntityModel(client, "models/survivors/survivor_manager.mdl");
+	}
+	else if (StrEqual(model, "Bill", false))
+	{
+		if (GetClientTeam(client) == 2) SetEntData(client, survoffset, 0, 1, true);
+		SetEntityModel(client, "models/survivors/survivor_namvet.mdl");
 	}
 	
 	return Plugin_Handled;
