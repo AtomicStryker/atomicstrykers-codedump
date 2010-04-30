@@ -1,7 +1,7 @@
 #pragma semicolon 1
 #include <sourcemod>
 #include <sdktools>
-#define PLUGIN_VERSION "1.0.1"
+#define PLUGIN_VERSION "1.0.2"
 
 public Plugin:myinfo =
 {
@@ -13,10 +13,11 @@ public Plugin:myinfo =
 };
 
 
-static bool:MapHasConfig	= false;
-static bool:MapHandled 		= true;
-static bool:RoundHandled 	= false;
-static MapRoute 			= 1;
+static Handle:cvarRoutingGamemodes 	= INVALID_HANDLE;
+static bool:MapHasConfig			= false;
+static bool:MapHandled 				= true;
+static bool:RoundHandled 			= false;
+static MapRoute 					= 1;
 
 
 public OnPluginStart()
@@ -24,6 +25,7 @@ public OnPluginStart()
 	RequireL4D2();
 
 	CreateConVar("l4d2_routing_version", PLUGIN_VERSION, " Version of L4D2 Routing Plugin on this server ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("l4d2_routing_gamemodes", "versus,teamversus,mutation12", " What gamemodes the Plugin is supposed to be active in ", FCVAR_PLUGIN|FCVAR_NOTIFY);
 
 	HookEvent("round_start", RoundStart_Event, EventHookMode_PostNoCopy);
 	CreateTimer(5.0, CheckForNeededActions, 0, TIMER_REPEAT);
@@ -74,7 +76,7 @@ public Action:CheckForNeededActions(Handle:timer)
 {
 	if (!MapHasConfig) return Plugin_Continue;
 
-	if (HasASurvivorLeftSaferoom() && IsVersus())
+	if (HasASurvivorLeftSaferoom() && IsAllowedGameMode())
 	{
 		if (!MapHandled)
 		{
@@ -201,11 +203,13 @@ stock bool:HasASurvivorLeftSaferoom()
 	return false;
 }
 
-stock bool:IsVersus()
+stock bool:IsAllowedGameMode()
 {
-	decl String:gamemode[24];
+	decl String:gamemode[24], String:gamemodeactive[64];
 	GetConVarString(FindConVar("mp_gamemode"), gamemode, sizeof(gamemode));
-	return (StrContains(gamemode, "versus", false) > -1);
+	GetConVarString(cvarRoutingGamemodes, gamemodeactive, sizeof(gamemodeactive));
+
+	return (StrContains(gamemodeactive, gamemode) != -1);
 }
 
 stock RequireL4D2()

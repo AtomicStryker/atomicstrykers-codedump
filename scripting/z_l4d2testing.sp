@@ -20,6 +20,8 @@ public OnPluginStart()
 	RegAdminCmd("sm_replacetank", Cmd4, ADMFLAG_CHEATS, "ReplaceTank <player> <player>");
 	
 	RegAdminCmd("sm_spawnas", Cmd5, ADMFLAG_CHEATS, "sm_spawnas <player> <infectedclass>");
+	
+	RegAdminCmd("sm_vocalize", Cmd6, ADMFLAG_CHEATS, "sm_vocalize <command>");
 }
 
 public Action:Cmd1(client, args)
@@ -204,6 +206,55 @@ public Action:Cmd5(client, args)
 		}
 	}
 	return Plugin_Handled;
+}
+
+public Action:Cmd6(client, args)
+{
+	if (!client || !args) return Plugin_Handled;
+	
+	if (args < 3)
+	{
+		ReplyToCommand(client, "Usage: sm_vocalize <command> <float> <float>");
+		return Plugin_Handled;
+	}
+	
+	decl String:arg[256], String:floatstring[24];
+	GetCmdArg(1, arg, sizeof(arg));
+	
+	GetCmdArg(2, floatstring, sizeof(floatstring));
+	new Float:floatA = StringToFloat(floatstring);
+
+	GetCmdArg(3, floatstring, sizeof(floatstring));
+	new Float:floatB = StringToFloat(floatstring);
+	
+	L4D2_Vocalize(client, arg, floatA, floatB);
+	
+	return Plugin_Continue;
+}
+
+
+// CTerrorPlayer::Vocalize(char const *, float, float)
+L4D2_Vocalize(client, const String:Vocalize[], Float:floatA, Float:floatB)
+{
+	DebugPrintToAll("Vocalize being called, client %N command %s floatA %f floatB %f", client, Vocalize, floatA, floatB);
+
+	new Handle:MySDKCall = INVALID_HANDLE;
+	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "Vocalize");
+	PrepSDKCall_AddParameter(SDKType_String, SDKPass_Pointer);
+	PrepSDKCall_AddParameter(SDKType_Float, SDKPass_Plain);
+	PrepSDKCall_AddParameter(SDKType_Float, SDKPass_Plain);
+	MySDKCall = EndPrepSDKCall();
+	CloseHandle(ConfigFile);
+	
+	if (MySDKCall == INVALID_HANDLE)
+	{
+		LogError("Cant initialize Vocalize SDKCall");
+		return;
+	}
+	
+	SDKCall(MySDKCall, client, Vocalize, floatA, floatB);
 }
 
 // CTerrorPlayer::TakeOverZombieBot(CTerrorPlayer*)
