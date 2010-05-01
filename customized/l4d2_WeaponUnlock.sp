@@ -176,7 +176,7 @@ public Action:RoundStartDelayed(Handle:timer)
 		return;
 	}
 	
-	if (StrEqual(GameMode, "versus") || StrEqual(GameMode, "mutation12"))
+	if (StrEqual(GameMode, "versus") || StrEqual(GameMode, "teamversus") || StrEqual(GameMode, "mutation12"))
 	{
 		if (g_bNewMap)
 		{

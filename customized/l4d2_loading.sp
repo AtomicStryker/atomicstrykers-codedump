@@ -161,6 +161,7 @@ public OnMapStart()
 {
 	isFirstPlayer = true;
 	isFirstRound = true;
+	SetConVarInt(FindConVar("sb_stop"), 1);
 
 	for (new i = 1; i <= MaxClients; i++)
 	{
@@ -185,6 +186,8 @@ public Event_RoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 
 	if (StrContains(gamemodeactive, gamemode) != -1)
 	{
+		SetConVarInt(FindConVar("sb_stop"), 1);
+	
 		#if DEBUG_SCRIM
 		PrintDebugMessage("[DEBUG] Starting new round");
 		#endif
@@ -1069,6 +1072,7 @@ public Action:LiveTimer(Handle:timer)
 		countDown = 0;
 
 		PrintTextAll("Round started - move out");
+		SetConVarInt(FindConVar("sb_stop"), 0);
 
 		if (!isFirstMap && checkPointDoorEntityStart != 0) SpawnFakeDoor(checkPointDoorEntityStart, false, 0.1);
 		UnFreezePlayers();
@@ -1109,6 +1113,7 @@ public Action:StartTimer(Handle:timer)
 		countDown = 0;
 
 		PrintTextAll("Round started - move out");
+		SetConVarInt(FindConVar("sb_stop"), 0);
 
 		if (!isFirstMap)
 		{
@@ -2039,6 +2044,11 @@ public Action:SpawnFakeDoorDelayed(Handle:timer, Handle:datapack)
 	new ent = ReadPackCell(datapack);
 	new cantOpen = ReadPackCell(datapack);
 	CloseHandle(datapack);
+	
+	if (!cantOpen)
+	{
+		SetConVarInt(FindConVar("sb_stop"), 0);
+	}
 
 	if (IsValidEntity(ent))
 	{

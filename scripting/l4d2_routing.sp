@@ -25,7 +25,7 @@ public OnPluginStart()
 	RequireL4D2();
 
 	CreateConVar("l4d2_routing_version", PLUGIN_VERSION, " Version of L4D2 Routing Plugin on this server ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_DONTRECORD);
-	CreateConVar("l4d2_routing_gamemodes", "versus,teamversus,mutation12", " What gamemodes the Plugin is supposed to be active in ", FCVAR_PLUGIN|FCVAR_NOTIFY);
+	cvarRoutingGamemodes = CreateConVar("l4d2_routing_gamemodes", "versus,teamversus,mutation12", " What gamemodes the Plugin is supposed to be active in ", FCVAR_PLUGIN|FCVAR_NOTIFY);
 
 	HookEvent("round_start", RoundStart_Event, EventHookMode_PostNoCopy);
 	CreateTimer(5.0, CheckForNeededActions, 0, TIMER_REPEAT);
