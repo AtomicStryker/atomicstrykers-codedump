@@ -3,7 +3,7 @@
 #pragma semicolon				1
 
 
-#define PLUGIN_VERSION 			"0.8.4"
+#define PLUGIN_VERSION 			"0.8.5"
 #define TEST_DEBUG				0
 #define TEST_DEBUG_LOG			1
 
@@ -579,7 +579,7 @@ static PrecacheWeaponModels()
 	CheckModelPreCache("models/v_models/v_smg_mp5.mdl");
 	CheckModelPreCache("models/v_models/v_snip_awp.mdl");
 	CheckModelPreCache("models/v_models/v_snip_scout.mdl");
-	CheckModelPreCache("models/v_models/weapons/v_bile_flask.mdl");
+	CheckModelPreCache("models/v_models/v_bile_flask.mdl");
 	CheckModelPreCache("models/w_models/weapons/w_m60.mdl");
 	CheckModelPreCache("models/v_models/v_m60.mdl");
 }

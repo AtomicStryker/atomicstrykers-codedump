@@ -22,6 +22,8 @@ public OnPluginStart()
 	RegAdminCmd("sm_spawnas", Cmd5, ADMFLAG_CHEATS, "sm_spawnas <player> <infectedclass>");
 	
 	RegAdminCmd("sm_vocalize", Cmd6, ADMFLAG_CHEATS, "sm_vocalize <command>");
+	
+	RegAdminCmd("sm_getvscomp", Cmd7, ADMFLAG_CHEATS, "sm_getvscomp <charint> <int>");
 }
 
 public Action:Cmd1(client, args)
@@ -232,6 +234,28 @@ public Action:Cmd6(client, args)
 	return Plugin_Continue;
 }
 
+public Action:Cmd7(client, args)
+{
+	if (!client || !args) return Plugin_Handled;
+	
+	if (args < 2)
+	{
+		ReplyToCommand(client, "Usage: sm_getvscomp <charint> <int>");
+		return Plugin_Handled;
+	}
+	
+	decl String:arg[256];
+	GetCmdArg(1, arg, sizeof(arg));
+	new A = StringToInt(arg);
+	
+	GetCmdArg(2, arg, sizeof(arg));
+	new B = StringToInt(arg);
+	
+	ReplyToCommand(client, "GetVSCompletionPerChar Output: %i", L4D2_GetVSCompletionPerChar(A, B));
+	
+	return Plugin_Continue;
+}
+
 
 // CTerrorPlayer::Vocalize(char const *, float, float)
 L4D2_Vocalize(client, const String:Vocalize[], Float:floatA, Float:floatB)
@@ -363,6 +387,30 @@ L4D2_ReplaceTank(client, target)
 	}
 	
 	SDKCall(MySDKCall, g_pZombieManager, client, target);
+}
+
+// CTerrorGameRules::GetVersusCompletionPerCharacter(SurvivorCharacterType, int)const
+L4D2_GetVSCompletionPerChar(SurvivorCharacterType, int)
+{
+	DebugPrintToAll("GetVersusCompletionPerCharacter being called, SurvivorCharacterType %i int %i", SurvivorCharacterType, int);
+
+	new Handle:MySDKCall = INVALID_HANDLE;
+	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
+	StartPrepSDKCall(SDKCall_GameRules);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "GetVersusCompletionPerCharacter");
+	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
+	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
+	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
+	MySDKCall = EndPrepSDKCall();
+	CloseHandle(ConfigFile);
+	
+	if (MySDKCall == INVALID_HANDLE)
+	{
+		LogError("Cant initialize GetVersusCompletionPerCharacter SDKCall");
+		return -1;
+	}
+	
+	return SDKCall(MySDKCall, SurvivorCharacterType, int);
 }
 
 L4D2_RespawnAsClassGhost(client, class)

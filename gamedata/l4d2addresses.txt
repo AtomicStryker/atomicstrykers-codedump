@@ -458,6 +458,19 @@
 				/*	53 8B 5C 24 08 56 8B F1 39 9E ? ? 00 00 74 ? 80 7E ? 00 74 ? 80 4E ? 01 EB	*/
 			}
 			
+			/*
+			 * CTerrorGameRules::GetVersusCompletionPerCharacter(SurvivorCharacterType, int)const
+			 *
+			 *	SurvivorCharacterType is likely int, 0-3 or 1-4
+			 *  function can be found via the  CDirectorVersusMode::UpdateMarkersReached(void) function, unique string "versus_marker_reached"
+			 */
+			"GetVersusCompletionPerCharacter"
+			{
+				"library"	"server"
+				"linux"	"@_ZNK16CTerrorGameRules31GetVersusCompletionPerCharacterE21SurvivorCharacterTypei"
+				"windows" "\x57\x8B\xF9\xE8\x2A\x2A\x2A\x2A\x84\xC0\x75\x2A\x8B\x4C\x2A\x2A\xB8\x2A\x2A\x2A\x2A\x8D"
+				/* 57 8B F9 E8 ? ? ? ? 84 C0 75 ? 8B 4C ? ? B8 ? ? ? ? 8D */
+			}
 		}
 	}
 }
