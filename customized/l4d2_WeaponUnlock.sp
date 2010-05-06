@@ -429,7 +429,7 @@ static SetModelForWeaponId(weaponent, id)
 		case SMG_MP5: 			SetEntityModel(weaponent, "models/w_models/weapons/w_smg_mp5.mdl");
 		case PISTOL_MAGNUM: 	SetEntityModel(weaponent, "models/w_models/weapons/w_desert_eagle.mdl");
 		case RIFLE_AK47: 		SetEntityModel(weaponent, "models/w_models/weapons/w_rifle_ak47.mdl");
-		case VOMITJAR: 			SetEntityModel(weaponent, "models/w_models/weapons/w_eq_bile_flask.mld");
+		case VOMITJAR: 			SetEntityModel(weaponent, "models/w_models/weapons/w_eq_bile_flask.mdl");
 		case PIPE_BOMB: 		SetEntityModel(weaponent, "models/w_models/weapons/w_eq_pipebomb.mdl");
 		case MOLOTOV: 			SetEntityModel(weaponent, "models/w_models/weapons/w_eq_molotov.mdl");
 		case SHOTGUN_SPAS: 		SetEntityModel(weaponent, "models/w_models/weapons/w_shotgun_spas.mdl");

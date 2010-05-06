@@ -1,5 +1,5 @@
 #include <sourcemod>
-#define PLUGIN_VERSION "1.0.5"
+#define PLUGIN_VERSION "1.0.6"
 
 public Plugin:myinfo = 
 {
@@ -10,14 +10,14 @@ public Plugin:myinfo =
 	url = "http://forums.alliedmods.net/showthread.php?t=103203"
 }
 
-new Handle:LoadingTimer[MAXPLAYERS+1] = INVALID_HANDLE; // one Handle for each client
-new Handle:CvarDuration = INVALID_HANDLE;
+static Handle:LoadingTimer[MAXPLAYERS+1] 	= INVALID_HANDLE;
+static Handle:cvarDuration 					= INVALID_HANDLE;
 
 public OnPluginStart()
 {
 	RegAdminCmd("sm_kickloading", KickLoaders, ADMFLAG_KICK, "Kicks everyone Connected but not ingame");
-	CreateConVar("l4d_kickloadstuckers_version", PLUGIN_VERSION, " Version of L4D Kick Load Stuckers on this server ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_DONTRECORD);
-	CvarDuration = CreateConVar("l4d_kickloadstuckers_duration", "60", " How long before a connected but not ingame player is kicked. (default 60) ", FCVAR_PLUGIN|FCVAR_NOTIFY);
+	CreateConVar(				"l4d_kickloadstuckers_version", 	PLUGIN_VERSION, " Version of L4D Kick Load Stuckers on this server ", 							FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	cvarDuration = CreateConVar("l4d_kickloadstuckers_duration", 	"60", 			" How long before a connected but not ingame player is kicked. (default 60) ", 	FCVAR_PLUGIN|FCVAR_NOTIFY);
 }
 
 public OnMapEnd()
@@ -37,9 +37,7 @@ public Action:KickLoaders(clients, args)
 		if (!IsClientConnected(i)) continue;
 		if (!IsClientInGame(i))
 		{
-			decl String:name[256];
-			GetClientName(i, name, sizeof(name));
-			PrintToChatAll("%s was admin kicked for being stuck in connecting state", name);
+			PrintToChatAll("%N was admin kicked for being stuck in connecting state", i);
 			
 			//BanClient(i, 0, BANFLAG_AUTO, "Slowass Loading", "Slowass Loader");
 			KickClient(i, "You were stuck Connecting for too long");
@@ -50,7 +48,7 @@ public Action:KickLoaders(clients, args)
 
 public OnClientConnected(client)
 {
-	LoadingTimer[client] = CreateTimer(GetConVarFloat(CvarDuration), CheckClientIngame, client, TIMER_FLAG_NO_MAPCHANGE); //on successfull connect the Timer is set in motion
+	LoadingTimer[client] = CreateTimer(GetConVarFloat(cvarDuration), CheckClientIngame, client, TIMER_FLAG_NO_MAPCHANGE); //on successfull connect the Timer is set in motion
 }
 
 public OnClientDisconnect(client)
@@ -69,24 +67,27 @@ public Action:CheckClientIngame(Handle:timer, any:client)
 	
 	if (!IsClientInGame(client))
 	{
-		decl String:name[256];
-		GetClientName(client, name, sizeof(name));
-		PrintToChatAll("%s was kicked for being stuck in connecting state for %i seconds", name, RoundToNearest(GetConVarFloat(CvarDuration)));
+		//player log file code. name and steamid only
+		decl String:file[PLATFORM_MAX_PATH], String:steamid[128];
+		BuildPath(Path_SM, file, sizeof(file), "logs/stuckplayerlog.log");
+	
+		GetClientAuthString(client, steamid, sizeof(steamid));
+		if (FindAdminByIdentity(AUTHMETHOD_STEAM, steamid) != INVALID_ADMIN_ID)
+		{
+			LogToFileEx(file, "%s - %N - NOT KICKED DUE TO ADMIN STATUS", steamid, client);
+			return;
+		}
+	
+		PrintToChatAll("%N was kicked for being stuck in connecting state for %i seconds", client, RoundToNearest(GetConVarFloat(cvarDuration)));
 		
 		KickClient(client, "You were stuck Connecting for too long");
-			
-		//player log file code. name and steamid only
-		decl String:file[PLATFORM_MAX_PATH], String:steamid[100];
 		
-		BuildPath(Path_SM, file, sizeof(file), "logs/stuckplayerlog.log");
-		GetClientAuthString(client, steamid, sizeof(steamid));
-		
-		LogToFileEx(file, "%s - %s", steamid, name); // this logs their steamids and names. to be banned.
+		LogToFileEx(file, "%s - %N", steamid, client); // this logs their steamids and names. to be banned.
 	}
 	LoadingTimer[client] = INVALID_HANDLE
 }
 
-KillAllTimers()
+static KillAllTimers()
 {
 	for (new i = 1; i <= MaxClients; i++)
 	{
@@ -102,8 +103,7 @@ stock bool:AreHumansConnected()
 {
 	for (new i = 1; i <= MaxClients; i++)
 	{
-		if (IsClientConnected(i))
-			if (!IsFakeClient(i)) return true;
+		if (IsClientConnected(i) && !IsFakeClient(i)) return true;
 	}
 	return false;
 }
