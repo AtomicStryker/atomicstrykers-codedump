@@ -9,7 +9,7 @@ public Plugin:myinfo =
 	author = " AtomicStryker",
 	description = " To work with Stripper configs ",
 	version = PLUGIN_VERSION,
-	url = ""
+	url = "http://forums.alliedmods.net/showthread.php?p=1172643"
 };
 
 
