@@ -1,7 +1,7 @@
 #pragma semicolon 1
 #include <sourcemod>
 #include <sdktools>
-#define PLUGIN_VERSION "1.0.3"
+#define PLUGIN_VERSION "1.0.4"
 
 public Plugin:myinfo =
 {
@@ -17,6 +17,7 @@ static Handle:cvarRoutingGamemodes 	= INVALID_HANDLE;
 static bool:MapHasConfig			= false;
 static bool:MapHandled 				= true;
 static bool:RoundHandled 			= false;
+static bool:ForceCooldown			= false;
 static MapRoute 					= 1;
 
 
@@ -42,6 +43,7 @@ public OnMapStart()
 {
 	MapHandled = false;
 	MapHasConfig = false;
+	MapRoute = 0;
 
 	// the following code checks for the existence of Atomic-Compliant *gg* pathing
 	new ent = -1;
@@ -81,7 +83,10 @@ public Action:CheckForNeededActions(Handle:timer)
 		if (!MapHandled)
 		{
 			CheatCommand(_, "ent_fire", "relay_routing_init trigger"); // destroys Valve routing entities
-			MapRoute = GetRandomInt(1,3); // picks a path for the map, both rounds. 1 is easy, 3 is hard
+			if (!MapRoute) // breaker in case admin already overrode pathing
+			{
+				MapRoute = GetRandomInt(1,3); // picks a path for the map, both rounds. 1 is easy, 3 is hard
+			}
 			
 			decl String:Difficulty[12];
 			switch (MapRoute)
@@ -128,6 +133,12 @@ public Action:ForcePath_Command(client, args)
 		return Plugin_Handled;
 	}
 	
+	if (ForceCooldown)
+	{
+		ReplyToCommand(client, "[SM] Cannot change routes so fast, wait a few seconds");
+		return Plugin_Handled;
+	}
+	
 	decl String:command[24];
 	GetCmdArg(1, command, sizeof(command));
 	
@@ -157,7 +168,15 @@ public Action:ForcePath_Command(client, args)
 		ReplyToCommand(client, "[SM] Usage: sm_forcepath <easy|medium|hard>");
 	}
 	
+	ForceCooldown = true;
+	CreateTimer(3.0, timerResetForceCooldown);
+	
 	return Plugin_Handled;
+}
+
+public Action:timerResetForceCooldown(Handle:timer)
+{
+	ForceCooldown = false;
 }
 
 stock CheatCommand(client = 0, String:command[], String:arguments[]="")
