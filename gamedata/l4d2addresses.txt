@@ -471,6 +471,19 @@
 				"windows" "\x57\x8B\xF9\xE8\x2A\x2A\x2A\x2A\x84\xC0\x75\x2A\x8B\x4C\x2A\x2A\xB8\x2A\x2A\x2A\x2A\x8D"
 				/* 57 8B F9 E8 ? ? ? ? 84 C0 75 ? 8B 4C ? ? B8 ? ? ? ? 8D */
 			}
+			
+			/*
+			 * CTerrorGameRules::RecordInfectedDamageForVersus(int)
+			 *
+			 *  Found using AreTeamsFlipped and NotifyNetWorkStateChanged - but im not sure its the right one
+			 */
+			"RecordInfectedDamageForVersus"
+			{
+				"library"	"server"
+				"linux"	"@_ZN16CTerrorGameRules29RecordInfectedDamageForVersusEi"
+				"windows" "\x56\x57\x8B\xF9\xE8\x2A\x2A\x2A\x2A\x84\xC0\x75\x2A\xBE\x01\x2A\x2A\x2A\xEB"
+				/* 56 57 8B F9 E8 ? ? ? ? 84 C0 75 ? BE 01 ? ? ? EB */
+			}
 		}
 	}
 }

@@ -1,7 +1,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.0"
+#define PLUGIN_VERSION "1.0.1"
 
 
 public Plugin:myinfo =
@@ -16,6 +16,7 @@ public Plugin:myinfo =
 public OnPluginStart()
 {
 	RegAdminCmd("sm_findentitybyclass", Cmd_FindEntityByClass, ADMFLAG_BAN, "sm_findentitybyclass <classname> <entid> - find an entity by classname and starting index.");
+	RegAdminCmd("sm_findentitybynetclass", Cmd_FindEntityByNetClass, ADMFLAG_BAN, "sm_findentitybynetclass <netclass> - finds all entites of a given netclass");
 	RegAdminCmd("sm_findentitybyname", Cmd_FindEntityByName, ADMFLAG_BAN, "sm_findentitybyname <name> <entid> - find an entity by name and starting index.");
 	RegAdminCmd("sm_listentities", Cmd_ListEntities, ADMFLAG_BAN, "sm_listentities - server console dump of all valid entities");
 	RegAdminCmd("sm_findnearentities", Cmd_FindNearEntities, ADMFLAG_BAN, "sm_findnearentities <radius> - find all Entities in a radius around you.");
@@ -58,6 +59,38 @@ public Action:Cmd_FindEntityByClass(client, args)
 	GetEntPropString(entid, Prop_Data, "m_iName", name, sizeof(name));
 	PrintToChat(client, "Found Entity Id %i, of name: %s; distance from you: %f", entid, name, distance);
 	
+	return Plugin_Handled;
+}
+
+public Action:Cmd_FindEntityByNetClass(client, args)
+{
+	if (args < 1)
+	{
+		ReplyToCommand(client, "[SM] Usage: sm_findentitybynetclass <netclass>");
+		return Plugin_Handled;
+	}
+	
+	decl String:arg[64], String:netclass[64], String:name[64], String:classname[64];
+	GetCmdArg(1, arg, sizeof(arg));
+
+	new maxentities = GetMaxEntities();
+	new netclasssize = sizeof(netclass);
+	
+	for (new i = 1; i <= maxentities; i++)
+	{
+		if (!IsValidEdict(i)) continue;
+		
+		GetEntityNetClass(i, netclass, netclasssize);
+		if (!StrEqual(arg, netclass, false)) continue;
+		
+		GetEdictClassname(i, classname, sizeof(classname));
+		GetEntPropString(i, Prop_Data, "m_iName", name, sizeof(name));
+		
+		ReplyToCommand(client, "Found Entity %i of Netclass %s, class %s, name %s", i, netclass, classname, name);
+		return Plugin_Handled;
+	}
+	
+	ReplyToCommand(client, "Finished search for Entites of Netclass %s", netclass);
 	return Plugin_Handled;
 }
 

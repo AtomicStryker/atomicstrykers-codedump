@@ -1,7 +1,7 @@
 #pragma semicolon 1
 #include <sourcemod>
 #include <sdktools>
-#define PLUGIN_VERSION "1.0.4"
+#define PLUGIN_VERSION "1.0.5"
 
 public Plugin:myinfo =
 {
@@ -19,6 +19,7 @@ static bool:MapHandled 				= true;
 static bool:RoundHandled 			= false;
 static bool:ForceCooldown			= false;
 static MapRoute 					= 1;
+static String:Overrider[256]		= "";
 
 
 public OnPluginStart()
@@ -32,6 +33,8 @@ public OnPluginStart()
 	CreateTimer(5.0, CheckForNeededActions, 0, TIMER_REPEAT);
 	
 	RegAdminCmd("sm_forcepath", ForcePath_Command, ADMFLAG_CHEATS);
+	
+	RegConsoleCmd("sm_pathinfo", InfoPath_Command, " Read Information about the current Route ");
 }
 
 public Action:RoundStart_Event(Handle:event, const String:name[], bool:dontBroadcast)
@@ -83,20 +86,23 @@ public Action:CheckForNeededActions(Handle:timer)
 		if (!MapHandled)
 		{
 			CheatCommand(_, "ent_fire", "relay_routing_init trigger"); // destroys Valve routing entities
+			
 			if (!MapRoute) // breaker in case admin already overrode pathing
 			{
 				MapRoute = GetRandomInt(1,3); // picks a path for the map, both rounds. 1 is easy, 3 is hard
+				
+				decl String:Difficulty[12];
+				switch (MapRoute)
+				{
+					case 1: Format(Difficulty, sizeof(Difficulty), "Easy");
+					case 2: Format(Difficulty, sizeof(Difficulty), "Medium");
+					case 3: Format(Difficulty, sizeof(Difficulty), "Hard");
+				}
+				
+				PrintToChatAll("\x04[Pathing Plugin]\x01 Chose \x03%s\x01 Pathing Option for both teams", Difficulty);
+				Format(Overrider, sizeof(Overrider), "Plugin Autopilot");
 			}
 			
-			decl String:Difficulty[12];
-			switch (MapRoute)
-			{
-				case 1: Format(Difficulty, sizeof(Difficulty), "Easy");
-				case 2: Format(Difficulty, sizeof(Difficulty), "Medium");
-				case 3: Format(Difficulty, sizeof(Difficulty), "Hard");
-			}
-			
-			PrintToChatAll("\x04[Pathing Plugin]\x01 Chose \x03%s\x01 Pathing Option for both teams", Difficulty);
 			MapHandled = true;
 		}
 		
@@ -117,6 +123,26 @@ public Action:CheckForNeededActions(Handle:timer)
 		}
 	}
 	return Plugin_Continue;
+}
+
+public Action:InfoPath_Command(client, args)
+{
+	if (!MapHasConfig)
+	{
+		ReplyToCommand(client, "[SM] This Map doesnt have routing");
+		return Plugin_Handled;
+	}
+
+	decl String:diff[10];
+	switch (MapRoute)
+	{
+		case 1: Format(diff, sizeof(diff), "easy");
+		case 2: Format(diff, sizeof(diff), "medium");
+		case 3: Format(diff, sizeof(diff), "hard");
+	}
+	
+	ReplyToCommand(client, "[SM] Current Route: %s, chosen by %s", diff, Overrider);
+	return Plugin_Handled;
 }
 
 public Action:ForcePath_Command(client, args)
@@ -148,6 +174,7 @@ public Action:ForcePath_Command(client, args)
 		CheatCommand(_, "ent_fire", "relay_routing_wipe trigger");
 		CheatCommand(_, "ent_fire", "relay_easy_route_spawn trigger");
 		PrintToChatAll("\x04[Pathing Plugin]\x01 Admin overrode Pathing, \x03Easy\x01 path enforced");
+		SetOverrider(client);
 	}
 	else if (StrEqual(command, "medium", false))
 	{
@@ -155,6 +182,7 @@ public Action:ForcePath_Command(client, args)
 		CheatCommand(_, "ent_fire", "relay_routing_wipe trigger");
 		CheatCommand(_, "ent_fire", "relay_medium_route_spawn trigger");
 		PrintToChatAll("\x04[Pathing Plugin]\x01 Admin overrode Pathing, \x03Medium\x01 path enforced");
+		SetOverrider(client);
 	}
 	else if (StrEqual(command, "hard", false))
 	{
@@ -162,6 +190,7 @@ public Action:ForcePath_Command(client, args)
 		CheatCommand(_, "ent_fire", "relay_routing_wipe trigger");
 		CheatCommand(_, "ent_fire", "relay_hard_route_spawn trigger");
 		PrintToChatAll("\x04[Pathing Plugin]\x01 Admin overrode Pathing, \x03Hard\x01 path enforced");
+		SetOverrider(client);
 	}
 	else
 	{
@@ -172,6 +201,18 @@ public Action:ForcePath_Command(client, args)
 	CreateTimer(3.0, timerResetForceCooldown);
 	
 	return Plugin_Handled;
+}
+
+static SetOverrider(client)
+{
+	if (client)
+	{
+		Format(Overrider, sizeof(Overrider), "%N", client);
+	}
+	else
+	{
+		Format(Overrider, sizeof(Overrider), "Server Console");
+	}
 }
 
 public Action:timerResetForceCooldown(Handle:timer)

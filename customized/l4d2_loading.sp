@@ -161,7 +161,6 @@ public OnMapStart()
 {
 	isFirstPlayer = true;
 	isFirstRound = true;
-	SetConVarInt(FindConVar("sb_stop"), 1);
 
 	for (new i = 1; i <= MaxClients; i++)
 	{

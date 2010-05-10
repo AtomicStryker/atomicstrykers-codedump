@@ -1,6 +1,6 @@
 /********************************************************************************************
 * Plugin	: L4D/L4D2 InfectedBots with Coop/Survival playable SI spawns
-* Version	: 1.9.2
+* Version	: 1.9.3
 * Game		: Left 4 Dead 1 & 2
 * Author	: djromero (SkyDavid, David) and MI 5
 * Testers	: Myself, MI 5
@@ -10,6 +10,13 @@
 * 			  there isn't enough real players. Also allows playable special infected on coop/survival modes.
 * 
 * WARNING	: Please use sourcemod's latest 1.3 branch snapshot.
+* 
+* Version 1.9.3
+* 	   - Added support for chainsaws gamemode
+* 	   - Changed how the plugin detected dead/alive players
+* 	   - Changed code that used GetEntData/SetEntData to GetEntProp/SetEntProp
+* 	   - Fixed typo in detecting the game
+* 	   - Fixed an error caused by line 4300
 * 
 * Version 1.9.2
 * 	   - Fixed bug with clients joining infected automatically when l4d_infectedbots_admins_only was set to 1
@@ -359,9 +366,10 @@
 
 #pragma semicolon 1
 
-#define PLUGIN_VERSION "1.9.2"
+#define PLUGIN_VERSION "1.9.3"
 
-#define DEBUG 0
+#define DEBUGSERVER 0
+#define DEBUGCLIENTS 0
 #define DEBUGTANK 0
 #define DEBUGHUD 0
 #define DEVELOPER 0
@@ -485,7 +493,7 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	// Checks to see if the game is a L4D game. If it is, check if its the sequel. L4DVersion is L4D if false, L4D2 if true.
 	decl String:GameName[64];
 	GetGameFolderName(GameName, sizeof(GameName));
-	if (StrContains("left4dead", "left4dead", false) == -1)
+	if (StrContains(GameName, "left4dead", false) == -1)
 		return APLRes_Failure; 
 	else if (StrEqual(GameName, "left4dead2", false))
 		L4DVersion = true;
@@ -915,7 +923,7 @@ TweakSettings()
 		//SetConVarInt(FindConVar("z_versus_charger_limit"), ChargerLimit);
 		SetConVarInt(FindConVar("versus_special_respawn_interval"), 99999999);
 	}
-	#if DEBUG
+	#if DEBUGSERVER
 	LogMessage("Tweaking Settings");
 	#endif
 	
@@ -1074,10 +1082,13 @@ public Action:evtRoundStart(Handle:event, const String:name[], bool:dontBroadcas
 	if (GameMode == 0)
 		return;
 	
-	#if DEBUG
+	#if DEBUGCLIENTS
 	PrintToChatAll("Round Started");
+	#endif
+	#if DEBUGSERVER
 	LogMessage("Round Started");
 	#endif
+	
 	
 	// Removes the boundaries for z_max_player_zombies and notify flag
 	new flags = GetConVarFlags(FindConVar("z_max_player_zombies"));
@@ -1132,7 +1143,7 @@ public Action:evtRoundStart(Handle:event, const String:name[], bool:dontBroadcas
 	
 	if (GameMode != 3)
 	{
-		#if DEBUG
+		#if DEBUGSERVER
 		LogMessage("Starting the Coop/Versus PlayerLeft Start Timer");
 		#endif
 		CreateTimer(1.0, PlayerLeftStart, _, TIMER_FLAG_NO_MAPCHANGE);
@@ -1141,7 +1152,7 @@ public Action:evtRoundStart(Handle:event, const String:name[], bool:dontBroadcas
 
 GameModeCheck()
 {
-	#if DEBUG
+	#if DEBUGSERVER
 	LogMessage("Checking Gamemode");
 	#endif
 	//MI 5, We determine what the gamemode is
@@ -1232,7 +1243,7 @@ public Action:KillInfected(Handle:Timer)
 public Action:MaxSpecialsSet(Handle:Timer)
 {
 	SetConVarInt(FindConVar("z_max_player_zombies"), MaxPlayerZombies);
-	#if DEBUG
+	#if DEBUGSERVER
 	LogMessage("Max Player Zombies Set");
 	#endif
 }
@@ -1268,7 +1279,7 @@ DirectorStuff()
 		SetConVarInt(FindConVar("holdout_max_boomers"), BoomerLimit);
 	}
 	
-	#if DEBUG
+	#if DEBUGSERVER
 	LogMessage("Director Stuff has been executed");
 	#endif
 	
@@ -1309,7 +1320,7 @@ public Action:evtRoundEnd (Handle:event, const String:name[], bool:dontBroadcast
 			}
 		}
 		
-		#if DEBUG
+		#if DEBUGSERVER
 		LogMessage("Round Ended");
 		#endif
 	}
@@ -1318,7 +1329,7 @@ public Action:evtRoundEnd (Handle:event, const String:name[], bool:dontBroadcast
 
 public OnMapEnd()
 {
-	#if DEBUG
+	#if DEBUGSERVER
 	LogMessage("Map has ended");
 	#endif
 	
@@ -1344,8 +1355,10 @@ public Action:PlayerLeftStart(Handle:Timer)
 		// We don't care who left, just that at least one did
 		if (!b_LeftSaveRoom)
 		{
-			#if DEBUG
+			#if DEBUGSERVER
 			LogMessage("A player left the start area, spawning bots");
+			#endif
+			#if DEBUGCLIENTS
 			PrintToChatAll("A player left the start area, spawning bots");
 			#endif
 			b_LeftSaveRoom = true;
@@ -1367,7 +1380,7 @@ public Action:PlayerLeftStart(Handle:Timer)
 				CheckIfBotsNeeded(true);
 			else
 			CheckIfBotsNeeded(false);
-			#if DEBUG
+			#if DEBUGSERVER
 			LogMessage("Checking to see if we need bots");
 			#endif
 			CreateTimer(3.0, InitialSpawnReset, _, TIMER_FLAG_NO_MAPCHANGE);
@@ -1391,8 +1404,10 @@ public Action:evtSurvivalStart(Handle:event, const String:name[], bool:dontBroad
 		// We don't care who left, just that at least one did
 		if (!b_LeftSaveRoom)
 		{
-			#if DEBUG
+			#if DEBUGSERVER
 			LogMessage("A player triggered the survival event, spawning bots");
+			#endif
+			#if DEBUGCLIENTS
 			PrintToChatAll("A player triggered the survival event, spawning bots");
 			#endif
 			b_LeftSaveRoom = true;
@@ -1414,7 +1429,7 @@ public Action:evtSurvivalStart(Handle:event, const String:name[], bool:dontBroad
 				CheckIfBotsNeeded(true);
 			else
 			CheckIfBotsNeeded(false);
-			#if DEBUG
+			#if DEBUGSERVER
 			LogMessage("Checking to see if we need bots");
 			#endif
 			CreateTimer(3.0, InitialSpawnReset, _, TIMER_FLAG_NO_MAPCHANGE);
@@ -1455,7 +1470,7 @@ public Action:InfectedPlayerJoiner(Handle:Timer, any:client)
 			if (!IsFakeClient(i))
 			{
 				SurvivorRealCount++;
-				#if DEBUG
+				#if DEBUGSERVER
 				LogMessage("Found a survivor player");
 				#endif
 			}
@@ -1517,7 +1532,7 @@ public Action:InfectedBotBooterVersus(Handle:Timer)
 				if (GetClientTeam(i) == TEAM_INFECTED)
 				{
 					// We count depending on class ...
-					if (!IsPlayerTank(i) || (IsPlayerTank(i) && GetClientHealth(i) <= 1))
+					if (!IsPlayerTank(i) || (IsPlayerTank(i) && !PlayerIsAlive(i)))
 					{
 						total++;
 					}
@@ -1539,14 +1554,14 @@ public Action:InfectedBotBooterVersus(Handle:Timer)
 					if (GetClientTeam(i) == TEAM_INFECTED)
 					{
 						// If player is not a tank
-						if (!IsPlayerTank(i) || ((IsPlayerTank(i) && GetClientHealth(i) <= 1)))
+						if (!IsPlayerTank(i) || ((IsPlayerTank(i) && !PlayerIsAlive(i))))
 						{
 							// timer to kick bot
 							CreateTimer(0.1,kickbot,i);
 							
 							// increment kicked count ..
 							kicked++;
-							#if DEBUG
+							#if DEBUGSERVER
 							LogMessage("Kicked a Bot");
 							#endif
 						}
@@ -1598,7 +1613,7 @@ public OnClientPutInServer(client)
 		CreateTimer(0.1, CheckForPlayers);
 	}
 	
-	#if DEBUG
+	#if DEBUGSERVER
 	LogMessage("OnClientPutInServer has started");
 	#endif
 }
@@ -1655,13 +1670,6 @@ public Action:JoinInfected(client, args)
 			PrintHintText(client, "The Infected Team is full.");
 		}
 	}
-	else
-	{
-		if (client && GetClientTeam(client)==1 && GameMode == 2)
-		{
-			ChangeClientTeam(client, TEAM_INFECTED);
-		}
-	}
 }
 
 public Action:JoinSurvivors(client, args)
@@ -1669,13 +1677,6 @@ public Action:JoinSurvivors(client, args)
 	if (client && (GameMode == 1 || GameMode == 3))
 	{
 		SwitchToSurvivors(client);
-	}
-	else
-	{
-		if (client && GetClientTeam(client)==1 && GameMode == 2)
-		{
-			SwitchToSurvivors(client);
-		}
 	}
 }
 
@@ -1723,7 +1724,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 				{
 					CreateTimer(0.1, kickbot, client);
 					
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Smoker kicked");
 					#endif
 					
@@ -1732,7 +1733,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 					CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
 					
 					
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Spawned Smoker");
 					#endif
 				}
@@ -1746,7 +1747,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 				{
 					CreateTimer(0.1, kickbot, client);
 					
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Boomer kicked");
 					#endif
 					
@@ -1754,7 +1755,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 					CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
 					
 					
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Spawned Booomer");
 					#endif
 				}
@@ -1768,7 +1769,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 				{
 					CreateTimer(0.1, kickbot, client);
 					
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Hunter Kicked");
 					#endif
 					
@@ -1777,7 +1778,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 					CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
 					
 					
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Hunter Spawned");
 					#endif
 				}
@@ -1791,7 +1792,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 				{
 					CreateTimer(0.1, kickbot, client);
 					
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Spitter Kicked");
 					#endif
 					
@@ -1800,7 +1801,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 					CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
 					
 					
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Spitter Spawned");
 					#endif
 				}
@@ -1814,7 +1815,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 				{
 					CreateTimer(0.1, kickbot, client);
 					
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Jockey Kicked");
 					#endif
 					
@@ -1823,7 +1824,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 					CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
 					
 					
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Jockey Spawned");
 					#endif
 				}
@@ -1837,7 +1838,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 				{
 					CreateTimer(0.1, kickbot, client);
 					
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Charger Kicked");
 					#endif
 					
@@ -1846,7 +1847,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 					CreateTimer(0.2, Spawn_InfectedBot_Director, BotNeeded);
 					
 					
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Charger Spawned");
 					#endif
 				}
@@ -1858,7 +1859,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 	{
 		if (b_LeftSaveRoom)
 		{
-			#if DEBUG
+			#if DEBUGSERVER
 			LogMessage("Tank Event Triggered");
 			#endif
 			if (!TankFrustStop)
@@ -1874,7 +1875,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 					if (GetClientTeam(i)==TEAM_INFECTED)
 					{
 						// If player is a tank
-						if (IsPlayerTank(i) && GetClientHealth(i) > 1)
+						if (IsPlayerTank(i) && PlayerIsAlive(i))
 						{
 							TanksPlaying++;
 							MaxPlayerTank++;
@@ -1884,7 +1885,7 @@ public Action:evtPlayerSpawn(Handle:event, const String:name[], bool:dontBroadca
 				
 				MaxPlayerTank = MaxPlayerTank + MaxPlayerZombies;
 				SetConVarInt(FindConVar("z_max_player_zombies"), MaxPlayerTank);
-				#if DEBUG
+				#if DEBUGSERVER
 				LogMessage("Incremented Max Zombies from Tank Spawn EVENT");
 				#endif
 				
@@ -2143,16 +2144,16 @@ public Action:evtBotReplacedPlayer(Handle:event, const String:name[], bool:dontB
 
 public Action:DisposeOfCowards(Handle:timer, any:coward)
 {
-	if (IsClientInGame(coward) && IsFakeClient(coward) && GetClientTeam(coward) == TEAM_INFECTED && !IsPlayerTank(coward) && GetClientHealth(coward)>1)
+	if (IsClientInGame(coward) && IsFakeClient(coward) && GetClientTeam(coward) == TEAM_INFECTED && !IsPlayerTank(coward) && PlayerIsAlive(coward))
 	{
 		// Check to see if the infected thats about to be slain sees the survivors. If so, kill the timer and make a new one.
-		new threats = GetEntData(coward, FindSendPropInfo("CTerrorPlayer", "m_hasVisibleThreats"));
+		new threats = GetEntProp(coward, Prop_Send, "m_hasVisibleThreats");
 		
 		if (threats)
 		{
 			FightOrDieTimer[coward] = INVALID_HANDLE;
 			FightOrDieTimer[coward] = CreateTimer(GetConVarFloat(h_idletime_b4slay), DisposeOfCowards, coward);
-			#if DEBUG
+			#if DEBUGCLIENTS
 			PrintToChatAll("%N saw survivors after timer is up, creating new timer", coward);
 			#endif
 			return;
@@ -2166,7 +2167,7 @@ public Action:DisposeOfCowards(Handle:timer, any:coward)
 				CreateTimer(float(SpawnTime), Spawn_InfectedBot, _, 0);
 				InfectedBotQueue++;
 				
-				#if DEBUG
+				#if DEBUGCLIENTS
 				PrintToChatAll("Kicked bot %N for not attacking", coward);
 				PrintToChatAll("An infected bot has been added to the spawn queue due to lifespan timer expiring");
 				#endif
@@ -2249,7 +2250,7 @@ public Action:evtPlayerDeath(Handle:event, const String:name[], bool:dontBroadca
 	{
 	canSpawnBoomer = false;
 	CreateTimer(float(GetConVarInt(h_InfectedSpawnTimeMin)), ResetSpawnRestriction, 3);
-	#if DEBUG
+	#if DEBUGSERVER
 	LogMessage("Boomer died, setting spawn restrictions");
 	#endif
 	}
@@ -2285,7 +2286,7 @@ public Action:evtPlayerDeath(Handle:event, const String:name[], bool:dontBroadca
 	{
 	canSpawnBoomer = false;
 	CreateTimer(float(GetConVarInt(h_InfectedSpawnTimeMin) * 0), ResetSpawnRestriction, 3);
-	#if DEBUG
+	#if DEBUGSERVER
 	LogMessage("Boomer died, setting spawn restrictions");
 	#endif
 	}
@@ -2312,7 +2313,7 @@ public Action:evtPlayerDeath(Handle:event, const String:name[], bool:dontBroadca
 			InfectedBotQueue++;
 		}
 		
-		#if DEBUG
+		#if DEBUGCLIENTS
 		PrintToChatAll("An infected bot has been added to the spawn queue...");
 		#endif
 	}
@@ -2327,7 +2328,7 @@ public Action:evtPlayerDeath(Handle:event, const String:name[], bool:dontBroadca
 			InfectedBotQueue++;
 		}
 		
-		#if DEBUG
+		#if DEBUGCLIENTS
 		PrintToChatAll("An infected bot has been added to the spawn queue...");
 		#endif
 	}
@@ -2375,15 +2376,15 @@ public Action:Spawn_InfectedBot_Director(Handle:timer, any:BotNeeded)
 					resetGhost[i] = true;
 					SetGhostStatus(i, false);
 				}
-				else if (GetClientHealth(i) <= 1 && respawnDelay[i] > 0 && GameMode != 2)
+				else if (!PlayerIsAlive(i) && respawnDelay[i] > 0 && GameMode != 2)
 				{
 					resetLife[i] = true;
 					SetLifeState(i, false);
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Detected a dead player with a respawn timer, setting restrictions to prevent player from taking a bot");
 					#endif
 				}
-				else if (GetClientHealth(i) <= 1 && respawnDelay[i] <= 0)
+				else if (!PlayerIsAlive(i) && respawnDelay[i] <= 0)
 				{
 					AlreadyGhosted[i] = false;
 					SetLifeState(i, true);
@@ -2396,7 +2397,7 @@ public Action:Spawn_InfectedBot_Director(Handle:timer, any:BotNeeded)
 	new bool:temp = false;
 	if (!anyclient)
 	{
-		#if DEBUG
+		#if DEBUGSERVER
 		LogMessage("[Infected bots] Creating temp client to fake command");
 		#endif
 		
@@ -2445,14 +2446,14 @@ public Action:ZombieClassTimer(Handle:timer, any:client)
 {
 	if (client)
 	{
-		SetEntData(client, FindSendPropInfo("CTerrorPlayer", "m_zombieClass"), 0, 1, false);
+		SetEntProp(client, Prop_Send, "m_zombieClass", 0);
 	}
 }
 
 /*
 public Action:ResetSpawnRestriction (Handle:timer, any:bottype)
 {
-#if DEBUG
+#if DEBUGSERVER
 LogMessage("Resetting spawn restrictions");
 #endif
 switch (bottype)
@@ -2496,7 +2497,7 @@ public Action:evtPlayerTeam(Handle:event, const String:name[], bool:dontBroadcas
 		{
 			//Kick Timer
 			CreateTimer(1.0, InfectedBotBooterVersus, _, TIMER_FLAG_NO_MAPCHANGE);
-			#if DEBUG
+			#if DEBUGSERVER
 			LogMessage("A player switched to infected, attempting to boot a bot");
 			#endif
 		}
@@ -2541,7 +2542,7 @@ public OnClientDisconnect(client)
 
 GameEnded()
 {
-	#if DEBUG
+	#if DEBUGSERVER
 	LogMessage("Game ended");
 	#endif
 	b_LeftSaveRoom = false;
@@ -2576,7 +2577,7 @@ public Action:ScrimmageTimer (Handle:timer, any:client)
 {
 	if (client && IsValidEntity(client))
 	{
-		SetEntData(client, FindSendPropInfo("CTerrorPlayer", "m_scrimmageType"), 0, 1, false);
+		SetEntProp(client, Prop_Send, "m_scrimmageType", 0);
 	}
 }
 
@@ -2589,7 +2590,7 @@ CheckIfBotsNeeded(bool:spawn_immediately)
 {
 	if (!DirectorSpawn)
 	{
-		#if DEBUG
+		#if DEBUGSERVER
 		LogMessage("Checking bots");
 		#endif
 		
@@ -2617,7 +2618,7 @@ CheckIfBotsNeeded(bool:spawn_immediately)
 				{
 					InfectedBotQueue++;
 					CreateTimer(0.5, Spawn_InfectedBot, _, 0);
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Setting up the bot now");
 					#endif
 				}
@@ -2664,7 +2665,7 @@ CountInfected()
 // Note: This function is also used for survival.
 CountInfected_Coop()
 {
-	#if DEBUG
+	#if DEBUGSERVER
 	LogMessage("Counting Bots for Coop");
 	#endif
 	
@@ -2690,26 +2691,26 @@ CountInfected_Coop()
 				continue;
 			
 			// If someone is a tank and the tank is playable...count him in play
-			if (IsPlayerTank(i) && GetClientHealth(i) > 1 && GetConVarBool(h_CoopPlayableTank) && !IsFakeClient(i))
+			if (IsPlayerTank(i) && PlayerIsAlive(i) && GetConVarBool(h_CoopPlayableTank) && !IsFakeClient(i))
 			{
 				InfectedRealCount++;
 			}
 			
 			// If player is not a tank or a dead one
-			if (!IsPlayerTank(i) || (IsPlayerTank(i) && GetClientHealth(i) <= 1))
+			if (!IsPlayerTank(i) || (IsPlayerTank(i) && !PlayerIsAlive(i)))
 			{
 				// If player is a bot ...
 				if (IsFakeClient(i))
 				{
 					InfectedBotCount++;
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Found a bot");
 					#endif
 				}
-				else if (GetClientHealth(i) > 1 || (IsPlayerGhost(i)))
+				else if (PlayerIsAlive(i) || (IsPlayerGhost(i)))
 				{
 					InfectedRealCount++;
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Found a player");
 					#endif
 				}
@@ -2734,7 +2735,7 @@ TankHalt = false;
 public Action:evtTankFrustrated(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	TankFrustStop = true;
-	#if DEBUG
+	#if DEBUGSERVER
 	LogMessage("Tank is frustrated!");
 	#endif
 	CreateTimer(2.0, TankFrustratedTimer, _, TIMER_FLAG_NO_MAPCHANGE);
@@ -2756,7 +2757,7 @@ public Action:TankSpawner(Handle:timer, any:client)
 	{
 		tankhealth = GetClientHealth(client);
 		GetClientAbsOrigin(client, position);
-		if ((GetEntData(client, FindSendPropOffs("CTerrorPlayer", "m_fFlags")) & FL_ONFIRE) && GetClientHealth(client) > 1)
+		if (GetEntProp(client, Prop_Data, "m_fFlags") & FL_ONFIRE && PlayerIsAlive(client))
 			tankonfire = true;
 	}
 	
@@ -2773,7 +2774,7 @@ public Action:TankSpawner(Handle:timer, any:client)
 			if (!IsFakeClient(t))
 			{
 				// If player is not a tank, or a dead one
-				if (!IsPlayerTank(t) || (IsPlayerTank(t) && GetClientHealth(t) <= 1))
+				if (!IsPlayerTank(t) || (IsPlayerTank(t) && !PlayerIsAlive(t)))
 				{
 					IndexCount++; // increase count of valid targets
 					Index[IndexCount] = t; //save target to index
@@ -2837,15 +2838,15 @@ public Action:TankSpawner(Handle:timer, any:client)
 					{
 						resetGhost[i] = true;
 						SetGhostStatus(i, false);
-						#if DEBUG
+						#if DEBUGSERVER
 						LogMessage("Player is a ghost, taking preventive measures to prevent the player from taking over the tank");
 						#endif
 					}
-					else if (GetClientHealth(i) <= 1)
+					else if (!PlayerIsAlive(i))
 					{
 						resetLife[i] = true;
 						SetLifeState(i, false);
-						#if DEBUG
+						#if DEBUGSERVER
 						LogMessage("Dead player found, setting restrictions to prevent the player from taking over the tank");
 						#endif
 					}
@@ -2858,7 +2859,7 @@ public Action:TankSpawner(Handle:timer, any:client)
 		new bool:temp = false;
 		if (!anyclient)
 		{
-			#if DEBUG
+			#if DEBUGSERVER
 			LogMessage("[Infected bots] Creating temp client to fake command");
 			#endif
 			// we create a fake client
@@ -2959,15 +2960,15 @@ public Action:TankRespawner(Handle:timer, any:datapack)
 				{
 					resetGhost[i] = true;
 					SetGhostStatus(i, false);
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Player is a ghost, taking preventive measures to prevent the player from taking over the tank");
 					#endif
 				}
-				else if (GetClientHealth(i) <= 1)
+				else if (!PlayerIsAlive(i))
 				{
 					resetLife[i] = true;
 					SetLifeState(i, false);
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Dead player found, setting restrictions to prevent the player from taking over the tank");
 					#endif
 				}
@@ -2980,7 +2981,7 @@ public Action:TankRespawner(Handle:timer, any:datapack)
 	new bool:temp = false;
 	if (!anyclient)
 	{
-		#if DEBUG
+		#if DEBUGSERVER
 		LogMessage("[Infected bots] Creating temp client to fake command");
 		#endif
 		// we create a fake client
@@ -3055,7 +3056,7 @@ public Action:HookSound_Callback(Clients[64], &NumClients, String:StrSample[PLAT
 		if (GetClientTeam(i)==TEAM_INFECTED)
 		{
 			// If player is a tank
-			if (IsPlayerTank(i) && GetClientHealth(i) > 1 && TankWasSeen[i] == false)
+			if (IsPlayerTank(i) && PlayerIsAlive(i) && TankWasSeen[i] == false)
 			{
 				if (RealPlayersOnInfected() && AreTherePlayersWhoAreNotTanks())
 				{
@@ -3101,7 +3102,7 @@ public Action:evtMissionLost(Handle:event, const String:name[], bool:dontBroadca
 					{
 						FreeSpawnReset[i] = true;
 					}
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Mission lost on the finale");
 					#endif
 				}
@@ -3113,7 +3114,7 @@ public Action:evtMissionLost(Handle:event, const String:name[], bool:dontBroadca
 
 BotTypeNeeded()
 {
-	#if DEBUG
+	#if DEBUGSERVER
 	LogMessage("Determining Bot type now");
 	#endif
 	
@@ -3131,20 +3132,20 @@ BotTypeNeeded()
 		if (IsClientInGame(i))
 		{
 			// if player is on infected's team
-			if (GetClientTeam(i) == TEAM_INFECTED)
+			if (GetClientTeam(i) == TEAM_INFECTED && PlayerIsAlive(i))
 			{
 				// We count depending on class ...
-				if (IsPlayerSmoker(i) && GetClientHealth(i) > 1)
+				if (IsPlayerSmoker(i))
 					smokers++;
-				else if (IsPlayerBoomer(i) && GetClientHealth(i) > 1)
+				else if (IsPlayerBoomer(i))
 					boomers++;	
-				else if (IsPlayerHunter(i) && GetClientHealth(i) > 1)
+				else if (IsPlayerHunter(i))
 					hunters++;	
-				else if (L4DVersion && IsPlayerSpitter(i) && GetClientHealth(i) > 1)
+				else if (L4DVersion && IsPlayerSpitter(i))
 					spitters++;	
-				else if (L4DVersion && IsPlayerJockey(i) && GetClientHealth(i) > 1)
+				else if (L4DVersion && IsPlayerJockey(i))
 					jockeys++;	
-				else if (L4DVersion && IsPlayerCharger(i) && GetClientHealth(i) > 1)
+				else if (L4DVersion && IsPlayerCharger(i))
 					chargers++;	
 			}
 		}
@@ -3158,7 +3159,7 @@ BotTypeNeeded()
 		{
 			if ((smokers < SmokerLimit) && (canSpawnSmoker))
 			{
-				#if DEBUG
+				#if DEBUGSERVER
 				LogMessage("Bot type returned Smoker");
 				#endif
 				return 2;
@@ -3168,7 +3169,7 @@ BotTypeNeeded()
 		{
 			if ((boomers < BoomerLimit) && (canSpawnBoomer))
 			{
-				#if DEBUG
+				#if DEBUGSERVER
 				LogMessage("Bot type returned Boomer");
 				#endif
 				return 3;
@@ -3178,7 +3179,7 @@ BotTypeNeeded()
 		{
 			if ((hunters < HunterLimit) && (canSpawnHunter))
 			{
-				#if DEBUG
+				#if DEBUGSERVER
 				LogMessage("Bot type returned Hunter");
 				#endif
 				return 1;
@@ -3188,7 +3189,7 @@ BotTypeNeeded()
 		{
 			if ((spitters < SpitterLimit) && (canSpawnSpitter))
 			{
-				#if DEBUG
+				#if DEBUGSERVER
 				LogMessage("Bot type returned Spitter");
 				#endif
 				return 4;
@@ -3198,7 +3199,7 @@ BotTypeNeeded()
 		{
 			if ((jockeys < JockeyLimit) && (canSpawnJockey))
 			{
-				#if DEBUG
+				#if DEBUGSERVER
 				LogMessage("Bot type returned Jockey");
 				#endif
 				return 5;
@@ -3208,7 +3209,7 @@ BotTypeNeeded()
 		{
 			if ((chargers < ChargerLimit) && (canSpawnCharger))
 			{
-				#if DEBUG
+				#if DEBUGSERVER
 				LogMessage("Bot type returned Charger");
 				#endif
 				return 6;
@@ -3225,7 +3226,7 @@ BotTypeNeeded()
 		{
 			if ((smokers < SmokerLimit) && (canSpawnSmoker)) // we need a smoker ???? can we spawn a smoker ??? is smoker bot allowed ??
 			{
-				#if DEBUG
+				#if DEBUGSERVER
 				LogMessage("Returning Smoker");
 				#endif
 				return 2;
@@ -3235,7 +3236,7 @@ BotTypeNeeded()
 		{
 			if ((boomers < BoomerLimit) && (canSpawnBoomer))
 			{
-				#if DEBUG
+				#if DEBUGSERVER
 				LogMessage("Returning Boomer");
 				#endif
 				return 3;
@@ -3245,7 +3246,7 @@ BotTypeNeeded()
 		{
 			if (hunters < HunterLimit && canSpawnHunter)
 			{
-				#if DEBUG
+				#if DEBUGSERVER
 				LogMessage("Returning Hunter");
 				#endif
 				return 1;
@@ -3305,7 +3306,7 @@ public Action:Spawn_InfectedBot(Handle:timer)
 	// If infected's team is already full ... we ignore this request (a real player connected after timer started ) ..
 	if ((InfectedRealCount + InfectedBotCount) >= MaxPlayerZombies || (InfectedRealCount + InfectedBotCount + InfectedBotQueue) > MaxPlayerZombies) 	
 	{
-		#if DEBUG
+		#if DEBUGSERVER
 		LogMessage("We found a player, don't spawn a bot");
 		#endif
 		InfectedBotQueue--;
@@ -3328,24 +3329,24 @@ public Action:Spawn_InfectedBot(Handle:timer)
 				{
 					resetGhost[i] = true;
 					SetGhostStatus(i, false);
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Player is a ghost, taking preventive measures for spawning an infected bot");
 					#endif
 				}
-				else if (GetClientHealth(i) <= 1 && GameMode == 2) // if player is just dead
+				else if (!PlayerIsAlive(i) && GameMode == 2) // if player is just dead
 				{
 					resetLife[i] = true;
 					SetLifeState(i, false);
 				}
-				else if (GetClientHealth(i) <= 1 && respawnDelay[i] > 0)
+				else if (!PlayerIsAlive(i) && respawnDelay[i] > 0)
 				{
 					resetLife[i] = true;
 					SetLifeState(i, false);
-					#if DEBUG
+					#if DEBUGSERVER
 					LogMessage("Found a dead player, spawn time has not reached zero, delaying player to Spawn an infected bot");
 					#endif
 				}
-				else if (GetClientHealth(i) <= 1 && respawnDelay[i] <= 0)
+				else if (!PlayerIsAlive(i) && respawnDelay[i] <= 0)
 				{
 					AlreadyGhosted[i] = false;
 					SetLifeState(i, true);
@@ -3359,7 +3360,7 @@ public Action:Spawn_InfectedBot(Handle:timer)
 	new bool:temp = false;
 	if (!anyclient)
 	{
-		#if DEBUG
+		#if DEBUGSERVER
 		LogMessage("[Infected bots] Creating temp client to fake command");
 		#endif
 		// we create a fake client
@@ -3390,48 +3391,48 @@ public Action:Spawn_InfectedBot(Handle:timer)
 	{
 		case 0: // Nothing
 		{
-			#if DEBUG
-			PrintToChatAll("Bot_type returned NOTHING!");
+			#if DEBUGSERVER
+			LogMessage("Bot_type returned NOTHING!");
 			#endif
 		}
 		case 1: // Hunter
 		{
-			#if DEBUG
+			#if DEBUGSERVER
 			LogMessage("Spawning Hunter");
 			#endif
 			CheatCommand(anyclient, "z_spawn", "hunter auto");
 		}
 		case 2: // Smoker
 		{	
-			#if DEBUG
+			#if DEBUGSERVER
 			LogMessage("Spawning Smoker");
 			#endif
 			CheatCommand(anyclient, "z_spawn", "smoker auto");
 		}
 		case 3: // Boomer
 		{
-			#if DEBUG
+			#if DEBUGSERVER
 			LogMessage("Spawning Boomer");
 			#endif
 			CheatCommand(anyclient, "z_spawn", "boomer auto");
 		}
 		case 4: // Spitter
 		{
-			#if DEBUG
+			#if DEBUGSERVER
 			LogMessage("Spawning Spitter");
 			#endif
 			CheatCommand(anyclient, "z_spawn", "spitter auto");
 		}
 		case 5: // Jockey
 		{
-			#if DEBUG
+			#if DEBUGSERVER
 			LogMessage("Spawning Jockey");
 			#endif
 			CheatCommand(anyclient, "z_spawn", "jockey auto");
 		}
 		case 6: // Charger
 		{
-			#if DEBUG
+			#if DEBUGSERVER
 			LogMessage("Spawning Charger");
 			#endif
 			CheatCommand(anyclient, "z_spawn", "charger auto");
@@ -3451,7 +3452,7 @@ public Action:Spawn_InfectedBot(Handle:timer)
 	if (temp) CreateTimer(0.1,kickbot,anyclient);
 	
 	// Debug print
-	#if DEBUG
+	#if DEBUGCLIENTS
 	PrintToChatAll("Spawning an infected bot. Type = %i ", bot_type);
 	#endif
 	
@@ -3463,7 +3464,7 @@ public Action:Spawn_InfectedBot(Handle:timer)
 
 stock GetAnyClient()
 {
-	#if DEBUG
+	#if DEBUGSERVER
 	LogMessage("[Infected bots] Looking for any real client to fake command");
 	#endif
 	for (new i=1;i<=MaxClients;i++)
@@ -3486,14 +3487,14 @@ public Action:kickbot(Handle:timer, any:client)
 
 bool:IsPlayerGhost (client)
 {
-	if (GetEntData(client, FindSendPropInfo("CTerrorPlayer", "m_isGhost"), 1))
+	if (GetEntProp(client, Prop_Send, "m_isGhost"))
 		return true;
 	return false;
 }
 
 bool:PlayerIsAlive (client)
 {
-	if (GetClientHealth(client) > 1)
+	if (!GetEntProp(client,Prop_Send, "m_lifeState"))
 		return true;
 	return false;
 }
@@ -3550,17 +3551,17 @@ bool:IsPlayerTank (client)
 SetGhostStatus (client, bool:ghost)
 {
 	if (ghost)
-		SetEntData(client, FindSendPropInfo("CTerrorPlayer", "m_isGhost"), 1, 1, true);
+		SetEntProp(client, Prop_Send, "m_isGhost", 1);
 	else
-	SetEntData(client, FindSendPropInfo("CTerrorPlayer", "m_isGhost"), 0, 1, false);
+	SetEntProp(client, Prop_Send, "m_isGhost", 0);
 }
 
 SetLifeState (client, bool:ready)
 {
 	if (ready)
-		SetEntData(client, FindSendPropInfo("CTerrorPlayer", "m_lifeState"), 1, 1, true);
+		SetEntProp(client, Prop_Send,  "m_lifeState", 1);
 	else
-	SetEntData(client, FindSendPropInfo("CTerrorPlayer", "m_lifeState"), 0, 1, false);
+	SetEntProp(client, Prop_Send, "m_lifeState", 0);
 }
 
 bool:RealPlayersInGame (client)
@@ -3626,7 +3627,7 @@ bool:AllSurvivorsDeadOrIncapacitated ()
 			{
 				PlayerIncap++;
 			}
-			else if (GetClientHealth(i) <= 1)
+			else if (!PlayerIsAlive(i))
 			{
 				PlayerDead++;
 			}
@@ -3659,7 +3660,7 @@ bool:AreTherePlayersWhoAreNotTanks ()
 		{
 			if (GetClientTeam(i) == TEAM_INFECTED)
 			{
-				if (!IsPlayerTank(i) || IsPlayerTank(i) && GetClientHealth(i) <= 1)
+				if (!IsPlayerTank(i) || IsPlayerTank(i) && !PlayerIsAlive(i))
 					return true;
 			}
 		}
@@ -3712,7 +3713,7 @@ PlayerReady()
 		if (GetClientTeam(i) == TEAM_INFECTED)
 		{
 			// If player is a real player and is dead...
-			if (!IsFakeClient(i) && GetClientHealth(i) <= 1)
+			if (!IsFakeClient(i) && !PlayerIsAlive(i))
 			{
 				if (!respawnDelay[i])
 				{
@@ -3736,7 +3737,7 @@ FindBotToTakeOver()
 		if (GetClientTeam(i) == TEAM_SURVIVORS)
 		{
 			// If player is a bot and is alive...
-			if (IsFakeClient(i) && GetClientHealth(i) > 1)
+			if (IsFakeClient(i) && PlayerIsAlive(i))
 			{
 				return i;
 			}
@@ -3765,14 +3766,10 @@ bool:LeftStartArea()
 	
 	if (ent > -1)
 	{
-		new offset = FindSendPropInfo("CTerrorPlayerResource", "m_hasAnySurvivorLeftSafeArea");
-		if (offset > 0)
-		{
-			if (GetEntData(ent, offset))
+			if (GetEntProp(ent, Prop_Send, "m_hasAnySurvivorLeftSafeArea"))
 			{
-				if (GetEntData(ent, offset) == 1) return true;
+				return true;
 			}
-		}
 	}
 	return false;
 }
@@ -4163,10 +4160,10 @@ public ShowInfectedHUD(src)
 							iHP = RoundFloat((float(GetClientHealth(i)) / zombieHP[6]) * 100);	
 						}
 						
-						if (GetClientHealth(i) > 1)
+						if (PlayerIsAlive(i))
 						{
 							// Check to see if they are a ghost or not
-							if (GetEntData(i, FindSendPropInfo("CTerrorPlayer", "m_isGhost"), 1))
+							if (IsPlayerGhost(i))
 							{
 								strcopy(iStatus, sizeof(iStatus), "GHOST");
 							}
@@ -4212,7 +4209,7 @@ public ShowInfectedHUD(src)
 						}
 						
 						// Special case - if player is Tank and on fire, show the countdown
-						if (StrContains(iClass, "Tank", false) != -1 && isTankOnFire[i] && GetClientHealth(i) > 0)
+						if (StrContains(iClass, "Tank", false) != -1 && isTankOnFire[i] && PlayerIsAlive(i))
 						{
 							Format(iStatus, sizeof(iStatus), "%s-FIRE(%i)", iStatus, burningTankTimeLeft[i]);
 						}
@@ -4301,7 +4298,7 @@ public Action:evtInfectedDeath(Handle:event, const String:name[], bool:dontBroad
 {
 	// Infected player died, so refresh the HUD
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	if (client)
+	if (client && IsClientConnected(client) && IsClientInGame(client))
 	{
 		if (GetClientTeam(client) == TEAM_INFECTED)
 		{
@@ -4363,8 +4360,7 @@ public Action:evtInfectedHurt(Handle:event, const String:name[], bool:dontBroadc
 				// If player is a tank and is on fire, we start the 
 				// 30-second guaranteed death timer and let his fellow Infected guys know.
 				
-				new mFlagsOffset = FindSendPropOffs("CTerrorPlayer", "m_fFlags");
-				if ((GetEntData(client, mFlagsOffset) & FL_ONFIRE) && GetClientHealth(client) > 1)
+				if ((GetEntProp(client, Prop_Data, "m_fFlags") & FL_ONFIRE) && PlayerIsAlive(client))
 				{
 					isTankOnFire[client] = true;
 					if ((StrContains(difficulty, "Easy", false) != -1) && (GameMode == 1))
@@ -4555,11 +4551,11 @@ stock TurnFlashlightOn(client)
 		PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_ByValue);
 		hSetFlashlightEnabled = EndPrepSDKCall();
 	}
-	SetEntData(client, FindSendPropInfo("CTerrorPlayer", "m_iTeamNum"), 2, 1, true);
+	SetEntProp(client, Prop_Send, "m_iTeamNum", 2);
 	new bool:boolean;
 	//ReplyToCommand (client, "SDK Enabling your flashlight");
 	SDKCall(hSetFlashlightEnabled, client, boolean);
-	SetEntData(client, FindSendPropInfo("CTerrorPlayer", "m_iTeamNum"), 3, 1, true);
+	SetEntProp(client, Prop_Send, "m_iTeamNum", 3);
 	return;
 }
 

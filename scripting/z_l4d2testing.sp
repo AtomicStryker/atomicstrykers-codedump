@@ -24,6 +24,82 @@ public OnPluginStart()
 	RegAdminCmd("sm_vocalize", Cmd6, ADMFLAG_CHEATS, "sm_vocalize <command>");
 	
 	RegAdminCmd("sm_getvscomp", Cmd7, ADMFLAG_CHEATS, "sm_getvscomp <charint> <int>");
+	
+	RegAdminCmd("sm_readscores", Cmd8, ADMFLAG_CHEATS, " sm_readscores ");
+	
+	RegAdminCmd("sm_setscore", Cmd9, ADMFLAG_CHEATS, " sm_setscore <score table id> <score> ");
+	
+	RegConsoleCmd("sm_soundtest", Cmd10, "");
+}
+
+public Action:Cmd10(client, args)
+{
+	if (!client) return Plugin_Handled;
+
+	CheatClientCommand(client, "stopsound", "music/flu/concert/midnightride.wav");
+	PrintToChat(client, "midnightride.wav Sound stopped");
+
+	return Plugin_Handled;
+}
+
+public Action:Cmd8(client, args)
+{
+	new managerent = FindEntityByClassname(-1, "terror_player_manager");
+	
+	if (!IsValidEdict(managerent))
+	{
+		ReplyToCommand(client, "Could not find terror_player_manager entity");
+		return Plugin_Handled;
+	}
+	
+	new scoreoffset = FindSendPropInfo("CTerrorPlayerResource", "m_iScore");
+	
+	for (new i = 0; i <= 32; i++)
+	{
+		PrintToConsole(client, "m_iScore offset %i, id %i: %i", i*4, i, GetEntData(managerent, scoreoffset+(i*4), 2));
+	}
+	return Plugin_Handled;
+}
+
+public Action:Cmd9(client, args)
+{
+	if (!client) return Plugin_Handled;
+	
+	if (args < 2)
+	{
+		ReplyToCommand(client, "Usage: sm_setscore <score table id> <score>");
+		return Plugin_Handled;
+	}
+	
+	new managerent = FindEntityByClassname(-1, "terror_player_manager");
+	
+	if (!IsValidEdict(managerent))
+	{
+		ReplyToCommand(client, "Could not find terror_player_manager entity");
+		return Plugin_Handled;
+	}
+	
+	new scoreoffset = FindSendPropInfo("CTerrorPlayerResource", "m_iScore");
+	
+	decl String:arg[64];
+	GetCmdArg(1, arg, sizeof(arg));
+	
+	new idoffset = StringToInt(arg);
+	
+	if (!idoffset || idoffset > 32)
+	{
+		ReplyToCommand(client, "Valid ID range is 1 to 32");
+		return Plugin_Handled;
+	}
+
+	GetCmdArg(2, arg, sizeof(arg));
+	
+	SetEntData(managerent, scoreoffset+(idoffset*4), StringToInt(arg), 2, true);
+	
+	PrintToChat(client, "Set Score OffsetID %i, ID %i score to %i", idoffset*4, idoffset, StringToInt(arg));
+	// has no effect. need extension ... sigh
+	
+	return Plugin_Handled;
 }
 
 public Action:Cmd1(client, args)
@@ -574,6 +650,31 @@ stock CheatCommand(client = 0, String:command[], String:arguments[]="")
 	new flags = GetCommandFlags(command);
 	SetCommandFlags(command, flags & ~FCVAR_CHEAT);
 	FakeClientCommand(client, "%s %s", command, arguments);
+	SetCommandFlags(command, flags);
+	SetUserFlagBits(client, userflags);
+}
+
+stock CheatClientCommand(client = 0, String:command[], String:arguments[]="")
+{
+	if (!client || !IsClientInGame(client))
+	{
+		for (new target = 1; target <= MaxClients; target++)
+		{
+			if (IsClientInGame(target))
+			{
+				client = target;
+				break;
+			}
+		}
+		
+		if (!IsClientInGame(client)) return;
+	}
+	
+	new userflags = GetUserFlagBits(client);
+	SetUserFlagBits(client, ADMFLAG_ROOT);
+	new flags = GetCommandFlags(command);
+	SetCommandFlags(command, flags & ~FCVAR_CHEAT);
+	ClientCommand(client, "%s %s", command, arguments);
 	SetCommandFlags(command, flags);
 	SetUserFlagBits(client, userflags);
 }
