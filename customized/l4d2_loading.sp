@@ -8,7 +8,7 @@
 #define DEBUG_LOG 0
 #define DEBUG_CHAT 0
 
-#define PLUGIN_VERSION "1.0.2"
+#define PLUGIN_VERSION "1.0.3"
 #define DEBUG_SCRIM 0
 #define DEBUG_DOOR 0
 #define DEBUG_CHMAP 0
@@ -113,7 +113,7 @@ public OnPluginStart()
 	HookEvent("witch_spawn", Event_WitchSpawn);
 
 	CreateConVar("l4d2_loadingVersion", PLUGIN_VERSION, "Version of the loading plugin", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_REPLICATED);
-	freezeOn1st = CreateConVar("l4d2_freezeOn1st", "0", "Freeze survivors on first chapter (0 = no, 1 = freeze survivors until all players have loaded; 2 = use countdown like on the other chapters)");
+	freezeOn1st = CreateConVar("l4d2_freezeOn1st", "1", "Freeze survivors on first chapter (0 = no, 1 = freeze survivors until all players have loaded; 2 = use countdown like on the other chapters)");
 	prepareTime1st = CreateConVar("l4d2_prepare1st", "10", "Wait this many seconds after all clients have loaded before starting first round on a map");
 	prepareTime2nd = CreateConVar("l4d2_prepare2nd", "10", "Wait this many seconds after all clients have loaded before starting second round on a map");
 	prepareTimeScrim = CreateConVar("l4d2_prepareScrim", "5", "Wait this many seconds after all clients are ready until going live (first chapter)");
@@ -185,8 +185,6 @@ public Event_RoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 
 	if (StrContains(gamemodeactive, gamemode) != -1)
 	{
-		SetConVarInt(FindConVar("sb_stop"), 1);
-	
 		#if DEBUG_SCRIM
 		PrintDebugMessage("[DEBUG] Starting new round");
 		#endif
@@ -215,6 +213,7 @@ public Event_RoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 			isFirstMap = false;
 			GetCheckPointDoorIds();
 			CreateTimer(1.0, LoadingTimer, _, TIMER_FLAG_NO_MAPCHANGE|TIMER_REPEAT);
+			SetConVarInt(FindConVar("sb_stop"), 1);
 		}
 		else
 		{
@@ -229,11 +228,14 @@ public Event_RoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 			}
 
 			if (!GetConVarBool(scrimMode) && GetConVarInt(freezeOn1st) == 0)
+			{
 				countDown = 0;
+			}
 			else
 			{
 				DirectorStop();
 				CreateTimer(1.0, LoadingTimer, _, TIMER_FLAG_NO_MAPCHANGE|TIMER_REPEAT);
+				SetConVarInt(FindConVar("sb_stop"), 1);
 			}
 		}
 
