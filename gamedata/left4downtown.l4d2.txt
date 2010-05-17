@@ -50,7 +50,7 @@
 				"library"	"server"
 				"linux"		"@_ZN16CTerrorGameRules17SetCampaignScoresEii"
 				"windows" "\x56\x8D\x44\x2A\x2A\x8D\xB1\x2A\x2A\x2A\x2A\x50\x6A\x00\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x8D\x4C\x2A\x2A\x51\x6A\x01\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x5E\xC2\x08\x00"
-					/* 56 8D 44 ? ? 8D B1 ? ? ? ? 50 6A 00 8B CE E8 ? ? ? ? 8D 4C ? ? 51 6A 01 8B CE E8 ? ? ? ? 5E C2 08 00 */
+				/* 56 8D 44 ? ? 8D B1 ? ? ? ? 50 6A 00 8B CE E8 ? ? ? ? 8D 4C ? ? 51 6A 01 8B CE E8 ? ? ? ? 5E C2 08 00 */
 			}
 			
 			/*

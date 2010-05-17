@@ -484,6 +484,17 @@
 				"windows" "\x56\x57\x8B\xF9\xE8\x2A\x2A\x2A\x2A\x84\xC0\x75\x2A\xBE\x01\x2A\x2A\x2A\xEB"
 				/* 56 57 8B F9 E8 ? ? ? ? 84 C0 75 ? BE 01 ? ? ? EB */
 			}
+			
+			/*
+			 * CDirector::HideScoreboard(void)
+			 */
+			"HideScoreboard"
+			{
+				"library"	"server"
+				"linux"	"@_ZN9CDirector14HideScoreboardEv"
+				"windows" "\x56\x8B\xF1\x8B\x2A\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x8B\x8E"
+				/* 56 8B F1 8B ? ? ? ? ? E8 ? ? ? ? 8B 8E */
+			}
 		}
 	}
 }

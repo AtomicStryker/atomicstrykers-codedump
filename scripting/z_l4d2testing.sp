@@ -30,6 +30,44 @@ public OnPluginStart()
 	RegAdminCmd("sm_setscore", Cmd9, ADMFLAG_CHEATS, " sm_setscore <score table id> <score> ");
 	
 	RegConsoleCmd("sm_soundtest", Cmd10, "");
+	
+	RegConsoleCmd("sm_hidescore", Cmd11, "");
+}
+
+public Action:Cmd11(client, args)
+{
+	L4D2_HideScoreBoard();
+	
+	return Plugin_Handled;
+}
+
+// CDirector::HideScoreboard(void)
+L4D2_HideScoreBoard()
+{
+	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
+	
+	new Address:g_pDirector = Address:0;
+	g_pDirector = GameConfGetAddress(ConfigFile, "CDirector");
+	DebugPrintToAll("PTR to Director loaded at 0x%x", g_pDirector);
+	if(g_pDirector == Address_Null)
+	{
+		DebugPrintToAll("ERROR: Could not load the Director pointer");
+	}
+
+	new Handle:MySDKCall = INVALID_HANDLE;
+	StartPrepSDKCall(SDKCall_Raw);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "HideScoreboard");
+	MySDKCall = EndPrepSDKCall();
+	CloseHandle(ConfigFile);
+	
+	if (MySDKCall == INVALID_HANDLE)
+	{
+		DebugPrintToAll("Cant initialize HideScoreboard SDKCall");
+		return;
+	}
+	
+	DebugPrintToAll("About to SDKCall HideScoreboard");
+	SDKCall(MySDKCall, g_pDirector);
 }
 
 public Action:Cmd10(client, args)
@@ -331,7 +369,6 @@ public Action:Cmd7(client, args)
 	
 	return Plugin_Continue;
 }
-
 
 // CTerrorPlayer::Vocalize(char const *, float, float)
 L4D2_Vocalize(client, const String:Vocalize[], Float:floatA, Float:floatB)

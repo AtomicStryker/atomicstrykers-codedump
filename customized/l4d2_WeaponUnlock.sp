@@ -5,7 +5,7 @@
 
 #define PLUGIN_VERSION 			"0.8.5"
 #define TEST_DEBUG				0
-#define TEST_DEBUG_LOG			1
+#define TEST_DEBUG_LOG			0
 
 
 #define PISTOL 					1

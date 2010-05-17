@@ -2,7 +2,14 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.1.3"
+#define PLUGIN_VERSION "1.1.4"
+
+#define TEST_DEBUG			1
+#define TEST_DEBUG_LOG		1
+
+static const TEAM_SURVIVORS						= 2;
+static const PILLS_ADRENALINE_SLOT				= 4;
+static const PASS_PILLS_MINIMUM_DISTANCE		= 200;
 
 new bool:buttondelay[MAXPLAYERS+1];
 new bool:IsBeingPwnt[MAXPLAYERS+1];
@@ -78,7 +85,7 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 {
 	if (buttons & IN_USE && !buttondelay[client] && !IsMunchingMed[client])
 	{
-		if (GetClientTeam(client)!=2) return Plugin_Continue;
+		if (GetClientTeam(client)!=TEAM_SURVIVORS) return Plugin_Continue;
 		if (!IsPlayerIncapped(client)) return Plugin_Continue;
 		if (!CanUsePills) return Plugin_Continue;
 		if (IncapDelay[client]) return Plugin_Continue;
@@ -102,7 +109,7 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 			return Plugin_Continue;
 		}
 		
-		new Meds = GetPlayerWeaponSlot(client, 4); // Slots start at 0. Slot Five equals 4 here.
+		new Meds = GetPlayerWeaponSlot(client, PILLS_ADRENALINE_SLOT);
 		if (Meds == -1) // this gets returned if you got no Pillz.
 		{
 			PrintToChat(client, "\x04You aint got no Meds.");
@@ -126,13 +133,13 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 	
 	if (buttons & IN_ATTACK2 && !buttondelay[client]) //the pass meds to incapped dudes code
 	{
-		if (GetClientTeam(client)!=2) return Plugin_Continue;
+		if (GetClientTeam(client)!=TEAM_SURVIVORS) return Plugin_Continue;
 		if (IsPlayerIncapped(client)) return Plugin_Continue;
 		
 		buttondelay[client] = true;
 		CreateTimer(0.5, ResetDelay, client);
 
-		new Meds = GetPlayerWeaponSlot(client, 4); // Slots start at 0. Slot Five equals 4 here.
+		new Meds = GetPlayerWeaponSlot(client, PILLS_ADRENALINE_SLOT);
 		if (Meds == -1) return Plugin_Continue; // this means he has NO Meds
 		
 		decl String:medstring[128];
@@ -143,7 +150,7 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 		
 		if (!IsPlayerIncapped(target)) return Plugin_Continue;
 		
-		Meds = GetPlayerWeaponSlot(target, 4);
+		Meds = GetPlayerWeaponSlot(target, PILLS_ADRENALINE_SLOT);
 		if (Meds != -1)
 		{
 			PrintToChat(client, "\x04Target already has Meds");
@@ -154,7 +161,7 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 		GetClientAbsOrigin(client, pos1);
 		GetClientAbsOrigin(target, pos2);
 		
-		if (GetVectorDistance(pos1, pos2) > 200) 
+		if (GetVectorDistance(pos1, pos2) > PASS_PILLS_MINIMUM_DISTANCE)
 		{
 			PrintToChat(client, "\x04You must get closer to pass your Meds");
 			return Plugin_Continue;
@@ -162,7 +169,13 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 		
 		if (IsValidEntity(Meds))
 		{
+			DebugPrintToAll("Trying to remove %N's %s, entid", client, medstring, Meds);
 			RemovePlayerItem(client, Meds);
+		}
+		if (IsValidEntity(Meds))
+		{
+			DebugPrintToAll("First Remove Failed, RemovePlayerItem broken, trying RemoveEdict now");
+			RemoveEdict(Meds);
 		}
 		
 		if (StrEqual(medstring, "weapon_pain_pills", false)) CheatCommand(target, "give", "pain_pills", "");
@@ -188,7 +201,7 @@ public Action:AdvertisePills(Handle:timer, any:client)
 	
 	if (!client) return;
 	if (!IsClientInGame(client)) return;
-	if (GetClientTeam(client)!=2) return;
+	if (GetClientTeam(client)!=TEAM_SURVIVORS) return;
 	if (!IsPlayerIncapped(client)) return;
 	
 	if (IsBeingPwnt[client] || IsBeingRevived[client])
@@ -197,7 +210,7 @@ public Action:AdvertisePills(Handle:timer, any:client)
 		return;
 	}
 	
-	new Meds = GetPlayerWeaponSlot(client, 4); // Slots start at 0. Slot Five equals 4 here.
+	new Meds = GetPlayerWeaponSlot(client, PILLS_ADRENALINE_SLOT); // Slots start at 0. Slot Five equals 4 here.
 	if (Meds != -1) // this means he has anything but NO Pills xD
 	{
 		PrintToChat(client, "\x01You have \x04Pills/Adrenaline\x01, you can now hold \x04USE\x01 to chug them and stand back up by yourself");
@@ -205,16 +218,21 @@ public Action:AdvertisePills(Handle:timer, any:client)
 	}
 }
 
-InterruptMunch(client)
+static InterruptMunch(client)
 {
 	KillProgressBar(client);
 	IsMunchingMed[client] = false;
-	KillTimer(MunchTimer[client]);
+	
+	if (MunchTimer[client] != INVALID_HANDLE)
+	{
+		KillTimer(MunchTimer[client]);
+	}
+	
 	MunchTimer[client] = INVALID_HANDLE;
 	
 	if (GetConVarBool(DropCVAR))
 	{
-		new Meds = GetPlayerWeaponSlot(client, 4);
+		new Meds = GetPlayerWeaponSlot(client, PILLS_ADRENALINE_SLOT);
 	
 		decl String:medstring[256];
 		GetEdictClassname(Meds, medstring, sizeof(medstring));
@@ -276,9 +294,9 @@ public Action:MunchFinished(Handle:timer, any:client)
 	ReviveClient(client);
 }
 
-ReviveClient(client)
+static ReviveClient(client)
 {
-	new Meds = GetPlayerWeaponSlot(client, 4);
+	new Meds = GetPlayerWeaponSlot(client, PILLS_ADRENALINE_SLOT);
 	if (IsValidEntity(Meds))
 	{
 		RemovePlayerItem(client, Meds);
@@ -315,12 +333,14 @@ stock SetupProgressBar(client, Float:time)
 {
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarStartTime", GetGameTime());
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarDuration", time);
+	SetEntPropEnt(client, Prop_Send, "m_reviveOwner", client);
 }
 
 stock KillProgressBar(client)
 {
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarStartTime", GetGameTime());
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarDuration", 0.0);
+	SetEntPropEnt(client, Prop_Send, "m_reviveOwner", 0);
 }
 
 stock CheatCommand(client, String:command[], String:parameter1[], String:parameter2[])
@@ -409,4 +429,26 @@ public Event_Incap(Handle:event, const String:name[], bool:dontBroadcast)
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	IncapDelay[client] = true;
 	CreateTimer(GetConVarFloat(DelaySetting), AdvertisePills, client);
+}
+
+stock DebugPrintToAll(const String:format[], any:...)
+{
+	#if (TEST_DEBUG || TEST_DEBUG_LOG)
+	decl String:buffer[256];
+	
+	VFormat(buffer, sizeof(buffer), format, 2);
+	
+	#if TEST_DEBUG
+	PrintToChatAll("[GUNCONTROL] %s", buffer);
+	PrintToConsole(0, "[GUNCONTROL] %s", buffer);
+	#endif
+	
+	LogMessage("%s", buffer);
+	#else
+	//suppress "format" never used warning
+	if(format[0])
+		return;
+	else
+		return;
+	#endif
 }
