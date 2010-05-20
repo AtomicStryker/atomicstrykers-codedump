@@ -1042,29 +1042,40 @@ public OnMapStart(){
 	CreateTimer(0.2, Load_Sounds);
 }
 
-public Action:Load_Sounds(Handle:timer){
+public Action:Load_Sounds(Handle:timer)
+{
 	// precache sounds, loop through sounds
 	BuildPath(Path_SM,soundlistfile,sizeof(soundlistfile),"configs/saysounds.cfg");
-	if(!FileExists(soundlistfile)) {
+	if(!FileExists(soundlistfile)) 
+	{
 		SetFailState("saysounds.cfg not parsed...file doesnt exist!");
-	}else{
-		if (listfile != INVALID_HANDLE){
+	}
+	else
+	{
+		if (listfile != INVALID_HANDLE)
+		{
 			CloseHandle(listfile);
 		}
 		listfile = CreateKeyValues("soundlist");
 		FileToKeyValues(listfile,soundlistfile);
 		KvRewind(listfile);
-		if (KvGotoFirstSubKey(listfile)){
-			do{
+		if (KvGotoFirstSubKey(listfile))
+		{
+			do
+			{
 				decl String:filelocation[PLATFORM_MAX_PATH+1];
 				decl String:dl[PLATFORM_MAX_PATH+1];
 				decl String:file[8];
 				new count = KvGetNum(listfile, "count", 1);
 				new download = KvGetNum(listfile, "download", 1);
-				for (new i = 0; i <= count; i++){
-					if (i){
+				for (new i = 0; i <= count; i++)
+				{
+					if (i)
+					{
 						Format(file, sizeof(file), "file%d", i);
-					}else{
+					}
+					else
+					{
 						strcopy(file, sizeof(file), "file");
 					}
 					filelocation[0] = '\0';
@@ -1078,23 +1089,31 @@ public Action:Load_Sounds(Handle:timer){
 						}
 					}
 				}
-			} while (KvGotoNextKey(listfile));
+			}
+			while (KvGotoNextKey(listfile));
 		}
-		else{
+		else
+		{
 			SetFailState("saysounds.cfg not parsed...No subkeys found!");
 		}
 	}
 	return Plugin_Handled;
 }
 
-public PlayerSpawn(Handle:event,const String:name[],bool:dontBroadcast){
-	if(GetConVarBool(cvarjoinspawn)){
+public PlayerSpawn(Handle:event,const String:name[],bool:dontBroadcast)
+{
+	if(GetConVarBool(cvarjoinspawn))
+	{
 		new userid = GetEventInt(event,"userid");
-		if (userid){
+		if (userid)
+		{
 			new index=GetClientOfUserId(userid);
-			if (index){
-				if(!IsFakeClient(index)){
-					if (firstSpawn[index]){
+			if (index)
+			{
+				if(!IsFakeClient(index))
+				{
+					if (firstSpawn[index])
+					{
 						decl String:auth[64];
 						GetClientAuthString(index,auth,63);
 						CheckJoin(index, auth);
