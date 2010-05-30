@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "2.14"
+#define PLUGIN_VERSION "2.16"
 #define CVAR_FLAGS          FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY
 
 #define DEBUG 0
@@ -13,15 +13,14 @@ new Handle:CloudDuration = INVALID_HANDLE;
 new Handle:CloudRadius = INVALID_HANDLE;
 new Handle:CloudDamage = INVALID_HANDLE;
 new Handle:CloudShake = INVALID_HANDLE;
+new Handle:CloudBlocksRevive = INVALID_HANDLE;
 new Handle:SoundPath = INVALID_HANDLE;
 new Handle:CloudMeleeSlowEnabled = INVALID_HANDLE;
 new Handle:DisplayDamageMessage = INVALID_HANDLE;
-new Handle:ReviveBlocking = INVALID_HANDLE;
 
-new Handle:timer_handle[MAXPLAYERS+1][5];
-new Handle:hurtdata[MAXPLAYERS+1][5];
 new meleeentinfo;
 new bool:isincloud[MAXPLAYERS+1];
+new bool:swappedTeams[MAXPLAYERS+1];
 new bool:MeleeDelay[MAXPLAYERS+1];
 new propinfoghost;
 
@@ -33,7 +32,6 @@ public Plugin:myinfo =
 	version = PLUGIN_VERSION,
 	url = "http://forums.alliedmods.net/showthread.php?t=96665"
 }
-
 
 public OnPluginStart()
 {
@@ -49,7 +47,7 @@ public OnPluginStart()
 	CloudMeleeSlowEnabled = CreateConVar("l4d_cloud_meleeslow_enabled", "1", " Enable/Disable the Cloud Melee Slow Effect ", CVAR_FLAGS);
 	DisplayDamageMessage = CreateConVar("l4d_cloud_message_enabled", "1", " 0 - Disabled; 1 - small HUD Hint; 2 - big HUD Hint; 3 - Chat Notification ", CVAR_FLAGS);
 	CloudShake = CreateConVar("l4d_cloud_shake_enabled", "1", " Enable/Disable the Cloud Damage Shake ", CVAR_FLAGS);
-	ReviveBlocking = CreateConVar("l4d_cloud_damage_revive_blocking_enabled", "0", " Enable/Disable Cloud damage stopping Survivor Revival ", CVAR_FLAGS);
+	CloudBlocksRevive = CreateConVar("l4d_cloud_blocks_revive", "0", " Enable/Disable the Cloud Damage Stopping Reviving ", CVAR_FLAGS);
 	
 	CreateConVar("l4d_cloud_damage_version", PLUGIN_VERSION, " Version of L4D Cloud Damage on this server ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_DONTRECORD);
 
@@ -58,6 +56,13 @@ public OnPluginStart()
 	
 	meleeentinfo = FindSendPropInfo("CTerrorPlayer", "m_iShovePenalty");
 	propinfoghost = FindSendPropInfo("CTerrorPlayer", "m_isGhost");
+	
+	decl String:gamename[128];
+	GetGameFolderName(gamename, sizeof(gamename));
+	if (StrContains(gamename, "left4dead") < 0)
+	{
+		SetFailState("This Plugin only supports L4D or L4D2");
+	}
 }
 
 public Action:PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
@@ -66,154 +71,62 @@ public Action:PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	
 	// If client is valid
-	if (client == 0) return Plugin_Continue;
-	if (!IsClientInGame(client)) return Plugin_Continue;
+	if (!client
+	|| !IsClientInGame(client)
+	|| GetClientTeam(client) !=3
+	|| IsPlayerSpawnGhost(client))
+	{
+		return Plugin_Continue;
+	}
 	
-	// If player wasn't on infected team, we ignore this ...
-	if (GetClientTeam(client)!=3) return Plugin_Continue;
-	// To fix the ghost Smoker cloud exploit
-	if (IsPlayerSpawnGhost(client)) return Plugin_Continue;
-	
-	// Dead classtype ...
 	decl String:class[100];
 	GetClientModel(client, class, sizeof(class));
 	
 	if (StrContains(class, "smoker", false) != -1)
 	{
-		
-		if (GetConVarInt(CloudEnabled) == 1)
+		if (GetConVarBool(CloudEnabled))
 		{
-			//PrintToChatAll("Smokerdeath caught, Plugin running");
-			decl Float:g_pos[3];
-			GetClientEyePosition(client,g_pos);
+			#if DEBUG
+			PrintToChatAll("Smokerdeath caught, Plugin running");
+			#endif
 			
-			new Handle:gasdata = CreateDataPack();
-			CreateTimer(1.0, GasCloud, gasdata);
-			WritePackCell(gasdata, client);
-			WritePackFloat(gasdata, g_pos[0]);
-			WritePackFloat(gasdata, g_pos[1]);
-			WritePackFloat(gasdata, g_pos[2]);
+			decl Float:g_pos[3];
+			GetClientEyePosition(client, g_pos);
+			
+			CreateGasCloud(client, g_pos);
 		}
 	}
 	return Plugin_Continue;
 }
 
-public Action:GasCloud(Handle:timer, Handle:gasdata)
+static CreateGasCloud(client, Float:g_pos[3])
 {
 	#if DEBUG
 	PrintToChatAll("Action GasCloud running");
 	#endif
 	
-	ResetPack(gasdata);
-	new client = ReadPackCell(gasdata);
-	decl Float:g_pos[3];
-	g_pos[0] = ReadPackFloat(gasdata);
-	g_pos[1] = ReadPackFloat(gasdata);
-	g_pos[2] = ReadPackFloat(gasdata);
-	CloseHandle(gasdata);
+	new Float:targettime = GetEngineTime() + GetConVarFloat(CloudDuration);
 	
-	// For Bot Smokers. They all have the same client, and multiple Clouds bugged it out
-	// Im sure this can be coded nicer. But i dont want to.
+	new Handle:data = CreateDataPack();
+	WritePackCell(data, client);
+	WritePackFloat(data, g_pos[0]);
+	WritePackFloat(data, g_pos[1]);
+	WritePackFloat(data, g_pos[2]);
+	WritePackFloat(data, targettime);
 	
-	decl cloudindex;
-	if (timer_handle[client][0] != INVALID_HANDLE)
-	{
-		if (timer_handle[client][1] != INVALID_HANDLE)
-		{
-			if (timer_handle[client][2] != INVALID_HANDLE)
-			{
-				if (timer_handle[client][3] != INVALID_HANDLE)
-				{
-					cloudindex = 4;
-				}
-				else 
-				{
-					cloudindex = 3;
-				}
-			}
-			else
-			{
-				cloudindex = 2;
-			}
-		}
-		else
-		{
-			cloudindex = 1;
-		}
-	}
-	else
-	{
-		cloudindex = 0;
-	}
-	
-	decl Float:duration;
-	duration = GetConVarFloat(CloudDuration);
-	
-	hurtdata[client][cloudindex] = CreateDataPack();
-	WritePackCell(hurtdata[client][cloudindex], client);
-	WritePackFloat(hurtdata[client][cloudindex], g_pos[0]);
-	WritePackFloat(hurtdata[client][cloudindex], g_pos[1]);
-	WritePackFloat(hurtdata[client][cloudindex], g_pos[2]);
-	timer_handle[client][cloudindex] = CreateTimer(2.0, Point_Hurt, hurtdata[client][cloudindex], TIMER_REPEAT);
-	
-	new Handle:entitypack = CreateDataPack();
-	CreateTimer(duration, RemoveGas, entitypack);
-	duration = duration + 1.0;
-	CreateTimer(duration, ClearHandle, entitypack);
-	WritePackCell(entitypack, client);
-	WritePackCell(entitypack, cloudindex);
-	
-	return Plugin_Continue;
-}
-
-
-public Action:RemoveGas(Handle:timer, Handle:entitypack)
-{
-	#if DEBUG
-	PrintToChatAll("Action Remover running");
-	#endif
-	
-	ResetPack(entitypack);
-	
-	new client = ReadPackCell(entitypack);
-	new cloudindex = ReadPackCell(entitypack);
-	
-	if (timer_handle[client][cloudindex] != INVALID_HANDLE)
-	{
-		KillTimer(timer_handle[client][cloudindex]);
-		timer_handle[client][cloudindex] = INVALID_HANDLE;
-		CloseHandle(hurtdata[client][cloudindex]);
-	}
-}
-
-public Action:ClearHandle(Handle:timer, Handle:entitypack)
-{
-	#if DEBUG
-	PrintToChatAll("Action HandleCleaner running");
-	#endif
-	
-	ResetPack(entitypack);
-	CloseHandle(entitypack);
+	CreateTimer(2.0, Point_Hurt, data, TIMER_REPEAT);
 }
 
 public Action:PlayerTeam(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	CreateTimer(1.0, EraseGhostExploit, client);
-	return Plugin_Continue;
+	swappedTeams[client] = true;
+	CreateTimer(2.0, EraseGhostExploit, client);
 }
 
-public Action:EraseGhostExploit(Handle:timer, Handle:client)
+public Action:EraseGhostExploit(Handle:timer, any:client)
 {	
-	for (new i = 0; i <= 4; i++)
-	{
-		if (timer_handle[client][i] != INVALID_HANDLE)
-		{
-			KillTimer(timer_handle[client][i]);
-			timer_handle[client][i] = INVALID_HANDLE;
-			CloseHandle(hurtdata[client][i]);
-		}
-	}
+	swappedTeams[client] = false;
 }
 
 public Action:Point_Hurt(Handle:timer, Handle:hurt)
@@ -224,6 +137,17 @@ public Action:Point_Hurt(Handle:timer, Handle:hurt)
 	g_pos[0] = ReadPackFloat(hurt);
 	g_pos[1] = ReadPackFloat(hurt);
 	g_pos[2] = ReadPackFloat(hurt);
+	new Float:targettime = ReadPackFloat(hurt);
+	
+	if (targettime - GetEngineTime() < 0)
+	{
+		#if DEBUG
+		PrintToChatAll("Target Time reached Action PointHurter killing itself");
+		#endif
+	
+		CloseHandle(hurt);
+		return Plugin_Stop;
+	}
 	
 	#if DEBUG
 	PrintToChatAll("Action PointHurter running");
@@ -232,121 +156,62 @@ public Action:Point_Hurt(Handle:timer, Handle:hurt)
 	if (!IsClientInGame(client)) client = -1;
 	// dummy line to prevent compiling errors. the client data has to be read or the datapack becomes corrupted
 	
+	decl Float:targetVector[3];
+	decl Float:distance;
+	new Float:radiussetting = GetConVarFloat(CloudRadius);
+	decl String:soundFilePath[256];
+	GetConVarString(SoundPath, soundFilePath, sizeof(soundFilePath));
+	new bool:shakeenabled = GetConVarBool(CloudShake);
+	new damage = GetConVarInt(CloudDamage);
+	new bool:slowenabled = GetConVarBool(CloudMeleeSlowEnabled);
+	
 	for (new target = 1; target <= MaxClients; target++)
 	{
-		if (target > 0 && IsClientInGame(target))
+		if (!target
+		|| !IsClientInGame(target)
+		|| !IsPlayerAlive(target)
+		|| GetClientTeam(target) != 2)
 		{
-		if (IsPlayerAlive(target) && GetClientTeam(target) == 2)
-		{
+			continue;
+		}
 
-			decl Float:targetVector[3];
-			GetClientEyePosition(target, targetVector);
-					
-			new Float:distance = GetVectorDistance(targetVector, g_pos);
-					
-			if (distance < GetConVarFloat(CloudRadius))
-			{							
-						
-				decl String:soundFilePath[256];
-				GetConVarString(SoundPath, soundFilePath,256);
-				EmitSoundToClient(target, soundFilePath);
-				
-				switch (GetConVarInt(DisplayDamageMessage))
-				{
-					case 1:
-					PrintCenterText(target, "You're suffering from a Smoker Cloud!");
-					
-					case 2:
-					PrintHintText(target, "You're suffering from a Smoker Cloud!");
-					
-					case 3:
-					PrintToChat(target, "You're suffering from a Smoker Cloud!");
-				}
-				
-				new IsIncapped = GetEntProp(target, Prop_Send, "m_isIncapacitated");
-				if (IsIncapped && GetConVarInt(ReviveBlocking) == 1) DamageEffect(target);
-				if (!IsIncapped) DamageEffect(target);
-				
-				if (GetConVarBool(CloudShake))
-				{
-					decl String:gamename[128];
-					GetGameFolderName(gamename, sizeof(gamename));
-					if (StrEqual(gamename, "left4dead"))
-					{
-						new Handle:hBf = StartMessageOne("Shake", target);
-						BfWriteByte(hBf, 0);
-						BfWriteFloat(hBf,6.0);
-						BfWriteFloat(hBf,1.0);
-						BfWriteFloat(hBf,1.0);
-						EndMessage();
-						CreateTimer(1.0, StopShake, target);
-					}
-					else if (StrEqual(gamename, "left4dead2"))
-					{
-						new array[1];
-						array[0] = target;
-						new Handle:hBf = StartMessageEx(11, array, 1);
-						if (hBf != INVALID_HANDLE)
-						{
-							BfWriteByte(hBf, 0);
-							BfWriteFloat(hBf,6.0);
-							BfWriteFloat(hBf,1.0);
-							BfWriteFloat(hBf,1.0);
-							EndMessage();
-						}
-						else CloseHandle(hBf);
-					}
-				}
-					
-				new damage = GetConVarInt(CloudDamage);
-				new hardhp = GetClientHealth(target) + 2; //i dont know why 2 are missing here.
-				
-				if (GetConVarInt(CloudMeleeSlowEnabled) == 1)
-				{
-					if (IsFakeClient(target)) continue;
-					isincloud[target] = true;
-					CreateTimer(2.0, ClearMeleeBlock, target);
-				}
-				
-				#if DEBUG
-				PrintToChatAll("HardHP: %i", hardhp);
-				#endif
-				
-				if (damage == 0) return Plugin_Continue;
-				
-				if (damage < hardhp || IsPlayerIncapped(target))
-				{
-					#if DEBUG
-					PrintToChatAll("Hard Damage IF applied, applying hard damage");
-					PrintToChatAll("DMG: %i HARDHP: %i NEWHP: %i", damage, hardhp, hardhp - damage);
-					#endif
-					
-					SetEntityHealth(target, hardhp - damage);
-				}
-				
-				else
-				{
-					new Float:temphp = GetEntPropFloat(target, Prop_Send, "m_healthBuffer") +2.0; //here 2 missing, again.
-					new Float:damagefloat = GetConVarFloat(CloudDamage);
-					
-					#if DEBUG
-					PrintToChatAll("TempHP: %f", temphp);
-					PrintToChatAll("DMG: %f TEMPHP: %f NEWT-HP: %f", damagefloat, temphp, FloatSub(temphp,damagefloat));
-					#endif
-					
-					if (FloatCompare(damagefloat,temphp) == -1)
-					{
-						#if DEBUG
-						PrintToChatAll("Temp Damage IF applied, applying temp damage");
-						#endif
-						
-						SetEntPropFloat(target, Prop_Send, "m_healthBuffer", FloatSub(temphp,damagefloat));
-					}
-				}
-			}
+		GetClientEyePosition(target, targetVector);
+		distance = GetVectorDistance(targetVector, g_pos);
+		if (distance > radiussetting) continue;
+
+		EmitSoundToClient(target, soundFilePath);
+		switch (GetConVarInt(DisplayDamageMessage))
+		{
+			case 1:
+			PrintCenterText(target, "You're suffering from a Smoker Cloud!");
+			
+			case 2:
+			PrintHintText(target, "You're suffering from a Smoker Cloud!");
+			
+			case 3:
+			PrintToChat(target, "You're suffering from a Smoker Cloud!");
 		}
+		
+		if (shakeenabled)
+		{
+			new Handle:hBf = StartMessageOne("Shake", target);
+			BfWriteByte(hBf, 0);
+			BfWriteFloat(hBf,6.0);
+			BfWriteFloat(hBf,1.0);
+			BfWriteFloat(hBf,1.0);
+			EndMessage();
+			CreateTimer(1.0, StopShake, target);
 		}
+		
+		if (slowenabled && !IsFakeClient(target))
+		{
+			isincloud[target] = true;
+			CreateTimer(2.0, ClearMeleeBlock, target);
+		}
+		
+		applyDamage(damage, target, client);
 	}
+	
 	return Plugin_Continue;
 }
 
@@ -382,40 +247,74 @@ public Action:ClearMeleeBlock(Handle:timer, Handle:target)
 	isincloud[target] = false;
 }
 
-public Action:DamageEffect(target)
-{
-	new pointHurt = CreateEntityByName("point_hurt");			// Create point_hurt
-	DispatchKeyValue(target, "targetname", "hurtme");				// mark target
-	DispatchKeyValue(pointHurt, "Damage", "0");					// No Damage, just HUD display. Does stop Reviving though
-	DispatchKeyValue(pointHurt, "DamageTarget", "hurtme");		// Target Assignment
-	DispatchKeyValue(pointHurt, "DamageType", "65536");			// Type of damage
-	DispatchSpawn(pointHurt);										// Spawn descriped point_hurt
-	AcceptEntityInput(pointHurt, "Hurt"); 						// Trigger point_hurt execute
-	AcceptEntityInput(pointHurt, "Kill"); 						// Remove point_hurt
-	DispatchKeyValue(target, "targetname",	"cake");			// Clear target's mark
-}
-
 public Action:StopShake(Handle:timer, any:target)
 {
-	if (target <= 0) return;
-	if (!IsClientInGame(target)) return;
+	if (!target || !IsClientInGame(target)) return;
 	
-	new Handle:hBf=StartMessageOne("Shake", target);
+	new Handle:hBf = StartMessageOne("Shake", target);
 	BfWriteByte(hBf, 0);
-	BfWriteFloat(hBf,0.0);
-	BfWriteFloat(hBf,0.0);
-	BfWriteFloat(hBf,0.0);
+	BfWriteFloat(hBf, 0.0);
+	BfWriteFloat(hBf, 0.0);
+	BfWriteFloat(hBf, 0.0);
 	EndMessage();
 }
 
-bool:IsPlayerSpawnGhost(client)
+stock bool:IsPlayerSpawnGhost(client)
 {
 	if (GetEntData(client, propinfoghost, 1)) return true;
 	return false;
 }
 
-bool:IsPlayerIncapped(client)
+stock bool:IsPlayerIncapped(client)
 {
 	if (GetEntProp(client, Prop_Send, "m_isIncapacitated", 1)) return true;
 	return false;
+}
+
+// timer idea by dirtyminuth, damage dealing by pimpinjuice http://forums.alliedmods.net/showthread.php?t=111684
+// added some L4D specific checks
+static applyDamage(damage, victim, attacker)
+{ 
+	new Handle:dataPack = CreateDataPack();
+	WritePackCell(dataPack, damage);  
+	WritePackCell(dataPack, victim);
+	WritePackCell(dataPack, attacker);
+	
+	CreateTimer(0.10, timer_stock_applyDamage, dataPack);
+}
+
+public Action:timer_stock_applyDamage(Handle:timer, Handle:dataPack)
+{
+	ResetPack(dataPack);
+	new damage = ReadPackCell(dataPack);  
+	new victim = ReadPackCell(dataPack);
+	new attacker = ReadPackCell(dataPack);
+	CloseHandle(dataPack);   
+
+	decl Float:victimPos[3], String:strDamage[16], String:strDamageTarget[16];
+	
+	GetClientEyePosition(victim, victimPos);
+	IntToString(damage, strDamage, sizeof(strDamage));
+	Format(strDamageTarget, sizeof(strDamageTarget), "hurtme%d", victim);
+	
+	new entPointHurt = CreateEntityByName("point_hurt");
+	if(!entPointHurt) return;
+	
+	new bool:reviveblock = GetConVarBool(CloudBlocksRevive);
+
+	// Config, create point_hurt
+	DispatchKeyValue(victim, "targetname", strDamageTarget);
+	DispatchKeyValue(entPointHurt, "DamageTarget", strDamageTarget);
+	DispatchKeyValue(entPointHurt, "Damage", strDamage);
+	DispatchKeyValue(entPointHurt, "DamageType", reviveblock ? "65536" : "263168");
+	DispatchSpawn(entPointHurt);
+	
+	// Teleport, activate point_hurt
+	TeleportEntity(entPointHurt, victimPos, NULL_VECTOR, NULL_VECTOR);
+	AcceptEntityInput(entPointHurt, "Hurt", (attacker > 0 && attacker < MaxClients && IsClientInGame(attacker)) ? attacker : -1);
+	
+	// Config, delete point_hurt
+	DispatchKeyValue(entPointHurt, "classname", "point_hurt");
+	DispatchKeyValue(victim, "targetname", "null");
+	RemoveEdict(entPointHurt);
 }

@@ -5,12 +5,15 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define TEST_DEBUG 0
-#define TEST_DEBUG_LOG 0
-
+static const 		OUT_SERVER								= 	 1;
+static const 		OUT_LOG									= 	 2;
+static const 		OUT_CHAT								= 	 4;
+static Handle:cvarDebugOut									= INVALID_HANDLE;
 
 public OnPluginStart()
 {
+	cvarDebugOut = CreateConVar("testingplugin_debug", "0", "Sum of debug flags for debug outputs (1-console, 2-log, 4-chat)", FCVAR_PLUGIN|FCVAR_NOTIFY);
+	
 	RegAdminCmd("sm_takeover", Cmd1, ADMFLAG_CHEATS, "Take Over Zombie Bot <player>");
 	
 	RegAdminCmd("sm_botify", Cmd2, ADMFLAG_CHEATS, "ReplaceWithBot <player> <bool>");
@@ -29,54 +32,67 @@ public OnPluginStart()
 	
 	RegAdminCmd("sm_setscore", Cmd9, ADMFLAG_CHEATS, " sm_setscore <score table id> <score> ");
 	
-	RegConsoleCmd("sm_soundtest", Cmd10, "");
+	RegAdminCmd("sm_dodamage", Cmd10, ADMFLAG_CHEATS, " sm_dodamage <target> <damage>");
 	
-	RegConsoleCmd("sm_hidescore", Cmd11, "");
+	RegAdminCmd("sm_pullanim", Cmd11, ADMFLAG_CHEATS, "");
+	// smoker pull: 18 oder 19
 }
 
 public Action:Cmd11(client, args)
 {
-	L4D2_HideScoreBoard();
+	if (!client)
+	{
+		ReplyToCommand(client, "Must be ingame to use this command");
+		return Plugin_Handled;
+	}
 	
+	if (!args)
+	{
+		ReplyToCommand(client, "Provide a sequence number");
+		return Plugin_Handled;
+	}
+	
+	decl String:arg[256];
+	GetCmdArg(1, arg, sizeof(arg));
+	
+	SetEntProp(client, Prop_Send, "m_nSequence", StringToInt(arg));
 	return Plugin_Handled;
-}
-
-// CDirector::HideScoreboard(void)
-L4D2_HideScoreBoard()
-{
-	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
-	
-	new Address:g_pDirector = Address:0;
-	g_pDirector = GameConfGetAddress(ConfigFile, "CDirector");
-	DebugPrintToAll("PTR to Director loaded at 0x%x", g_pDirector);
-	if(g_pDirector == Address_Null)
-	{
-		DebugPrintToAll("ERROR: Could not load the Director pointer");
-	}
-
-	new Handle:MySDKCall = INVALID_HANDLE;
-	StartPrepSDKCall(SDKCall_Raw);
-	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "HideScoreboard");
-	MySDKCall = EndPrepSDKCall();
-	CloseHandle(ConfigFile);
-	
-	if (MySDKCall == INVALID_HANDLE)
-	{
-		DebugPrintToAll("Cant initialize HideScoreboard SDKCall");
-		return;
-	}
-	
-	DebugPrintToAll("About to SDKCall HideScoreboard");
-	SDKCall(MySDKCall, g_pDirector);
 }
 
 public Action:Cmd10(client, args)
 {
-	if (!client) return Plugin_Handled;
-
-	CheatClientCommand(client, "stopsound", "music/flu/concert/midnightride.wav");
-	PrintToChat(client, "midnightride.wav Sound stopped");
-
+	if (!client)
+	{
+		ReplyToCommand(client, "Must be ingame to use this command");
+		return Plugin_Handled;
+	}
+	
+	if (args < 2)
+	{
+		ReplyToCommand(client, "Usage: sm_dodamage <target> <damage>");
+		return Plugin_Handled;
+	}
+	
+	decl String:arg[256];
+	GetCmdArg(1, arg, sizeof(arg));
+	new target = FindTarget(client, arg, false, false);
+	
+	if (target < 1)
+	{
+		ReplyToCommand(client, "Invalid target specified");
+		return Plugin_Handled;
+	}
+	
+	GetCmdArg(2, arg, sizeof(arg));
+	new damage = StringToInt(arg);
+	
+	if (damage < 1)
+	{
+		ReplyToCommand(client, "Invalid Amount of Damage specified");
+		return Plugin_Handled;
+	}
+	
+	applyDamage(damage, target, client);
 	return Plugin_Handled;
 }
 
@@ -129,7 +145,7 @@ public Action:Cmd9(client, args)
 		ReplyToCommand(client, "Valid ID range is 1 to 32");
 		return Plugin_Handled;
 	}
-
+	
 	GetCmdArg(2, arg, sizeof(arg));
 	
 	SetEntData(managerent, scoreoffset+(idoffset*4), StringToInt(arg), 2, true);
@@ -339,7 +355,7 @@ public Action:Cmd6(client, args)
 	
 	GetCmdArg(2, floatstring, sizeof(floatstring));
 	new Float:floatA = StringToFloat(floatstring);
-
+	
 	GetCmdArg(3, floatstring, sizeof(floatstring));
 	new Float:floatB = StringToFloat(floatstring);
 	
@@ -374,7 +390,7 @@ public Action:Cmd7(client, args)
 L4D2_Vocalize(client, const String:Vocalize[], Float:floatA, Float:floatB)
 {
 	DebugPrintToAll("Vocalize being called, client %N command %s floatA %f floatB %f", client, Vocalize, floatA, floatB);
-
+	
 	new Handle:MySDKCall = INVALID_HANDLE;
 	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
 	StartPrepSDKCall(SDKCall_Player);
@@ -399,7 +415,7 @@ L4D2_Vocalize(client, const String:Vocalize[], Float:floatA, Float:floatB)
 L4D2_TakeOverZombieBot(client, target)
 {
 	DebugPrintToAll("TakeOverZombieBot being called, client %N target %N", client, target);
-
+	
 	new Handle:MySDKCall = INVALID_HANDLE;
 	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
 	StartPrepSDKCall(SDKCall_Player);
@@ -424,7 +440,7 @@ L4D2_TakeOverZombieBot(client, target)
 L4D2_ReplaceWithBot(client, boolean)
 {
 	DebugPrintToAll("ReplaceWithBot being called, client %N boolean %b", client, boolean);
-
+	
 	new Handle:MySDKCall = INVALID_HANDLE;
 	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
 	StartPrepSDKCall(SDKCall_Player);
@@ -447,7 +463,7 @@ L4D2_ReplaceWithBot(client, boolean)
 L4D2_CullZombie(target)
 {
 	DebugPrintToAll("CullZombie being called, target %N", target);
-
+	
 	new Handle:MySDKCall = INVALID_HANDLE;
 	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
 	StartPrepSDKCall(SDKCall_Player);
@@ -472,7 +488,7 @@ L4D2_CullZombie(target)
 L4D2_ReplaceTank(client, target)
 {
 	DebugPrintToAll("ReplaceTank being called, client %N target %N", client, target);
-
+	
 	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
 	new Address:g_pZombieManager = GameConfGetAddress(ConfigFile, "CZombieManager");
 	if(g_pZombieManager == Address_Null)
@@ -506,7 +522,7 @@ L4D2_ReplaceTank(client, target)
 L4D2_GetVSCompletionPerChar(SurvivorCharacterType, int)
 {
 	DebugPrintToAll("GetVersusCompletionPerCharacter being called, SurvivorCharacterType %i int %i", SurvivorCharacterType, int);
-
+	
 	new Handle:MySDKCall = INVALID_HANDLE;
 	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
 	StartPrepSDKCall(SDKCall_GameRules);
@@ -529,7 +545,7 @@ L4D2_GetVSCompletionPerChar(SurvivorCharacterType, int)
 L4D2_RespawnAsClassGhost(client, class)
 {
 	DebugPrintToAll("RespawnAsClassGhost being called, client %N targetclass %d", client, class);
-
+	
 	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
 	
 	new Handle:SDK_BecomeGhost = INVALID_HANDLE;
@@ -571,7 +587,7 @@ public Action:TEST_DelayedClassChange(Handle:timer, Handle:data)
 	new client = ReadPackCell(data);
 	new class = ReadPackCell(data);
 	CloseHandle(data);
-
+	
 	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
 	
 	new Platform = GameConfGetOffset(ConfigFile, "Platform");
@@ -625,28 +641,6 @@ public Action:TEST_DelayedClassChange(Handle:timer, Handle:data)
 	AcceptEntityInput(MakeCompatEntRef(GetEntProp(client, Prop_Send, "m_customAbility")), "Kill");
 	SetEntProp(client, Prop_Send, "m_customAbility", GetEntData(SDKCall(SDK_CreateAbility, client), AbilityOffset));
 	return Plugin_Stop;
-}
-
-stock DebugPrintToAll(const String:format[], any:...)
-{
-	#if TEST_DEBUG	|| TEST_DEBUG_LOG
-	decl String:buffer[192];
-	
-	VFormat(buffer, sizeof(buffer), format, 2);
-	
-	#if TEST_DEBUG
-	PrintToChatAll("[TEST] %s", buffer);
-	PrintToConsole(0, "[TEST] %s", buffer);
-	#endif
-	
-	LogMessage("%s", buffer);
-	#else
-	//suppress "format" never used warning
-	if(format[0])
-		return;
-	else
-		return;
-	#endif
 }
 
 //entity abs origin code from here
@@ -714,4 +708,82 @@ stock CheatClientCommand(client = 0, String:command[], String:arguments[]="")
 	ClientCommand(client, "%s %s", command, arguments);
 	SetCommandFlags(command, flags);
 	SetUserFlagBits(client, userflags);
+}
+
+
+stock applyDamage(damage, victim, attacker=0)
+{ 
+	new Handle:dataPack = CreateDataPack();
+	WritePackCell(dataPack, damage);  
+	WritePackCell(dataPack, victim);
+	WritePackCell(dataPack, attacker);
+	
+	// Delay damage event by a small amount.
+	// Prevents infinite [damage > death > damage > ...] loops.
+	CreateTimer(0.10, timer_stock_applyDamage, dataPack);
+}
+
+public Action:timer_stock_applyDamage(Handle:timer, Handle:dataPack)
+{
+	ResetPack(dataPack);
+	new damage = ReadPackCell(dataPack);  
+	new victim = ReadPackCell(dataPack);
+	new attacker = ReadPackCell(dataPack);
+	CloseHandle(dataPack);   
+	
+	if((damage) && IsClientInGame(victim) && IsPlayerAlive(victim))
+	{
+		decl Float:victimPos[3];
+		decl String:strDamage[16];
+		decl String:strDamageTarget[16];
+		
+		GetClientEyePosition(victim, victimPos);
+		IntToString(damage, strDamage, sizeof(strDamage));
+		Format(strDamageTarget, sizeof(strDamageTarget), "hurtme%d", victim);
+		
+		new entPointHurt = CreateEntityByName("point_hurt");
+		if(entPointHurt)
+		{
+			// Config, create point_hurt
+			DispatchKeyValue(victim, "targetname", strDamageTarget);
+			DispatchKeyValue(entPointHurt, "DamageTarget", strDamageTarget);
+			DispatchKeyValue(entPointHurt, "Damage", strDamage);
+			DispatchKeyValue(entPointHurt, "DamageType", "0"); // DMG_GENERIC
+			DispatchSpawn(entPointHurt);
+			
+			// Teleport, activate point_hurt
+			TeleportEntity(entPointHurt, victimPos, NULL_VECTOR, NULL_VECTOR);
+			AcceptEntityInput(entPointHurt, "Hurt", (attacker) ? attacker : -1);
+			
+			// Config, delete point_hurt
+			DispatchKeyValue(entPointHurt, "classname", "point_hurt");
+			DispatchKeyValue(victim, "targetname", "null");
+			RemoveEdict(entPointHurt);
+		}
+	}
+	
+	return Plugin_Continue;
+}
+
+static DebugPrintToAll(const String:format[], any:...)
+{
+	new outflags = GetConVarInt(cvarDebugOut);
+	if (!outflags) return;
+	
+	decl String:buffer[192];
+	
+	VFormat(buffer, sizeof(buffer), format, 2);
+	
+	if(outflags & OUT_SERVER)
+	{
+		PrintToConsole(0, "[SM] %s", buffer);
+	}
+	if(outflags & OUT_CHAT)
+	{
+		PrintToChatAll("[SM] %s", buffer);
+	}
+	if(outflags & OUT_LOG)
+	{
+		LogMessage("%s", buffer);
+	}
 }

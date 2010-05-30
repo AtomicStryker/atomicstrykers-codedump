@@ -44,10 +44,10 @@ The car Mr. Tank just put into Ellis:    "prop_physics"
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#define PLUGIN_VERSION						"1.0.0"
+#define PLUGIN_VERSION						"1.0.2"
 
-#define TEST_DEBUG							 0
-#define TEST_DEBUG_LOG						 0
+#define TEST_DEBUG							 1
+#define TEST_DEBUG_LOG						 1
 
 #define				MAX_MODDED_WEAPONS		32
 #define				CLASS_STRINGLENGHT		32
@@ -112,6 +112,8 @@ public OnPluginStart()
 	}
 
 	CreateConVar("l4d2_damage_mod_version", PLUGIN_VERSION, "L4D2 Damage Mod Version", FCVAR_PLUGIN|FCVAR_REPLICATED|FCVAR_DONTRECORD);
+	
+	RegAdminCmd("sm_reloaddamagemod", cmd_ReloadData, ADMFLAG_CHEATS, "Reload the setting file for live changes");
 }
 
 public OnClientPostAdminCheck(client)
@@ -128,6 +130,18 @@ public OnEntityCreated(entity, const String:classname[])
 }
 
 public OnMapStart()
+{
+	ReloadKeyValues();
+}
+
+public Action:cmd_ReloadData(client, args)
+{
+	ReloadKeyValues();
+	ReplyToCommand(client, "L4D2 Damage Mod config file re-loaded");
+	return Plugin_Handled;
+}
+
+static ReloadKeyValues()
 {
 	if (weaponIndexTrie != INVALID_HANDLE)
 	{
@@ -219,7 +233,7 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 	
 	decl teamattacker, teamvictim, Float:damagemod;
 	
-	if (attacker < L4D2_MAX_HUMAN_PLAYERS) // case: attacker human player
+	if (attacker < L4D2_MAX_HUMAN_PLAYERS && IsClientInGame(attacker)) // case: attacker human player
 	{
 		teamattacker = GetClientTeam(attacker);
 		
@@ -247,8 +261,9 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 			}
 		}
 	}
-	else if (victim < L4D2_MAX_HUMAN_PLAYERS) // case: attacker witch or common, victim human player
+	else if (victim < L4D2_MAX_HUMAN_PLAYERS && IsClientInGame(victim)) // case: attacker witch or common, victim human player
 	{
+
 		teamvictim = GetClientTeam(victim);
 		if (teamvictim == L4D2_TEAM_INFECTED)
 		{
@@ -259,11 +274,12 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 			damagemod = damageModArray[i][damageModifierEnemy];
 		}
 	}
+	else return Plugin_Continue; //unhandled
 	
 	damage = damage * damagemod;
 	DebugPrintToAll("Damage modded by [%f] to [%f]", damagemod, damage);
 	
-	return Plugin_Continue;
+	return Plugin_Changed;
 }
 
 stock DebugPrintToAll(const String:format[], any:...)
