@@ -1,19 +1,21 @@
 #pragma semicolon 1
 #include <sourcemod>
 #include <sdktools>
-#define PLUGIN_VERSION						"1.0.3"
+#define PLUGIN_VERSION								"1.0.4"
 
-#define TEST_DEBUG							0
-#define TEST_DEBUG_LOG						0
+#define TEST_DEBUG									0
+#define TEST_DEBUG_LOG								0
 
-new Handle:modifyDamageEnabled			=	INVALID_HANDLE;
-new Handle:modifyMeleeDamageCommons		=	INVALID_HANDLE;
+static Handle:modifyDamageEnabled					=	INVALID_HANDLE;
+static Handle:modifyMeleeDamageCommons				=	INVALID_HANDLE;
 
-new Handle:trieModdedWeapons			=	INVALID_HANDLE;
-new Handle:trieModdedWeaponsTank		=	INVALID_HANDLE;
+static Handle:trieModdedWeapons						=	INVALID_HANDLE;
+static Handle:trieModdedWeaponsTank					=	INVALID_HANDLE;
 
-new static damageModEnabled				=	1;
-new static damageModEnabledForCI		=	1;
+static 		damageModEnabled						=	1;
+static 		damageModEnabledForCI					=	1;
+static bool:ignoreNextDamageDealt[MAXPLAYERS+1]		=	false;
+
 
 public Plugin:myinfo =
 {
@@ -21,7 +23,7 @@ public Plugin:myinfo =
 	author = "AtomicStryker",
 	description = "Modify damage for each Weapon",
 	version = PLUGIN_VERSION,
-	url = ""
+	url = "http://forums.alliedmods.net/showthread.php?t=116668"
 };
 
 public OnPluginStart()
@@ -88,15 +90,15 @@ public Action:_DM_PlayerHurt_Event(Handle:event, const String:name[], bool:dontB
 	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	
-	if (!client || !attacker) return Plugin_Continue; // both must be valid players.
+	if (!client || !attacker || ignoreNextDamageDealt[attacker]) return Plugin_Continue; // both must be valid players.
 	
 	decl Float:multiplierWeapon, String:weaponname[64];
 	
-	new dmg_health = GetEventInt(event,"dmg_health");	 // get the amount of damage done
-	new eventhealth = GetEventInt(event,"health");	// get the health after damage as the even sees it
-	new altereddamage;
+	new dmg_health = GetEventInt(event, "dmg_health");	 // get the amount of damage done
+	new eventhealth = GetEventInt(event, "health");	// get the health after damage as the event sees it
+	new damagedelta;
 	
-	if (dmg_health < 1) return Plugin_Continue; // exclude zero damage calculations
+	if (dmg_health < 1 || eventhealth < 1) return Plugin_Continue; // exclude pointless cases
 	
 	GetClientWeapon(attacker, weaponname, sizeof(weaponname)); // get the attacker weapon
 	
@@ -105,55 +107,36 @@ public Action:_DM_PlayerHurt_Event(Handle:event, const String:name[], bool:dontB
 		GetEntPropString(GetPlayerWeaponSlot(attacker, 1), Prop_Data, "m_strMapSetScriptName", weaponname, sizeof(weaponname));
 	}
 	
-	if (!IsPlayerTank(client))
+	if (IsPlayerTank(client) ? GetTrieValue(trieModdedWeaponsTank, weaponname, multiplierWeapon) : GetTrieValue(trieModdedWeapons, weaponname, multiplierWeapon))
 	{
-		if (GetTrieValue(trieModdedWeapons, weaponname, multiplierWeapon)) // check for the weapon multiplier setting
+		damagedelta = RoundToNearest((dmg_health * multiplierWeapon) - dmg_health);
+		
+		switch (damagedelta > 0)
 		{
-			altereddamage = RoundToNearest(dmg_health * multiplierWeapon);
-
-			if (eventhealth > 1) // dont bother if the player dies
+			case true:
 			{
-				new health = eventhealth + dmg_health - altereddamage;
-				// health calculation: first revert damage done by adding dmg_health, then subtract the changed damage
-				
+				applyDamage(damagedelta, client, attacker);
+				DebugPrintToAll("Changed weapon %s damage used by %N on %N, was %i, adding %i", weaponname, attacker, client, dmg_health, damagedelta);
+			}
+			case false:
+			{
+				new health = eventhealth - damagedelta;
+			
 				if (health < 1)
 				{
-					altereddamage += (health - 1);
+					damagedelta += (health - 1);
 					health = 1;
 				}
 				
 				SetEntityHealth(client, health);
-				SetEventInt(event,"dmg_health", altereddamage); // for correct stats.	
+				SetEventInt(event, "dmg_health", dmg_health + damagedelta); // for correct stats.
+				SetEventInt(event, "health", health);
 				
-				DebugPrintToAll("Changed weapon %s damage used by %N on %N, was %i, is now %i, oldhealth %i, newhealth %i", weaponname, attacker, client, dmg_health, altereddamage, eventhealth, health);
+				DebugPrintToAll("Changed weapon %s damage used by %N on %N, was %i, is now %i, oldhealth %i, newhealth %i", weaponname, attacker, client, dmg_health, dmg_health+damagedelta, eventhealth, health);
 			}
 		}
 	}
-	else
-	{
-		if (GetTrieValue(trieModdedWeaponsTank, weaponname, multiplierWeapon)) // check for the weapon tank multiplier setting
-		{
-			altereddamage = RoundToNearest(dmg_health * multiplierWeapon);
 
-			if (eventhealth > 1) // dont bother if the player dies
-			{
-				new health = eventhealth + dmg_health - altereddamage;
-				// health calculation: first revert damage done by adding dmg_health, then subtract the changed damage
-				
-				if (health < 1)
-				{
-					altereddamage += (health - 1);
-					health = 1;
-				}
-				
-				SetEntityHealth(client, health);
-				SetEventInt(event,"dmg_health", altereddamage); // for correct stats.
-				
-				DebugPrintToAll("Changed weapon %s damage used by %N on Tank %N, was %i, is now %i, oldhealth %i, newhealth %i", weaponname, attacker, client, dmg_health, altereddamage, eventhealth, health);
-			}
-		}
-	}
-	
 	return Plugin_Continue;
 }
 
@@ -164,16 +147,16 @@ public Action:_DM_InfectedHurt_Event(Handle:event, const String:name[], bool:don
 	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
 	new entity = (GetEventInt(event, "entityid"));
 	
-	if (!attacker || !IsValidEntity(entity)) return; //both must be valid
+	if (!attacker || !IsValidEntity(entity) || ignoreNextDamageDealt[attacker]) return; //both must be valid
 	
 	decl String:entname[32];
 	GetEdictClassname(entity, entname, sizeof(entname));
 	
 	new dmg_health = GetEventInt(event,"amount");	 // get the amount of damage done
 	new eventhealth = GetEntProp(entity, Prop_Data, "m_iHealth");	// get the health after damage was applied (its a POST hook)
-	new altereddamage;
+	new damagedelta;
 	
-	if (dmg_health < 1) return; // exclude zero damage calculations
+	if (dmg_health < 1 || eventhealth < 1) return; // exclude zero damage calculations
 	
 	GetClientWeapon(attacker, weaponname, sizeof(weaponname));
 	
@@ -186,21 +169,31 @@ public Action:_DM_InfectedHurt_Event(Handle:event, const String:name[], bool:don
 	
 	if(GetTrieValue(trieModdedWeapons, weaponname, multiplierWeapon))
 	{
-		altereddamage = RoundToNearest(dmg_health * multiplierWeapon);
-	
-		new health = eventhealth + dmg_health - altereddamage; // else use the multiplier.
-			
-		if (health < 1)
+		damagedelta = RoundToNearest((dmg_health * multiplierWeapon) - dmg_health);
+		
+		switch (damagedelta > 0)
 		{
-			altereddamage += (health - 1);
-			health = 1;
-		}
-		
-		SetEntProp(entity, Prop_Data, "m_iHealth", health); // apply the new calculated health value if its over 1
-		SetEventInt(event, "amount", altereddamage); // for correct stats.
+			case true:
+			{
+				applyDamage(damagedelta, entity, attacker);
+				DebugPrintToAll("Changed weapon %s damage used by %N on a Witch, was %i, adding %i", weaponname, attacker, dmg_health, damagedelta);
+			}
+			case false:
+			{
+				new health = eventhealth - damagedelta;
 			
-		DebugPrintToAll("Changed weapon %s damage used by %N on a Witch, was %i, is now %i, oldhealth %i, newhealth %i", weaponname, attacker, dmg_health, altereddamage, eventhealth, health);
-		
+				if (health < 1)
+				{
+					damagedelta += (health - 1);
+					health = 1;
+				}
+				
+				SetEntProp(entity, Prop_Data, "m_iHealth", health);
+				SetEventInt(event, "amount", damagedelta); // for correct stats.
+				
+				DebugPrintToAll("Changed weapon %s damage used by %N on a Witch, was %i, is now %i, oldhealth %i, newhealth %i", weaponname, attacker, dmg_health, dmg_health+damagedelta, eventhealth, health);
+			}
+		}
 	}
 }
 
@@ -304,4 +297,83 @@ stock DebugPrintToAll(const String:format[], any:...)
 	else
 		return;
 	#endif
+}
+
+// timer idea by dirtyminuth, damage dealing by pimpinjuice http://forums.alliedmods.net/showthread.php?t=111684
+// added some L4D specific checks
+static applyDamage(damage, victim, attacker)
+{ 
+	new Handle:dataPack = CreateDataPack();
+	WritePackCell(dataPack, damage);  
+	WritePackCell(dataPack, victim);
+	WritePackCell(dataPack, attacker);
+	
+	CreateTimer(0.1, timer_stock_applyDamage, dataPack);
+	ignoreNextDamageDealt[attacker] = true;
+	CreateTimer(0.2, timer_resetStop, attacker);
+}
+
+public Action:timer_resetStop(Handle:timer, any:client)
+{
+	ignoreNextDamageDealt[client] = false;
+}
+
+public Action:timer_stock_applyDamage(Handle:timer, Handle:dataPack)
+{
+	ResetPack(dataPack);
+	new damage = ReadPackCell(dataPack);  
+	new victim = ReadPackCell(dataPack);
+	new attacker = ReadPackCell(dataPack);
+	CloseHandle(dataPack);   
+
+	decl Float:victimPos[3], String:strDamage[16], String:strDamageTarget[16];
+	
+	if (victim < 20 && IsClientInGame(victim))
+	{
+		GetClientEyePosition(victim, victimPos);
+	}
+	else if (IsValidEntity(victim))
+	{
+		GetEntityAbsOrigin(victim, victimPos);
+	}
+	else return;
+	
+	IntToString(damage, strDamage, sizeof(strDamage));
+	Format(strDamageTarget, sizeof(strDamageTarget), "hurtme%d", victim);
+	
+	new entPointHurt = CreateEntityByName("point_hurt");
+	if(!entPointHurt) return;
+
+	// Config, create point_hurt
+	DispatchKeyValue(victim, "targetname", strDamageTarget);
+	DispatchKeyValue(entPointHurt, "DamageTarget", strDamageTarget);
+	DispatchKeyValue(entPointHurt, "Damage", strDamage);
+	DispatchKeyValue(entPointHurt, "DamageType", "0"); // DMG_GENERIC
+	DispatchSpawn(entPointHurt);
+	
+	// Teleport, activate point_hurt
+	TeleportEntity(entPointHurt, victimPos, NULL_VECTOR, NULL_VECTOR);
+	AcceptEntityInput(entPointHurt, "Hurt", (attacker && attacker < 20 && IsClientInGame(attacker)) ? attacker : -1);
+	
+	// Config, delete point_hurt
+	DispatchKeyValue(entPointHurt, "classname", "point_hurt");
+	DispatchKeyValue(victim, "targetname", "null");
+	RemoveEdict(entPointHurt);
+}
+
+//entity abs origin code from here
+//http://forums.alliedmods.net/showpost.php?s=e5dce96f11b8e938274902a8ad8e75e9&p=885168&postcount=3
+stock GetEntityAbsOrigin(entity,Float:origin[3])
+{
+	if (entity > 0 && IsValidEntity(entity))
+	{
+		decl Float:mins[3], Float:maxs[3];
+		GetEntPropVector(entity,Prop_Send,"m_vecOrigin",origin);
+		GetEntPropVector(entity,Prop_Send,"m_vecMins",mins);
+		GetEntPropVector(entity,Prop_Send,"m_vecMaxs",maxs);
+		
+		origin[0] += (mins[0] + maxs[0]) * 0.5;
+		origin[1] += (mins[1] + maxs[1]) * 0.5;
+		origin[2] += (mins[2] + maxs[2]) * 0.5;
+	}
 }

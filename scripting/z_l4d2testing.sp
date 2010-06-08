@@ -34,8 +34,21 @@ public OnPluginStart()
 	
 	RegAdminCmd("sm_dodamage", Cmd10, ADMFLAG_CHEATS, " sm_dodamage <target> <damage>");
 	
-	RegAdminCmd("sm_pullanim", Cmd11, ADMFLAG_CHEATS, "");
+	RegAdminCmd("sm_getstart", Cmd11, ADMFLAG_CHEATS, "");
 	// smoker pull: 18 oder 19
+	
+	RegAdminCmd("sm_isfinale", Cmd12, ADMFLAG_CHEATS, "");
+}
+
+public Action:Cmd12(client, args)
+{
+	ReplyToCommand(client, "trigger_finale exists %b", L4D2_OnFinaleMap());
+	return Plugin_Handled;
+}
+
+stock bool:L4D2_OnFinaleMap()
+{
+	return (FindEntityByClassname(-1, "trigger_finale") != -1);
 }
 
 public Action:Cmd11(client, args)
@@ -46,16 +59,22 @@ public Action:Cmd11(client, args)
 		return Plugin_Handled;
 	}
 	
-	if (!args)
+	new director = FindEntityByClassname(-1, "survivorPos_intro_01");
+	
+	if (director < 1 || !IsValidEntity(director))
 	{
-		ReplyToCommand(client, "Provide a sequence number");
+		ReplyToCommand(client, "No survivorPos_intro_01 found");
 		return Plugin_Handled;
 	}
 	
-	decl String:arg[256];
-	GetCmdArg(1, arg, sizeof(arg));
+	decl Float:direcpos[3], Float:clientpos[3];
 	
-	SetEntProp(client, Prop_Send, "m_nSequence", StringToInt(arg));
+	GetClientAbsOrigin(client, clientpos);
+	GetEntityAbsOrigin(director, direcpos);
+	
+	new Float:distance = GetVectorDistance(clientpos, direcpos);
+	ReplyToCommand(client, "vector distance to survivorPos_intro_01: %f", distance);
+	
 	return Plugin_Handled;
 }
 

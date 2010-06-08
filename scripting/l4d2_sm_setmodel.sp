@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.0"
+#define PLUGIN_VERSION "1.0.1"
 
 public Plugin:myinfo =
 {
@@ -44,7 +44,7 @@ public Action:Command_GetModel(client, args)
 }
 */
 
-public OnMapStart()
+public OnConfigsExecuted()
 {
 	if (!IsModelPrecached("models/survivors/survivor_teenangst.mdl")) PrecacheModel("models/survivors/survivor_teenangst.mdl", true);
 	if (!IsModelPrecached("models/survivors/survivor_biker.mdl")) PrecacheModel("models/survivors/survivor_biker.mdl", true);

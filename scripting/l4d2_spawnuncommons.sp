@@ -3,9 +3,15 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define PLUGIN_VERSION "1.0.4"
+#define PLUGIN_VERSION "1.0.7"
 
 #define DEBUG 0
+
+#define FOR_EACH_UNCOMMON_TYPE(%1)											\
+	for(new %1 = 0; %1 < sizeof(UncommonData); %1++)
+	
+#define STRING_LENGTH_NAME		10
+#define STRING_LENGTH_MODEL		56
 
 public Plugin:myinfo =
 {
@@ -13,46 +19,116 @@ public Plugin:myinfo =
 	author = "AtomicStryker",
 	description = "Let's you spawn Uncommon Zombies",
 	version = PLUGIN_VERSION,
-	url = ""
+	url = "http://forums.alliedmods.net/showthread.php?p=993523"
 }
 
-new RemainingZombiesToSpawn;
-new HordeNumber;
-new Handle:HordeAmountCVAR = INVALID_HANDLE;
+enum Uncommons
+{
+	riot,
+	ceda,
+	clown,
+	mudman,
+	roadcrew,
+	jimmy,
+	fallen
+}
+
+enum UncommonInfo
+{
+	String:name[STRING_LENGTH_NAME],
+	String:model[STRING_LENGTH_MODEL],
+	flag
+}
+
+static RemainingZombiesToSpawn		= 0;
+static HordeNumber					= 0;
+static Handle:HordeAmountCVAR 		= INVALID_HANDLE;
+static Handle:RandomizeUCI			= INVALID_HANDLE;
+static Handle:RandomizeUCIChance	= INVALID_HANDLE;
+static Handle:AllowedUCIFlags		= INVALID_HANDLE;
+static bool:AutoShuffleEnabled		= false;
+static		UncommonInfectedChance	= 0;
+static		AllowedUCIFlag			= 0;
+
+static UncommonData[Uncommons][UncommonInfo];
 
 
 public OnPluginStart()
 {
 	CreateConVar("l4d2_spawn_uncommons_version", PLUGIN_VERSION, "L4D2 Spawn Uncommons Version", FCVAR_PLUGIN | FCVAR_SPONLY | FCVAR_DONTRECORD | FCVAR_NOTIFY);
 	
-	HordeAmountCVAR = CreateConVar("l4d2_spawn_uncommons_hordecount", "25", "How many Zombies do you mean by 'horde'", FCVAR_PLUGIN | FCVAR_NOTIFY);
-
+	HordeAmountCVAR = 		CreateConVar("l4d2_spawn_uncommons_hordecount", "25", "How many Zombies do you mean by 'horde'", FCVAR_PLUGIN | FCVAR_NOTIFY);
+	RandomizeUCI = 			CreateConVar("l4d2_spawn_uncommons_autoshuffle", "1", "Do you want all Uncommons randomly spawning on all maps", FCVAR_PLUGIN | FCVAR_NOTIFY);
+	RandomizeUCIChance =	CreateConVar("l4d2_spawn_uncommons_autochance", "15", "Every 'THIS' zombie spawning will be statistically turned uncommon if autoshuffle is active", FCVAR_PLUGIN | FCVAR_NOTIFY);
+	AllowedUCIFlags =		CreateConVar("l4d2_spawn_uncommons_autotypes", "19", "binary flag of allowed autoshuffle zombies. 1 = riot, 2 = ceda, 4 = clown, 8 = mudman, 16 = roadcrew, 32 = jimmy, 64 = fallen", FCVAR_PLUGIN | FCVAR_NOTIFY);
+	
 	RegAdminCmd("sm_spawnuncommon", Command_Uncommon, ADMFLAG_CHEATS, "Spawn uncommon infected, ANYTIME");
 	RegAdminCmd("sm_spawnuncommonhorde", Command_UncommonHorde, ADMFLAG_CHEATS, "Spawn an uncommon infected horde, ANYTIME");
 	
-	PrecacheModel("models/infected/common_male_riot.mdl", true);
-	PrecacheModel("models/infected/common_male_ceda.mdl", true);
-	PrecacheModel("models/infected/common_male_clown.mdl", true);
-	PrecacheModel("models/infected/common_male_mud.mdl", true);
-	PrecacheModel("models/infected/common_male_roadcrew.mdl", true);
-	PrecacheModel("models/infected/common_male_jimmy.mdl", true);
-	PrecacheModel("models/infected/common_male_fallen_survivor.mdl", true);
+	InitDataArray();
+	PreCacheModels();
+	
+	AutoShuffleEnabled = GetConVarBool(RandomizeUCI);
+	UncommonInfectedChance = GetConVarInt(RandomizeUCIChance);
+	AllowedUCIFlag = GetConVarInt(AllowedUCIFlags);
+	HookConVarChange(RandomizeUCI, ShuffleConvarChanged);
+	HookConVarChange(RandomizeUCIChance, ShuffleConvarChanged);
+	HookConVarChange(AllowedUCIFlags, ShuffleConvarChanged);
+}
+
+public ShuffleConvarChanged(Handle:convar, const String:oldValue[], const String:newValue[])
+{
+	AutoShuffleEnabled = GetConVarBool(RandomizeUCI);
+	UncommonInfectedChance = GetConVarInt(RandomizeUCIChance);
+	AllowedUCIFlag = GetConVarInt(AllowedUCIFlags);
 }
 
 public OnMapStart()
 {
-	PrecacheModel("models/infected/common_male_riot.mdl", true);
-	PrecacheModel("models/infected/common_male_ceda.mdl", true);
-	PrecacheModel("models/infected/common_male_clown.mdl", true);
-	PrecacheModel("models/infected/common_male_mud.mdl", true);
-	PrecacheModel("models/infected/common_male_roadcrew.mdl", true);
-	PrecacheModel("models/infected/common_male_jimmy.mdl", true);
-	PrecacheModel("models/infected/common_male_fallen_survivor.mdl", true);
+	PreCacheModels();
+}
+
+static PreCacheModels()
+{
+	FOR_EACH_UNCOMMON_TYPE(i)
+	{
+		if (!IsModelPrecached(UncommonData[i][model]))
+		{
+			PrecacheModel(UncommonData[i][model], true);
+		}
+	}
 }
 
 public OnMapEnd()
 {
 	RemainingZombiesToSpawn = 0;
+}
+
+static InitDataArray()
+{
+	Format(UncommonData[riot][name], 		STRING_LENGTH_NAME-1, 		"riot");
+	Format(UncommonData[ceda][name], 		STRING_LENGTH_NAME-1, 		"ceda");
+	Format(UncommonData[clown][name],		STRING_LENGTH_NAME-1, 		"clown");
+	Format(UncommonData[mudman][name], 		STRING_LENGTH_NAME-1, 		"mud");
+	Format(UncommonData[roadcrew][name], 	STRING_LENGTH_NAME-1, 		"roadcrew");
+	Format(UncommonData[jimmy][name], 		STRING_LENGTH_NAME-1, 		"jimmy");
+	Format(UncommonData[fallen][name], 		STRING_LENGTH_NAME-1, 		"fallen");
+
+	Format(UncommonData[riot][model], 		STRING_LENGTH_MODEL-1, 		"models/infected/common_male_riot.mdl");
+	Format(UncommonData[ceda][model], 		STRING_LENGTH_MODEL-1, 		"models/infected/common_male_ceda.mdl");
+	Format(UncommonData[clown][model],		STRING_LENGTH_MODEL-1, 		"models/infected/common_male_clown.mdl");
+	Format(UncommonData[mudman][model], 	STRING_LENGTH_MODEL-1, 		"models/infected/common_male_mud.mdl");
+	Format(UncommonData[roadcrew][model], 	STRING_LENGTH_MODEL-1, 		"models/infected/common_male_roadcrew.mdl");
+	Format(UncommonData[jimmy][model], 		STRING_LENGTH_MODEL-1, 		"models/infected/common_male_jimmy.mdl");
+	Format(UncommonData[fallen][model], 	STRING_LENGTH_MODEL-1, 		"models/infected/common_male_fallen_survivor.mdl");
+	
+	UncommonData[riot][flag]		= 1;
+	UncommonData[ceda][flag]		= 2;
+	UncommonData[clown][flag]		= 4;
+	UncommonData[mudman][flag]		= 8;
+	UncommonData[roadcrew][flag]	= 16;
+	UncommonData[jimmy][flag]		= 32;
+	UncommonData[fallen][flag]		= 64;
 }
 
 public Action:Command_Uncommon(client, args)
@@ -67,17 +143,20 @@ public Action:Command_Uncommon(client, args)
 	
 	decl String:cmd[56];
 	GetCmdArg(1, cmd, sizeof(cmd));
-	new number;
+	new number = 0;
 	
-	if (StrEqual(cmd, "riot", false)) number = 1;
-	else if (StrEqual(cmd, "ceda", false)) number = 2;
-	else if (StrEqual(cmd, "clown", false)) number = 3;
-	else if (StrEqual(cmd, "mud", false)) number = 4;
-	else if (StrEqual(cmd, "roadcrew", false)) number = 5;
-	else if (StrEqual(cmd, "jimmy", false)) number = 6;
-	else if (StrEqual(cmd, "fallen", false)) number = 7;
-	else if (StrEqual(cmd, "random", false)) number = 8;
-	
+	FOR_EACH_UNCOMMON_TYPE(i)
+	{
+		if (StrEqual(cmd, UncommonData[i][name], false))
+		{
+			number = i+1;
+		}
+		else if (StrEqual(cmd, "random", false))
+		{
+			number = sizeof(UncommonData)+1;
+		}
+	}
+		
 	if (!number)
 	{
 		ReplyToCommand(client, "Usage: sm_spawnuncommon <riot|ceda|clown|mud|roadcrew|jimmy|fallen|random>");
@@ -97,34 +176,35 @@ public Action:Command_Uncommon(client, args)
 	location2[1] = (location[1]+(50*(Sine(DegToRad(ang[1])))));
 	location2[2] = location[2] + 30.0;
 	
-	SpawnUncommonInf(number, location2);
+	SpawnUncommonInf(number-1, location2);
 	
 	return Plugin_Handled;
 }
 
 public Action:Command_UncommonHorde(client, args)
 {
-	if (!client) return Plugin_Handled;
-	
 	if (args < 1)
 	{
-		ReplyToCommand(client, "Usage: sm_spawnuncommonhorde <riot|ceda|clown|mud|roadcrew|jimmy|random>");
+		ReplyToCommand(client, "Usage: sm_spawnuncommonhorde <riot|ceda|clown|mud|roadcrew|jimmy|fallen|random>");
 		return Plugin_Handled;
 	}
 	
 	decl String:cmd[56];
-	new number;
+	new number = 0;
 	
 	GetCmdArg(1, cmd, sizeof(cmd));
 	
-	if (StrEqual(cmd, "riot", false)) number = 1;
-	else if (StrEqual(cmd, "ceda", false)) number = 2;
-	else if (StrEqual(cmd, "clown", false)) number = 3;
-	else if (StrEqual(cmd, "mud", false)) number = 4;
-	else if (StrEqual(cmd, "roadcrew", false)) number = 5;
-	else if (StrEqual(cmd, "jimmy", false)) number = 6;
-	else if (StrEqual(cmd, "fallen", false)) number = 7;
-	else if (StrEqual(cmd, "random", false)) number = 8;
+	FOR_EACH_UNCOMMON_TYPE(i)
+	{
+		if (StrEqual(cmd, UncommonData[i][name], false))
+		{
+			number = i+1;
+		}
+		else if (StrEqual(cmd, "random", false))
+		{
+			number = sizeof(UncommonData);
+		}
+	}
 	
 	if (!number)
 	{
@@ -145,91 +225,65 @@ public Action:Command_UncommonHorde(client, args)
 
 public OnEntityCreated(entity, const String:classname[])
 {
-	if (RemainingZombiesToSpawn <= 0 || !HordeNumber) return;
+	if (GetEngineTime() < 10.0) return;
+	if (!StrEqual(classname, "infected", false)) return;
+
+	new number = -1;
 	
-	if (StrEqual(classname, "infected", false))
+	if(RemainingZombiesToSpawn > 0)
 	{
-		decl String:model[256];
-		new number = HordeNumber;
+		number = HordeNumber-1;
 		
-		if (number == 8) number = GetRandomInt(1,5);
-		
-		switch (number)
+		if (number == sizeof(UncommonData)-1)
 		{
-			case 1:
-			{
-				Format(model, sizeof(model), "models/infected/common_male_riot.mdl");
-			}
-			case 2:
-			{
-				Format(model, sizeof(model), "models/infected/common_male_ceda.mdl");
-			}
-			case 3:
-			{
-				Format(model, sizeof(model), "models/infected/common_male_clown.mdl");
-			}
-			case 4:
-			{
-				Format(model, sizeof(model), "models/infected/common_male_mud.mdl");
-			}
-			case 5:
-			{
-				Format(model, sizeof(model), "models/infected/common_male_roadcrew.mdl");
-			}
-			case 6:
-			{
-				Format(model, sizeof(model), "models/infected/common_male_jimmy.mdl");
-			}
-			case 7:
-			{
-				Format(model, sizeof(model), "models/infected/common_male_fallen_survivor.mdl");
-			}
+			if (!AllowedUCIFlag) return;
+			number = GetAllowedUncommonInf();
 		}
-		SetEntityModel(entity, model);
 		RemainingZombiesToSpawn--;
 	}
+	else if (AutoShuffleEnabled && AllowedUCIFlag)
+	{
+		if (GetRandomInt(1, UncommonInfectedChance) != 1) return;
+		
+		number = GetAllowedUncommonInf();
+	}
+	
+	if (number > -1)
+	{
+		SetEntityModel(entity, UncommonData[number][model]);
+		#if DEBUG
+		PrintToChatAll("Changing Zombie %i into a Uncommon of type %s", entity, UncommonData[number][name]);	
+		#endif
+	}
+}
+
+static GetAllowedUncommonInf()
+{
+	new number = 0;
+	
+	do
+	{
+		number = GetRandomInt(0, sizeof(UncommonData)-1);		
+	}
+	while (!(AllowedUCIFlag & UncommonData[number][flag]));
+	
+	#if DEBUG
+	PrintToChatAll("GetAllowedUncommonInf returning inf %i", number);	
+	#endif
+	
+	return number;
 }
 
 public Action:SpawnUncommonInf(number, Float:location[3])
 {
 	new zombie = CreateEntityByName("infected");
-	decl String:model[256];
 	
-	if (number ==8) number = GetRandomInt(1,5);
-	
-	switch (number)
+	if (number == sizeof(UncommonData))
 	{
-		case 1:
-		{
-			Format(model, sizeof(model), "models/infected/common_male_riot.mdl");
-		}
-		case 2:
-		{
-			Format(model, sizeof(model), "models/infected/common_male_ceda.mdl");
-		}
-		case 3:
-		{
-			Format(model, sizeof(model), "models/infected/common_male_clown.mdl");
-		}
-		case 4:
-		{
-			Format(model, sizeof(model), "models/infected/common_male_mud.mdl");
-		}
-		case 5:
-		{
-			Format(model, sizeof(model), "models/infected/common_male_roadcrew.mdl");
-		}
-		case 6:
-		{
-			Format(model, sizeof(model), "models/infected/common_male_jimmy.mdl");
-		}
-		case 7:
-		{
-			Format(model, sizeof(model), "models/infected/common_male_fallen_survivor.mdl");
-		}
+		number = GetAllowedUncommonInf();
 	}
 	
-	SetEntityModel(zombie, model);
+	SetEntityModel(zombie, UncommonData[number][model]);
 	new ticktime = RoundToNearest( FloatDiv( GetGameTime() , GetTickInterval() ) ) + 5;
 	SetEntProp(zombie, Prop_Data, "m_nNextThinkTick", ticktime);
 

@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "2.16"
+#define PLUGIN_VERSION "2.17"
 #define CVAR_FLAGS          FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY
 
 #define DEBUG 0
@@ -289,10 +289,11 @@ public Action:timer_stock_applyDamage(Handle:timer, Handle:dataPack)
 	new damage = ReadPackCell(dataPack);  
 	new victim = ReadPackCell(dataPack);
 	new attacker = ReadPackCell(dataPack);
-	CloseHandle(dataPack);   
-
+	CloseHandle(dataPack);
+	
 	decl Float:victimPos[3], String:strDamage[16], String:strDamageTarget[16];
 	
+	if (!IsClientInGame(victim)) return;
 	GetClientEyePosition(victim, victimPos);
 	IntToString(damage, strDamage, sizeof(strDamage));
 	Format(strDamageTarget, sizeof(strDamageTarget), "hurtme%d", victim);

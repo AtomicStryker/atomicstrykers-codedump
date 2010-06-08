@@ -202,6 +202,7 @@ public Action:Cmd_FindNearEntities(client, args)
 		if (strcmp(classname, "ability_spit") == 0) continue;
 		if (strcmp(classname, "ability_leap") == 0) continue;
 		if (strcmp(classname, "ability_charge") == 0) continue;
+		if (strcmp(classname, "ability_throw") == 0) continue;
 		
 		GetEntityAbsOrigin(i, entpos);
 		if (GetVectorDistance(entpos, clientpos) < radius)
@@ -269,6 +270,7 @@ stock FindEntityByName(String:name[], any:startcount)
 		if (strcmp(classname, "ability_spit") == 0) continue;
 		if (strcmp(classname, "ability_leap") == 0) continue;
 		if (strcmp(classname, "ability_charge") == 0) continue;
+		if (strcmp(classname, "ability_throw") == 0) continue;
 		
 		decl String:iname[128];
 		GetEntPropString(i, Prop_Data, "m_iName", iname, sizeof(iname));

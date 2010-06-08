@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#define PLUGIN_VERSION										"1.0.3"
+#define PLUGIN_VERSION										"1.0.4"
 
 #define			STRINGLENGTH									32
 #define			STRINGLENGTH_DEBUG							   192
@@ -13,6 +13,7 @@ static const 		OUT_CHAT								= 	 4;
 static const		L4D2_TEAM_INFECTED					    =    3;
 static const		L4D2_INFLICTOR_INFECTED	 			    = 4095;
 static const		TEMP_HEALTH_ERROR_MARGIN				=    1;
+static const		ZOMBIECLASS_SPITTER						=	 4;
 
 static const Float:GOD_FRAME_CHECK_DURATION					=  3.0;
 static const Float:DAMAGE_CHECK_DELAY						=  0.1;
@@ -25,14 +26,18 @@ static const String:CVAR_TEMP_HEALTH_DECAY[]				= "pain_pills_decay_rate";
 static const String:ENTPROP_HARD_HEALTH[]					= "m_iHealth";
 static const String:ENTPROP_TEMP_HEALTH[]					= "m_healthBuffer";
 static const String:ENTPROP_TEMP_HEALTH_DECAY[]				= "m_healthBufferTime";
+static const String:ENTPROP_ZOMBIECLASS[]					= "m_zombieClass";
+
 
 static Handle:cvarEnabled									= INVALID_HANDLE;
 static Handle:cvarTempHealthDecay							= INVALID_HANDLE;
 static Handle:cvarDebugOut									= INVALID_HANDLE;
 static Handle:cvarCommonsEnabled							= INVALID_HANDLE;
+static Handle:cvarSpitterOverrides							= INVALID_HANDLE;
 static Float:lastSavedGodFrameBegin[MAXPLAYERS+1]			=  0.0;
 static bool:justHealed[MAXPLAYERS+1]						= false;
 static		LEFT4DEAD										= 0;
+static		MaxPlayerClients								= 16;
 
 
 public Plugin:myinfo =
@@ -65,6 +70,7 @@ public OnPluginStart()
 	cvarEnabled = CreateConVar("l4d2_god_frames_be_gone_enabled", 			"1", "Enable or Disable God Frame Damage Override", 					FCVAR_PLUGIN|FCVAR_NOTIFY);
 	cvarCommonsEnabled = CreateConVar("l4d2_god_frames_be_gone_commons", 	"0", "Enable or Disable Common Infected attacks to override", 			FCVAR_PLUGIN|FCVAR_NOTIFY);
 	cvarDebugOut = CreateConVar("l4d2_god_frames_be_gone_debug", 			"0", "Sum of debug flags for debug outputs (1-console, 2-log, 4-chat)", FCVAR_PLUGIN|FCVAR_NOTIFY);
+	cvarSpitterOverrides = CreateConVar("l4d2_god_frames_be_gone_4spitter", "1", "Is Spitter damage included in Damage Overriding", 				FCVAR_PLUGIN|FCVAR_NOTIFY);
 	
 	cvarTempHealthDecay =	FindConVar(CVAR_TEMP_HEALTH_DECAY);
 
@@ -84,6 +90,26 @@ public OnPluginStart()
 	HookEventEx("adrenaline_used",		_GF_HealEvent);
 	
 	HookEvent("player_incapacitated", 	_GF_IncapEvent); // being incapped 'heals' you from 1 to 300 hard health
+}
+
+public OnConfigsExecuted()
+{
+	new Handle:cvar = FindConVar("l4d_maxplayers");
+
+	if (cvar != INVALID_HANDLE)
+	{
+		MaxPlayerClients = GetConVarInt(cvar);
+		return;
+	}
+	
+	cvar = FindConVar("sv_maxplayers");
+	
+	if (cvar != INVALID_HANDLE)
+	{
+		MaxPlayerClients = GetConVarInt(cvar);
+	}
+	
+	CloseHandle(cvar);
 }
 
 public _GF_CheckForGodFrames(Handle:event, const String:name[], bool:dontBroadcast)
@@ -128,13 +154,10 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 			if (!GetConVarBool(cvarEnabled)
 			|| !IsValidEdict(victim)
 			|| !IsValidEdict(attacker)
-			|| victim > MaxClients
+			|| victim > MaxPlayerClients
 			|| !IsClientInGame(victim)
 			|| GetClientTeam(victim) == L4D2_TEAM_INFECTED
-			
-			|| (attacker < MaxClients
-			&& IsClientInGame(attacker)
-			&& GetClientTeam(attacker) != L4D2_TEAM_INFECTED))
+			|| (attacker < MaxPlayerClients && IsClientInGame(attacker) && GetClientTeam(attacker) != L4D2_TEAM_INFECTED))
 			{
 				return Plugin_Continue;													// establish the victim is a valid Survivor attacked by Infected
 			}
@@ -145,7 +168,7 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 			|| !IsValidEdict(victim)
 			|| !IsValidEdict(attacker)
 			|| inflictor != L4D2_INFLICTOR_INFECTED
-			|| victim > MaxClients
+			|| victim > MaxPlayerClients
 			|| !IsClientInGame(victim)
 			|| GetClientTeam(victim) == L4D2_TEAM_INFECTED)
 			{
@@ -154,13 +177,16 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 		}
 	}
 	
-	if ((!GetConVarBool(cvarCommonsEnabled)
-		&& attacker
-		&& attacker < MaxClients
-		&& !IsClientInGame(attacker))													// case common override disabled and attacker common
-	
+	new bool:playerattacker = (attacker	&& attacker < MaxPlayerClients && IsClientInGame(attacker));
+
+	if (!playerattacker && !GetConVarBool(cvarCommonsEnabled)							// case common override disabled and attacker common
 	|| lastSavedGodFrameBegin[victim] == 0.0											// case no god frames on record
 	|| GetEngineTime() - lastSavedGodFrameBegin[victim] > GOD_FRAME_CHECK_DURATION)		// case attack not within god frame time window
+	{
+		return Plugin_Continue;
+	}
+	
+	if (playerattacker && GetEntProp(attacker, Prop_Send, ENTPROP_ZOMBIECLASS) == ZOMBIECLASS_SPITTER && !GetConVarBool(cvarSpitterOverrides))
 	{
 		return Plugin_Continue;
 	}
@@ -302,7 +328,7 @@ public Action:timer_stock_applyDamage(Handle:timer, Handle:dataPack)
 	
 	// Teleport, activate point_hurt
 	TeleportEntity(entPointHurt, victimPos, NULL_VECTOR, NULL_VECTOR);
-	AcceptEntityInput(entPointHurt, "Hurt", (attacker && attacker < MaxClients && IsClientInGame(attacker)) ? attacker : -1);
+	AcceptEntityInput(entPointHurt, "Hurt", (attacker && attacker < MaxPlayerClients && IsClientInGame(attacker)) ? attacker : -1);
 	
 	// Config, delete point_hurt
 	DispatchKeyValue(entPointHurt, "classname", "point_hurt");
