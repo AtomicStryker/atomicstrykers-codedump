@@ -3,9 +3,9 @@
 #pragma semicolon				1
 
 
-#define PLUGIN_VERSION 			"0.8.5"
+#define PLUGIN_VERSION 			"0.8.6"
 #define TEST_DEBUG				0
-#define TEST_DEBUG_LOG			0
+#define TEST_DEBUG_LOG			1
 
 
 #define PISTOL 					1
@@ -29,6 +29,10 @@
 #define SNIPER_AWP 				35
 #define SNIPER_SCOUT 			36
 
+
+static const Float:PLUGINSTART_DELAY		= 1.0;
+static const Float:ROUNDSTART_DELAY			= 6.0;
+static const Float:LOCATION_ERROR_MARGIN	= 2.0;
 
 // chances weapons getting transformed into CSS brethren are 1:X - X being the value set here. 1:1 is 100%, 1:2 is 50%, 1:3 is 33%, 1:4 is 25%, 1:5 is 20%...
 static const SG552_LOTTERY_CHANCE			= 4;
@@ -102,7 +106,7 @@ public OnPluginStart()
 	
 	//Precache hidden weapon models and initialize them after one second.
 	PrecacheWeaponModels();
-	CreateTimer(1.0, InitHiddenWeaponsDelayed);
+	CreateTimer(PLUGINSTART_DELAY, InitHiddenWeaponsDelayed);
 }
 
 public ConVarChange_Enabled(Handle:convar, const String:oldValue[], const String:newValue[])
@@ -113,7 +117,7 @@ public ConVarChange_Enabled(Handle:convar, const String:oldValue[], const String
 	}
 	if ((StringToInt(oldValue) == 0) && (StringToInt(newValue) == 1))
 	{
-		CreateTimer(0.1, RoundStartDelayed);
+		CreateTimer(ROUNDSTART_DELAY, RoundStartDelayed);
 	}
 }
 
@@ -130,7 +134,7 @@ public OnMapStart()
 public Action:Event_RoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	if (!GetConVarBool(cvarEnabled)) return;
-	CreateTimer(1.0, RoundStartDelayed);
+	CreateTimer(ROUNDSTART_DELAY, RoundStartDelayed);
 }
 
 public Action:RoundStartDelayed(Handle:timer)
@@ -449,7 +453,7 @@ static SetModelForWeaponId(weaponent, id)
 static SpawnIndexedWeapons()
 {
 	PrecacheWeaponModels();
-	WipeAllWeapons();
+	WipeStoredWeapons();
 	
 	DebugPrintToAll("Commencing to spawn indexed weapons now");
 	
@@ -483,9 +487,9 @@ static SpawnIndexedWeapons()
 	DebugPrintToAll("Finished Spawning indexed weapons");
 }
 
-static WipeAllWeapons()
+static WipeStoredWeapons()
 {
-	DebugPrintToAll("WipeAllWeapons() was called. Removing all dynamic Weapon Spawns on map");
+	DebugPrintToAll("WipeStoredWeapons() was called. Removing stored Weapon Spawns on map");
 	
 	decl String:GameMode[16];
 	GetConVarString(FindConVar("mp_gamemode"), GameMode, sizeof(GameMode));
@@ -494,6 +498,7 @@ static WipeAllWeapons()
 	
 	new entcount = GetEntityCount();
 	decl String:EdictClassName[64];
+	decl Float:origin[3];
 	
 	for (new i = 32; i <= entcount; i++)
 	{
@@ -502,11 +507,31 @@ static WipeAllWeapons()
 			GetEdictClassname(i, EdictClassName, sizeof(EdictClassName));
 			if (StrEqual(EdictClassName, "weapon_spawn") || (wipestaticspawns && IsWantedGunEntity(EdictClassName)))
 			{
-				DebugPrintToAll("WipeAllWeapons: About to wipe ent %i of class %s", i, EdictClassName);
-				RemoveEdict(i);
+				GetEntPropVector(i, Prop_Send, VEC_ORIGIN_ENTPROP, origin);
+				if (IsIndexedOrigin(origin))
+				{
+					DebugPrintToAll("WipeStoredWeapons: About to wipe ent %i of class %s", i, EdictClassName);
+					RemoveEdict(i);
+				}
 			}
 		}
 	}
+}
+
+static bool:IsIndexedOrigin(Float:origin[3])
+{
+	for (new i = 0; i < sizeof(WeaponSpawn_ID); i++)
+	{
+		if (WeaponSpawn_ID[i] == -1) break;
+		
+		if (origin[0] >= WeaponOrigin[i][0] - LOCATION_ERROR_MARGIN && origin[0] <= WeaponOrigin[i][0] + LOCATION_ERROR_MARGIN
+		&& origin[1] >= WeaponOrigin[i][1] - LOCATION_ERROR_MARGIN && origin[1] <= WeaponOrigin[i][1] + LOCATION_ERROR_MARGIN
+		&& origin[2] >= WeaponOrigin[i][2] - LOCATION_ERROR_MARGIN && origin[2] <= WeaponOrigin[i][2] + LOCATION_ERROR_MARGIN)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 static bool:IsWantedGunEntity(const String:EdictClassName[])
@@ -533,7 +558,7 @@ static bool:IsWantedGunEntity(const String:EdictClassName[])
 
 static RestoreWeaponSpawns()
 {
-	WipeAllWeapons();
+	WipeStoredWeapons();
 	
 	DebugPrintToAll("Commencing to restore default indexed weapons now");
 	

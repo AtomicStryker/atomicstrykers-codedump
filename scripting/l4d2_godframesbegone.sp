@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#define PLUGIN_VERSION										"1.0.4"
+#define PLUGIN_VERSION										"1.0.5"
 
 #define			STRINGLENGTH									32
 #define			STRINGLENGTH_DEBUG							   192
@@ -109,7 +109,10 @@ public OnConfigsExecuted()
 		MaxPlayerClients = GetConVarInt(cvar);
 	}
 	
-	CloseHandle(cvar);
+	if (cvar != INVALID_HANDLE)
+	{
+		CloseHandle(cvar);
+	}
 }
 
 public _GF_CheckForGodFrames(Handle:event, const String:name[], bool:dontBroadcast)

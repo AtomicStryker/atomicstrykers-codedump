@@ -1,6 +1,6 @@
 /********************************************************************************************
 * Plugin	: L4D/L4D2 InfectedBots with Coop/Survival playable SI spawns
-* Version	: 1.9.3
+* Version	: 1.9.5
 * Game		: Left 4 Dead 1 & 2
 * Author	: djromero (SkyDavid, David) and MI 5
 * Testers	: Myself, MI 5
@@ -10,6 +10,15 @@
 * 			  there isn't enough real players. Also allows playable special infected on coop/survival modes.
 * 
 * WARNING	: Please use sourcemod's latest 1.3 branch snapshot.
+* 
+* Version 1.9.5
+* 	   - Removed incorrect gamemode message, plugin will assume unknown gamemodes/mutations are based on coop
+* 	   - Fixed spitter acid glitch
+* 	   - Compatible with "Headshot!" mutation
+* 	   - Added cvar l4d_infectedbots_spawns_disabled_tank: disables infected bot spawning when a tank is in play
+* 
+* Version 1.9.4
+* 	   - Compatible with new mutations: Last Man On Earth, Chainsaw Massacre and Room for One
 * 
 * Version 1.9.3
 * 	   - Added support for chainsaws gamemode
@@ -366,7 +375,7 @@
 
 #pragma semicolon 1
 
-#define PLUGIN_VERSION "1.9.3"
+#define PLUGIN_VERSION "1.9.5"
 
 #define DEBUGSERVER 0
 #define DEBUGCLIENTS 0
@@ -458,6 +467,7 @@ new Handle:h_HumanCoopLimit;
 new Handle:h_AdminJoinInfected;
 new Handle:FightOrDieTimer[MAXPLAYERS+1]; // kill idle bots
 new Handle:h_BotGhostTime;
+new Handle:h_DisableSpawnsTank;
 
 // Stuff related to Durzel's HUD (Panel was redone)
 new respawnDelay[MAXPLAYERS+1]; 			// Used to store individual player respawn delays after death
@@ -579,6 +589,7 @@ public OnPluginStart()
 	h_HumanCoopLimit = CreateConVar("l4d_infectedbots_human_coop_survival_limit", "4", "Sets the limit for the amount of humans that can join the infected team in coop/survival", FCVAR_PLUGIN|FCVAR_SPONLY);
 	h_AdminJoinInfected = CreateConVar("l4d_infectedbots_admins_only", "0", "If 1, only admins can join the infected team in coop/survival", FCVAR_PLUGIN|FCVAR_SPONLY, true, 0.0, true, 1.0);
 	h_BotGhostTime = CreateConVar("l4d_infectedbots_ghost_time", "2", "If higher than zero, the plugin will ghost bots before they fully spawn on versus/scavenge", FCVAR_PLUGIN|FCVAR_SPONLY);
+	h_DisableSpawnsTank = CreateConVar("l4d_infectedbots_spawns_disabled_tank", "0", "If 1, Plugin will disable spawning when a tank is on the field", FCVAR_PLUGIN|FCVAR_SPONLY, true, 0.0, true, 1.0);
 	
 	HookConVarChange(h_BoomerLimit, ConVarBoomerLimit);
 	BoomerLimit = GetConVarInt(h_BoomerLimit);
@@ -1155,20 +1166,17 @@ GameModeCheck()
 	#if DEBUGSERVER
 	LogMessage("Checking Gamemode");
 	#endif
-	//MI 5, We determine what the gamemode is
+	// We determine what the gamemode is
 	decl String:GameName[16];
 	GetConVarString(h_GameMode, GameName, sizeof(GameName));
 	if (StrEqual(GameName, "survival", false))
 		GameMode = 3;
 	else if (StrEqual(GameName, "versus", false) || StrEqual(GameName, "teamversus", false) || StrEqual(GameName, "scavenge", false) || StrEqual(GameName, "teamscavenge", false) || StrEqual(GameName, "mutation12", false) || StrEqual(GameName, "mutation13", false))
 		GameMode = 2;
-	else if (StrEqual(GameName, "coop", false) || StrEqual(GameName, "realism", false) || StrEqual(GameName, "mutation3", false) || StrEqual(GameName, "mutation9", false))
+	else if (StrEqual(GameName, "coop", false) || StrEqual(GameName, "realism", false) || StrEqual(GameName, "mutation3", false) || StrEqual(GameName, "mutation9", false) || StrEqual(GameName, "mutation1", false) || StrEqual(GameName, "mutation7", false) || StrEqual(GameName, "mutation10", false) || StrEqual(GameName, "mutation2", false))
 		GameMode = 1;
 	else
-	{
-		GameMode = 0;
-		CreateTimer(30.0, IncorrectGameMode, _, TIMER_FLAG_NO_MAPCHANGE);
-	}
+	GameMode = 1;
 	
 	TankHealthCheck();
 }
@@ -1214,12 +1222,6 @@ TankHealthCheck()
 			HookConVarChange(cvarZombieHP[6], cvarZombieHPChanged);
 		}
 	}
-}
-
-public Action:IncorrectGameMode(Handle:Timer)
-{
-	// Show this to everyone when the gamemode has been set incorrectly
-	PrintToChatAll("\x04[SM] \x03INFECTED BOTS: \x03mp_gamemode \x04has been set \x03INCORRECTLY! PLUGIN WILL NOT START!");
 }
 
 public Action:KillInfected(Handle:Timer)
@@ -2328,6 +2330,9 @@ public Action:evtPlayerDeath(Handle:event, const String:name[], bool:dontBroadca
 			InfectedBotQueue++;
 		}
 		
+		if (IsPlayerTank(client))
+			CheckIfBotsNeeded(false);
+		
 		#if DEBUGCLIENTS
 		PrintToChatAll("An infected bot has been added to the spawn queue...");
 		#endif
@@ -2350,8 +2355,8 @@ public Action:evtPlayerDeath(Handle:event, const String:name[], bool:dontBroadca
 		CreateTimer(0.1, ScrimmageTimer, client, TIMER_FLAG_NO_MAPCHANGE);
 	}
 	
-	// This fixes the spawns when the spawn timer is set to 5 or below
-	if (IsFakeClient(client))
+	// This fixes the spawns when the spawn timer is set to 5 or below and fixes the spitter spit glitch
+	if (IsFakeClient(client) && !IsPlayerSpitter(client))
 		CreateTimer(0.1, kickbot, client);
 	
 	return Plugin_Continue;
@@ -3313,6 +3318,30 @@ public Action:Spawn_InfectedBot(Handle:timer)
 		return;
 	}
 	
+	// If there is a tank on the field and l4d_infectedbots_spawns_disable_tank is set to 1, the plugin will check for
+	// any tanks on the field
+	
+	if (GetConVarBool(h_DisableSpawnsTank))
+	{
+		for (new i=1;i<=MaxClients;i++)
+		{
+			// We check if player is in game
+			if (!IsClientInGame(i)) continue;
+			
+			// Check if client is infected ...
+			if (GetClientTeam(i)==TEAM_INFECTED)
+			{
+				// If player is a tank
+				if (IsPlayerTank(i) && IsPlayerAlive(i))
+				{
+					InfectedBotQueue--;
+					return;
+				}
+			}
+		}
+		
+	}
+	
 	// Before spawning the bot, we determine if an real infected player is dead, since the new infected bot will be controlled by this player
 	new bool:resetGhost[MAXPLAYERS+1];
 	new bool:resetLife[MAXPLAYERS+1];
@@ -3766,10 +3795,10 @@ bool:LeftStartArea()
 	
 	if (ent > -1)
 	{
-			if (GetEntProp(ent, Prop_Send, "m_hasAnySurvivorLeftSafeArea"))
-			{
-				return true;
-			}
+		if (GetEntProp(ent, Prop_Send, "m_hasAnySurvivorLeftSafeArea"))
+		{
+			return true;
+		}
 	}
 	return false;
 }
@@ -4606,4 +4635,4 @@ stock SwitchToSurvivors(client)
 }
 
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

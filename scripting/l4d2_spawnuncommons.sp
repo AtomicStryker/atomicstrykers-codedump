@@ -3,7 +3,7 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define PLUGIN_VERSION "1.0.7"
+#define PLUGIN_VERSION "1.0.8"
 
 #define DEBUG 0
 
@@ -47,6 +47,7 @@ static Handle:RandomizeUCI			= INVALID_HANDLE;
 static Handle:RandomizeUCIChance	= INVALID_HANDLE;
 static Handle:AllowedUCIFlags		= INVALID_HANDLE;
 static bool:AutoShuffleEnabled		= false;
+static bool:AreModelsCached			= false;
 static		UncommonInfectedChance	= 0;
 static		AllowedUCIFlag			= 0;
 
@@ -97,11 +98,13 @@ static PreCacheModels()
 			PrecacheModel(UncommonData[i][model], true);
 		}
 	}
+	AreModelsCached = true;
 }
 
 public OnMapEnd()
 {
 	RemainingZombiesToSpawn = 0;
+	AreModelsCached = false;
 }
 
 static InitDataArray()
@@ -225,8 +228,11 @@ public Action:Command_UncommonHorde(client, args)
 
 public OnEntityCreated(entity, const String:classname[])
 {
-	if (GetEngineTime() < 10.0) return;
-	if (!StrEqual(classname, "infected", false)) return;
+	if (!AreModelsCached
+	|| !StrEqual(classname, "infected", false))
+	{
+		return;
+	}
 
 	new number = -1;
 	

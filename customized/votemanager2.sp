@@ -5,8 +5,7 @@
 #define CVAR_FLAGS 					FCVAR_PLUGIN
 #define TEAM_SPECTATOR				1
 #define TEAM_INFECTED				3
-#define VOTE_DELAY					15.0
-#define POST_VOTE_DELAY				10.0
+#define POST_VOTE_DELAY				5.0
 
 #define TEST_DEBUG					1
 #define TEST_DEBUG_LOG				0
@@ -62,26 +61,26 @@ public OnPluginStart()
 	RegConsoleCmd("veto", Veto_Handler);
 	RegConsoleCmd("passvote", PassVote_Handler);
 	
-	lobbyAccess         = CreateConVar("l4d_vote_lobby_access",           "",  "Access level needed to start a return to lobby vote",CVAR_FLAGS);
-	difficultyAccess    = CreateConVar("l4d_vote_difficulty_access",      "",  "Access level needed to start a change difficulty vote",CVAR_FLAGS);
-	levelAccess         = CreateConVar("l4d_vote_level_access",           "",  "Access level needed to start a change level vote",CVAR_FLAGS);
-	restartAccess       = CreateConVar("l4d_vote_restart_access",         "",  "Access level needed to start a restart level vote",CVAR_FLAGS);
-	kickAccess          = CreateConVar("l4d_vote_kick_access",            "",  "Access level needed to start a kick vote",CVAR_FLAGS);
-	kickImmunity        = CreateConVar("l4d_vote_kick_immunity",          "1", "Make votekick respect admin immunity",CVAR_FLAGS,true,0.0,true,1.0);
-	vetoAccess          = CreateConVar("l4d_vote_veto_access",            "z", "Access level needed to veto a vote",CVAR_FLAGS);
-	passVoteAccess      = CreateConVar("l4d_vote_pass_access",            "z", "Access level needed to pass a vote",CVAR_FLAGS);
-	voteTimeout         = CreateConVar("l4d_vote_timeout",                "0", "Players must wait (timeout) this many seconds between votes. 0 = no timeout",CVAR_FLAGS,true,0.0);
-	voteNoTimeoutAccess = CreateConVar("l4d_vote_no_timeout_access",      "",  "Access level needed to not have vote timeout.",CVAR_FLAGS);
-	sendToLog           = CreateConVar("l4d_vote_log",                    "0", "Log voting data",CVAR_FLAGS,true,0.0,true,1.0);
-	customAccess        = CreateConVar("l4d_custom_vote_access",          "z", "Access level needed to call custom votes.",CVAR_FLAGS);
+	lobbyAccess         = CreateConVar("l4d_vote_lobby_access",           "",  "Access level needed to start a return to lobby vote", CVAR_FLAGS);
+	difficultyAccess    = CreateConVar("l4d_vote_difficulty_access",      "",  "Access level needed to start a change difficulty vote", CVAR_FLAGS);
+	levelAccess         = CreateConVar("l4d_vote_level_access",           "",  "Access level needed to start a change level vote", CVAR_FLAGS);
+	restartAccess       = CreateConVar("l4d_vote_restart_access",         "",  "Access level needed to start a restart level vote", CVAR_FLAGS);
+	kickAccess          = CreateConVar("l4d_vote_kick_access",            "",  "Access level needed to start a kick vote", CVAR_FLAGS);
+	kickImmunity        = CreateConVar("l4d_vote_kick_immunity",          "1", "Make votekick respect admin immunity", CVAR_FLAGS, true, 0.0, true, 1.0);
+	vetoAccess          = CreateConVar("l4d_vote_veto_access",            "z", "Access level needed to veto a vote", CVAR_FLAGS);
+	passVoteAccess      = CreateConVar("l4d_vote_pass_access",            "z", "Access level needed to pass a vote", CVAR_FLAGS);
+	voteTimeout         = CreateConVar("l4d_vote_timeout",                "0", "Players must wait (timeout) this many seconds between votes. 0 = no timeout", CVAR_FLAGS, true, 0.0);
+	voteNoTimeoutAccess = CreateConVar("l4d_vote_no_timeout_access",      "",  "Access level needed to not have vote timeout.", CVAR_FLAGS);
+	sendToLog           = CreateConVar("l4d_vote_log",                    "0", "Log voting data", CVAR_FLAGS, true, 0.0, true, 1.0);
+	customAccess        = CreateConVar("l4d_custom_vote_access",          "z", "Access level needed to call custom votes.", CVAR_FLAGS);
 	voteNotify          = CreateConVar("l4d_vote_notify_access",          "bcdefghijklmnz",  "Who sees certain vote related notices. If blank everyone sees them.", CVAR_FLAGS);
-	survivalMap         = CreateConVar("l4d_vote_surv_map_access",        "",  "Access level needed to switch Survival maps.",CVAR_FLAGS);
-	survivalRestart     = CreateConVar("l4d_vote_surv_restart_access",    "",  "Access level needed to restart Survival maps.",CVAR_FLAGS);
-	survivalLobby       = CreateConVar("l4d_vote_surv_lobby_access",      "",  "Access level needed to return to lobby on Survival maps.",CVAR_FLAGS);
+	survivalMap         = CreateConVar("l4d_vote_surv_map_access",        "",  "Access level needed to switch Survival maps.", CVAR_FLAGS);
+	survivalRestart     = CreateConVar("l4d_vote_surv_restart_access",    "",  "Access level needed to restart Survival maps.", CVAR_FLAGS);
+	survivalLobby       = CreateConVar("l4d_vote_surv_lobby_access",      "",  "Access level needed to return to lobby on Survival maps.", CVAR_FLAGS);
 	
 	AutoExecConfig(true, "sm_plugin_votemanager2");
 
-	CreateConVar("l4d_votemanager2", PLUGIN_VERSION, "Version number for Vote Manager 2 Plugin", FCVAR_REPLICATED|FCVAR_NOTIFY);
+	CreateConVar("l4d_votemanager2", PLUGIN_VERSION, "Version number for Vote Manager 2 Plugin", FCVAR_PLUGIN|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
 }
 
 
@@ -256,7 +255,6 @@ public hasVoteAccess(client, String:voteName[32])
 //return true if client is in time out right now (considering access)
 public isInVoteTimeout(client)
 {
-
 	// check if timeout is even activated
 	if (GetConVarBool(voteTimeout))
 	{
@@ -295,7 +293,6 @@ public isValidVote(String:voteName[32])
 
 public Action:Callvote_Handler(client, args)
 {
-
 	// return Plugin_Handled;  - to prevent the vote from going through
 	// return Plugin_Continue; - to allow the vote to go like normal
 
@@ -335,12 +332,10 @@ public Action:Callvote_Handler(client, args)
 	
 	if (postVoteDelay)
 	{
-		PrintToChat(client, "\x04[!] \x01Must wait \x03%f \x01seconds between votes.", POST_VOTE_DELAY);
+		PrintToChat(client, "\x04[!] \x01Must wait atleast \x03%f \x01seconds between votes.", POST_VOTE_DELAY);
 		LogVote(client, "tried starting a %s vote but it is too soon since the last vote.",voteName);
 		return Plugin_Handled;
 	}
-	
-	CreateTimer(VOTE_DELAY, VoteEnd);
 	
 	if (!isValidVote(voteName))
 	{
@@ -387,8 +382,9 @@ public Action:Callvote_Handler(client, args)
 		LogVote(client, "started a %s vote",voteName);
 		//PrintToChatAll("\x04[SM] \x01%s initiated a %s vote.", initiatorName, voteName);
 		Notify(client, "\x04[Vote] \x03%s \x01initiated a \x03%s \x01vote.", initiatorName, voteName);
+		
+		CreateTimer(GetConVarFloat(FindConVar("sv_vote_timer_duration")), VoteEnd);
 		return Plugin_Continue;
-				
 	}
 	else
 	{
@@ -398,7 +394,6 @@ public Action:Callvote_Handler(client, args)
 		Notify(client, "\x04[Vote] \x03%s \x01tried to start a \x03%s \x01vote but does not have access.", initiatorName, voteName);
 		return Plugin_Handled;
 	}
-
 }
 
 
@@ -599,10 +594,9 @@ public Action:PassVote_Handler(client, args)
 
 public PassVote()
 {
-	new count=MaxClients;
-	for (new i=1; i<=count; i++)
+	for (new i = 1; i <= MaxClients; i++)
 	{
-		if (IsClientInGame(i) && IsClientConnected(i) && !IsFakeClient(i))
+		if (IsClientInGame(i) && !IsFakeClient(i))
 		{
 			FakeClientCommandEx(i,"Vote Yes");
 		}
@@ -663,7 +657,6 @@ public Action:CustomVote_Handler(client, args)
 
 public Action:Custom_Vote_Logic(client, args)
 {
-
 	decl String:initiatorName[MAX_NAME_LENGTH];
 	GetClientName(client, initiatorName, sizeof(initiatorName));
 
@@ -692,9 +685,7 @@ public Action:Custom_Vote_Logic(client, args)
 		CreateTimer(30.0, EndCustomVote, client);
 		
 		customVoteInProgress=true;
-		
 	}	
-	
 	return Plugin_Handled;
 }
 
@@ -702,20 +693,16 @@ public Action:Custom_Vote_Logic(client, args)
 
 public Action:Vote_Handler(client, args)
 {
-
 	decl String:voterName[MAX_NAME_LENGTH];
 	GetClientName(client, voterName, sizeof(voterName));
 	
-
 	decl String:vote[8];
 	GetCmdArg(1,vote,sizeof(vote));
 	
 	//PrintToChatAll("\x04[SM] \x01%s voted %s.",voterName,vote);	
-
 	// if it's a custom vote handle it specially
 	if ( customVoteInProgress && !hasVoted[client] )
 	{
-		
 		if (strcmp(vote,"Yes",true) == 0)
 		{
 			customYesVotes++;
@@ -737,12 +724,7 @@ public Action:Vote_Handler(client, args)
 		{
 			CreateTimer(2.0, EndCustomVote, client);
 		}
-	
-		return Plugin_Handled;
-		
 	}
-
-	// otherwise do normal behavior
 	return Plugin_Continue;
 }
 
@@ -750,10 +732,8 @@ public Action:Vote_Handler(client, args)
 // after a certain amount of time just end the vote regardless
 public Action:EndCustomVote(Handle:timer, any:client)
 {
-
 	if (customVoteInProgress)
 	{
-
 		new Handle:voteEndEvent = CreateEvent("vote_ended");
 		FireEvent(voteEndEvent);
 	
