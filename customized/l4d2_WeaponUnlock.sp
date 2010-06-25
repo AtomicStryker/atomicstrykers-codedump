@@ -3,7 +3,7 @@
 #pragma semicolon				1
 
 
-#define PLUGIN_VERSION 			"0.8.6"
+#define PLUGIN_VERSION 			"0.8.7"
 #define TEST_DEBUG				0
 #define TEST_DEBUG_LOG			1
 
@@ -32,7 +32,7 @@
 
 static const Float:PLUGINSTART_DELAY		= 1.0;
 static const Float:ROUNDSTART_DELAY			= 6.0;
-static const Float:LOCATION_ERROR_MARGIN	= 2.0;
+static const Float:LOCATION_ERROR_MARGIN	= 4.0;
 
 // chances weapons getting transformed into CSS brethren are 1:X - X being the value set here. 1:1 is 100%, 1:2 is 50%, 1:3 is 33%, 1:4 is 25%, 1:5 is 20%...
 static const SG552_LOTTERY_CHANCE			= 4;
@@ -70,6 +70,7 @@ static bool:InitFinished					= false;
 static bool:g_bNewMap						= false;
 static bool:g_bScavengeHalftime				= false;
 
+forward SRS_OnItemsHandled(bool:justIndexed);
 
 public Plugin:myinfo =
 {
@@ -137,11 +138,39 @@ public Action:Event_RoundStart(Handle:event, const String:name[], bool:dontBroad
 	CreateTimer(ROUNDSTART_DELAY, RoundStartDelayed);
 }
 
-public Action:RoundStartDelayed(Handle:timer)
+public SRS_OnItemsHandled(bool:justIndexed)
 {
-	if (!InitFinished) return;
+	DebugPrintToAll("SRS_OnItemsHandled fired, justIndexed: %b", justIndexed);
 	
-	//Look up the map and type of game we're running.
+	if (!GetConVarBool(cvarEnabled)
+	|| !IsAllowedMap())
+	{
+		return;
+	}
+
+	if (justIndexed)
+	{
+		IndexWeaponSpawns();
+	}
+
+	SpawnIndexedWeapons();
+}
+
+static bool:IsSRSMODactive()
+{
+	new Handle:cvar = FindConVar("srs_remove_enabled");
+	if (cvar != INVALID_HANDLE)
+	{
+		if (GetConVarBool(cvar))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool:IsAllowedMap()
+{
 	decl String:GameMode[16];
 	GetConVarString(FindConVar("mp_gamemode"), GameMode, sizeof(GameMode));
 	
@@ -157,8 +186,25 @@ public Action:RoundStartDelayed(Handle:timer)
 	StrEqual(Map, "c4m3_sugarmill_b") ||
 	StrEqual(Map, "c4m4_milltown_b")))
 	{
+		return false;
+	}
+	
+	return true;
+}
+
+public Action:RoundStartDelayed(Handle:timer)
+{
+	if (!InitFinished || !IsAllowedMap()) return;
+	
+	if (IsSRSMODactive())
+	{
+		DebugPrintToAll("Active srsmod Item Module found, aborting automatic Weapon exchange");
 		return;
 	}
+	
+	//Look up the map and type of game we're running.
+	decl String:GameMode[16];
+	GetConVarString(FindConVar("mp_gamemode"), GameMode, sizeof(GameMode));
 	
 	if (StrEqual(GameMode, "survival"))
 	{
@@ -175,22 +221,16 @@ public Action:RoundStartDelayed(Handle:timer)
 		{
 			IndexWeaponSpawns();
 		}
-		
-		SpawnIndexedWeapons();
-		return;
 	}
 	
-	if (StrEqual(GameMode, "versus") || StrEqual(GameMode, "teamversus") || StrEqual(GameMode, "mutation12"))
+	//if (StrEqual(GameMode, "versus") || StrEqual(GameMode, "teamversus") || StrEqual(GameMode, "mutation12"))
+	if (g_bNewMap)
 	{
-		if (g_bNewMap)
-		{
-			IndexWeaponSpawns();
-			g_bNewMap = false;
-		}
-		
-		SpawnIndexedWeapons();
-		return;
+		IndexWeaponSpawns();
+		g_bNewMap = false;
 	}
+	
+	SpawnIndexedWeapons();
 }
 
 public Action:Event_ScavengeRoundHalftime(Handle:event, const String:name[], bool:dontBroadcast)

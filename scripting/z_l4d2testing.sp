@@ -34,8 +34,7 @@ public OnPluginStart()
 	
 	RegAdminCmd("sm_dodamage", Cmd10, ADMFLAG_CHEATS, " sm_dodamage <target> <damage>");
 	
-	RegAdminCmd("sm_getstart", Cmd11, ADMFLAG_CHEATS, "");
-	// smoker pull: 18 oder 19
+	RegAdminCmd("sm_wtlv", Cmd11, ADMFLAG_CHEATS, "");
 	
 	RegAdminCmd("sm_isfinale", Cmd12, ADMFLAG_CHEATS, "");
 }
@@ -59,21 +58,7 @@ public Action:Cmd11(client, args)
 		return Plugin_Handled;
 	}
 	
-	new director = FindEntityByClassname(-1, "survivorPos_intro_01");
-	
-	if (director < 1 || !IsValidEntity(director))
-	{
-		ReplyToCommand(client, "No survivorPos_intro_01 found");
-		return Plugin_Handled;
-	}
-	
-	decl Float:direcpos[3], Float:clientpos[3];
-	
-	GetClientAbsOrigin(client, clientpos);
-	GetEntityAbsOrigin(director, direcpos);
-	
-	new Float:distance = GetVectorDistance(clientpos, direcpos);
-	ReplyToCommand(client, "vector distance to survivorPos_intro_01: %f", distance);
+	ReplyToCommand(client, "Your m_nWaterLevel: %i", GetEntProp(client, Prop_Send, "m_nWaterLevel"));
 	
 	return Plugin_Handled;
 }
