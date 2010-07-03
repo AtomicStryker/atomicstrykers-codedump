@@ -542,7 +542,7 @@ static WipeStoredWeapons()
 	
 	for (new i = 32; i <= entcount; i++)
 	{
-		if (IsValidEntity(i))
+		if (IsValidEdict(i))
 		{
 			GetEdictClassname(i, EdictClassName, sizeof(EdictClassName));
 			if (StrEqual(EdictClassName, "weapon_spawn") || (wipestaticspawns && IsWantedGunEntity(EdictClassName)))

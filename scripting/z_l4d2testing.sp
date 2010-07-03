@@ -12,7 +12,7 @@ static Handle:cvarDebugOut									= INVALID_HANDLE;
 
 public OnPluginStart()
 {
-	cvarDebugOut = CreateConVar("testingplugin_debug", "0", "Sum of debug flags for debug outputs (1-console, 2-log, 4-chat)", FCVAR_PLUGIN|FCVAR_NOTIFY);
+	cvarDebugOut = CreateConVar("testingplugin_debug", "1", "Sum of debug flags for debug outputs (1-console, 2-log, 4-chat)", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	
 	RegAdminCmd("sm_takeover", Cmd1, ADMFLAG_CHEATS, "Take Over Zombie Bot <player>");
 	
@@ -34,15 +34,7 @@ public OnPluginStart()
 	
 	RegAdminCmd("sm_dodamage", Cmd10, ADMFLAG_CHEATS, " sm_dodamage <target> <damage>");
 	
-	RegAdminCmd("sm_wtlv", Cmd11, ADMFLAG_CHEATS, "");
-	
-	RegAdminCmd("sm_isfinale", Cmd12, ADMFLAG_CHEATS, "");
-}
-
-public Action:Cmd12(client, args)
-{
-	ReplyToCommand(client, "trigger_finale exists %b", L4D2_OnFinaleMap());
-	return Plugin_Handled;
+	RegAdminCmd("sm_isreachable", Cmd11, ADMFLAG_CHEATS, "sm_isreachable <player> <targetent>");
 }
 
 stock bool:L4D2_OnFinaleMap()
@@ -58,9 +50,62 @@ public Action:Cmd11(client, args)
 		return Plugin_Handled;
 	}
 	
-	ReplyToCommand(client, "Your m_nWaterLevel: %i", GetEntProp(client, Prop_Send, "m_nWaterLevel"));
+	if (args < 2)
+	{
+		ReplyToCommand(client, "Usage: sm_isreachable <player> <targetent>");
+		return Plugin_Handled;
+	}
 	
+	decl String:buffer[128];
+	
+	GetCmdArg(1, buffer, sizeof(buffer));
+	new player = FindTarget(client, buffer, false, false);
+	
+	if (player == -1)
+	{
+		ReplyToCommand(client, "Invalid Player specified");
+		return Plugin_Handled;
+	}
+	
+	GetCmdArg(2, buffer, sizeof(buffer));
+	new entity = StringToInt(buffer);
+	
+	if (!IsValidEntity(entity))
+	{
+		ReplyToCommand(client, "Invalid Entity specified");
+		return Plugin_Handled;
+	}
+	
+	GetEdictClassname(entity, buffer, sizeof(buffer));
+	
+	decl Float:vector[3];
+	GetEntityAbsOrigin(entity, vector);
+	
+	ReplyToCommand(client, "Ent %i of class %s reachable by %N : %b", entity, buffer, player, IsEntityReachableByClient(player, vector));
+
 	return Plugin_Handled;
+}
+
+// SurvivorBot::IsReachable(Vector  const&)const
+static bool:IsEntityReachableByClient(target, const Float:vector[3])
+{
+	new Handle:ConfigFile = LoadGameConfigFile("srsmod");
+
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "IsReachable_Vector");
+	PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_Plain);
+	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
+	new Handle:sdkcallIsReachable = EndPrepSDKCall();
+	CloseHandle(ConfigFile);
+	
+	if (sdkcallIsReachable == INVALID_HANDLE)
+	{
+		SetFailState("Cant initialize SurvivorBot::IsReachable_Vector SDKCall");
+	}
+
+
+	DebugPrintToAll("SurvivorBot::IsReachable(Vector  const&) being called, target %N", target);
+	return SDKCall(sdkcallIsReachable, target, vector);
 }
 
 public Action:Cmd10(client, args)

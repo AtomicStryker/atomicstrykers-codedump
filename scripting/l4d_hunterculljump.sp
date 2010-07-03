@@ -2,16 +2,20 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION							"1.0.1"
+#define PLUGIN_VERSION							"1.0.3"
 
 
 static const ZOMBIECLASS_HUNTER					= 3;
 static const JUMPFLAG							= IN_JUMP;
+static const Float:DELAY						= 1.5;
 
 static Handle:cvarCullJumpStrenght				= INVALID_HANDLE;
+static Handle:cvarGameMode						= INVALID_HANDLE;
 
 static bool:jumpdelay[MAXPLAYERS+1]				= false;
+static bool:spawndelay[MAXPLAYERS+1]			= false;
 static bool:isPouncingSomeone[MAXPLAYERS+1]		= false;
+static bool:isGamemodeCoop						= false;
 static victimPouncer[MAXPLAYERS+1]				= -1;
 
 
@@ -24,7 +28,6 @@ public Plugin:myinfo =
 	url			= "http://forums.alliedmods.net/showthread.php?t=118182"
 }
 
-
 public OnPluginStart()
 {
 	CheckForL4DGame();
@@ -35,22 +38,36 @@ public OnPluginStart()
 	
 	HookEvent("lunge_pounce", Event_StartPwn);
 	HookEvent("pounce_stopped", Event_EndPwn);
+	HookEvent("player_spawn", Event_Spawn);
+	
+	cvarGameMode = FindConVar("mp_gamemode");
+	HookConVarChange(cvarGameMode, _CJ_ConVarChange);
+}
+
+public _CJ_ConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
+{
+	decl String:gamemode[32];
+	GetConVarString(cvarGameMode, gamemode, sizeof(gamemode));
+	isGamemodeCoop = StrEqual(gamemode, "coop");
 }
 
 public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:clientEyeAngles[3], &weapon)
 {
-	if (buttons & IN_ATTACK && !jumpdelay[client])
+	if (buttons & IN_ATTACK && !jumpdelay[client] && !spawndelay[client])
 	{
-		if (GetClientTeam(client) != 3) return Plugin_Continue;
-		if (!IsPlayerAlive(client)) return Plugin_Continue;
-		if (IsPlayerSpawnGhost(client)) return Plugin_Continue;
-		if (!IsPlayerHunter(client)) return Plugin_Continue;
-		if (isPouncingSomeone[client]) return Plugin_Continue;
-		if (GetEntityFlags(client) & JUMPFLAG) return Plugin_Continue;
-		if (IsCoop()) return Plugin_Continue;
+		if (GetClientTeam(client) != 3
+		|| (!IsPlayerAlive(client))
+		|| (IsPlayerSpawnGhost(client))
+		|| (!IsPlayerHunter(client))
+		|| (isPouncingSomeone[client])
+		|| (GetEntityFlags(client) & JUMPFLAG)
+		|| (isGamemodeCoop))
+		{
+			return Plugin_Continue;
+		}
 		
 		jumpdelay[client] = true;
-		CreateTimer(1.5, ResetJumpDelay, client);
+		CreateTimer(DELAY, ResetJumpDelay, client);
 		DoPounce(client);
 	}
 	
@@ -81,6 +98,11 @@ public Action:ResetJumpDelay(Handle:timer, any:client)
 	jumpdelay[client] = false;
 }
 
+public Action:ResetSpawnDelay(Handle:timer, any:client)
+{
+	spawndelay[client] = false;
+}
+
 static PlayCullJumpSound(client)
 {
 	decl String:soundpath[256];
@@ -104,6 +126,15 @@ static PlayCullJumpSound(client)
 		if (IsClientInGame(i) && !IsFakeClient(i))
 			EmitSoundToClient(i, soundpath, client, SNDCHAN_AUTO, SNDLEVEL_GUNFIRE);
 	}
+}
+
+public Event_Spawn (Handle:event, const String:name[], bool:dontBroadcast)
+{
+	new hunter = GetClientOfUserId(GetEventInt(event, "userid"));
+	if (!hunter) return;
+	
+	spawndelay[hunter] = true;
+	CreateTimer(DELAY, ResetSpawnDelay, hunter);
 }
 
 public Event_StartPwn (Handle:event, const String:name[], bool:dontBroadcast)
@@ -134,13 +165,6 @@ static bool:IsPlayerHunter(client)
 {
 	if(GetEntProp(client, Prop_Send, "m_zombieClass") == ZOMBIECLASS_HUNTER) return true;
 	else return false;
-}
-
-stock bool:IsCoop()
-{
-	decl String:gamemode[64];
-	GetConVarString(FindConVar("mp_gamemode"), gamemode, sizeof(gamemode));
-	return StrEqual(gamemode, "coop");
 }
 
 stock bool:IsPlayerSpawnGhost(client)
