@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.9"
+#define PLUGIN_VERSION "1.9.1"
 
 
 public Plugin:myinfo =
@@ -68,43 +68,68 @@ public Action:Command_Respawn(client, args)
 		return Plugin_Handled;
 	}
 	
-	decl player_id, String:player[64];
+	decl String:arg1[MAX_TARGET_LENGTH];
+	decl String:target_name[MAX_TARGET_LENGTH];
+	new target_list[MAXPLAYERS];
+	new target_count;
+	new bool:tn_is_ml;
 	
-	for(new i = 0; i < args; i++)
+	GetCmdArg(1, arg1, sizeof(arg1));
+ 
+	if ((target_count = ProcessTargetString(
+			arg1,
+			client,
+			target_list,
+			MAXPLAYERS,
+			0,				// no filtering
+			target_name,
+			sizeof(target_name),
+			tn_is_ml)) <= 0)
 	{
-		GetCmdArg(i+1, player, sizeof(player));
-		player_id = FindTarget(client, player);
-		
-		switch(GetClientTeam(player_id))
-		{
-			case 2:
-			{
-				SDKCall(hRoundRespawn, player_id);
-				
-				CheatCommand(player_id, "give", "first_aid_kit");
-				CheatCommand(player_id, "give", "smg");
+		/* This function replies to the admin with a failure message */
+		ReplyToTargetError(client, target_count);
+		return Plugin_Handled;
+	}
 
-				if(!SetTeleportEndPoint(client) || client == player_id)
-				{
-					return Plugin_Handled;
-				}
-				PerformTeleport(client,player_id,g_pos);
-			}
+	for (new i = 0; i < target_count; i++)
+	{
+		RespawnPlayer(client, target_list[i]);
+	}
+	
+	ShowActivity2(client, "[SM] ", "Respawned target '%s'", target_name);
+	
+	return Plugin_Handled;
+}
+
+static RespawnPlayer(client, player_id)
+{
+	switch(GetClientTeam(player_id))
+	{
+		case 2:
+		{
+			SDKCall(hRoundRespawn, player_id);
 			
-			case 3:
+			CheatCommand(player_id, "give", "first_aid_kit");
+			CheatCommand(player_id, "give", "smg");
+			if(!SetTeleportEndPoint(client) || client == player_id)
 			{
-				decl String:game_name[24];
-				GetGameFolderName(game_name, sizeof(game_name));
-				if (StrEqual(game_name, "left4dead", false)) return Plugin_Handled;
-			
-				SDKCall(hState_Transition, player_id, 8);
-				SDKCall(hBecomeGhost, player_id, 1);
-				SDKCall(hState_Transition, player_id, 6);
-				SDKCall(hBecomeGhost, player_id, 1);
+				return;
 			}
+			PerformTeleport(client,player_id,g_pos);
+		}
+		
+		case 3:
+		{
+			decl String:game_name[24];
+			GetGameFolderName(game_name, sizeof(game_name));
+			if (StrEqual(game_name, "left4dead", false)) return;
+		
+			SDKCall(hState_Transition, player_id, 8);
+			SDKCall(hBecomeGhost, player_id, 1);
+			SDKCall(hState_Transition, player_id, 6);
+			SDKCall(hBecomeGhost, player_id, 1);
 		}
 	}
-	return Plugin_Handled;
 }
 
 public bool:TraceEntityFilterPlayer(entity, contentsMask)

@@ -3,7 +3,7 @@
 #include <sdktools>
 #include <left4downtown>
 
-#define PLUGIN_VERSION "1.0.2"
+#define PLUGIN_VERSION "1.0.3"
 
 #define TEST_DEBUG 0
 #define TEST_DEBUG_LOG 1
@@ -26,6 +26,7 @@ static Handle:cvar_SurrenderChoiceType				= INVALID_HANDLE;
 static Handle:surrenderMenu							= INVALID_HANDLE;
 
 static bool:withinTimeLimit							= false;
+static bool:isFinale								= false;
 static primaryTankPlayer							= -1;
 
 public Plugin:myinfo = 
@@ -48,6 +49,19 @@ public OnPluginStart()
 	RegAdminCmd("sm_taketank", TS_CMD_TakeTank, ADMFLAG_CHEATS, " Take over the current Tank ");
 	
 	LoadTranslations("common.phrases");
+	
+	HookEvent("finale_start", _FinaleStart_Event, EventHookMode_PostNoCopy);
+	HookEvent("round_end", _RoundEnd_Event, EventHookMode_PostNoCopy);
+}
+
+public Action:_RoundEnd_Event(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	isFinale = false;
+}
+
+public Action:_FinaleStart_Event(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	isFinale = true;
 }
 
 stock Require_L4D2()
@@ -98,12 +112,16 @@ public Action:L4D_OnSpawnTank(const Float:vector[3], const Float:qangle[3])
 	
 	new Float:PlayerControlDelay = GetConVarFloat(FindConVar("director_tank_lottery_selection_time"));
 	
-	switch (GetConVarInt(cvar_SurrenderChoiceType))
+	if (!isFinale)
 	{
-		case 0:		return Plugin_Continue;
-		case 1:		CreateTimer(PlayerControlDelay + CONTROL_DELAY_SAFETY, TS_DisplayNotificationToTank);
-		case 2:		CreateTimer(PlayerControlDelay + CONTROL_DELAY_SAFETY, TS_Display_Auto_MenuToTank);
+		switch (GetConVarInt(cvar_SurrenderChoiceType))
+		{
+			case 0:		return Plugin_Continue;
+			case 1:		CreateTimer(PlayerControlDelay + CONTROL_DELAY_SAFETY, TS_DisplayNotificationToTank);
+			case 2:		CreateTimer(PlayerControlDelay + CONTROL_DELAY_SAFETY, TS_Display_Auto_MenuToTank);
+		}
 	}
+	
 	return Plugin_Continue;
 }
 

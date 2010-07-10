@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.1"
+#define PLUGIN_VERSION "1.0.3"
 
 public Plugin:myinfo =
 {
@@ -55,6 +55,12 @@ public Action:_RoundStart_Event(Handle:event, const String:name[], bool:dontBroa
 public Action:_RoundEnd_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	roundHandled = false;
+	
+	if (countDownTimer != INVALID_HANDLE)
+	{
+		KillTimer(countDownTimer);
+		countDownTimer = INVALID_HANDLE;
+	}
 }
 
 public Action:_Spawn_Timer(Handle:timer)
@@ -88,7 +94,7 @@ static FindSurvivalButton()
 		if (ent)
 		{
 			GetEntPropString(ent, Prop_Data, "m_iName", buffer, sizeof(buffer));
-			if (StrEqual(buffer, "survival_alarm_button", false))
+			if (StrEqual(buffer, "survival_alarm_button", false) || StrEqual(buffer, "survival_button", false))
 			{
 				return ent;
 			}
