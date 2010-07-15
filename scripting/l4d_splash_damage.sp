@@ -2,9 +2,11 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.6"
+#define PLUGIN_VERSION "1.0.7"
 #define CVAR_FLAGS FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY
 
+
+static const Float:TRACE_TOLERANCE 			= 25.0;
 
 static Handle:SplashEnabled = INVALID_HANDLE;
 static Handle:SplashRadius = INVALID_HANDLE;
@@ -56,7 +58,9 @@ public Action:PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 }
 
 public Action:Splashdamage(Handle:timer, any:client)
-{		
+{
+	if (!IsClientInGame(client)) return Plugin_Stop;
+
 	decl String:class[100];
 	GetClientModel(client, class, sizeof(class));
 	
@@ -81,7 +85,7 @@ public Action:Splashdamage(Handle:timer, any:client)
 							
 							new Float:distance = GetVectorDistance(targetVector, g_pos);
 							
-							if (distance < GetConVarFloat(SplashRadius))
+							if (distance < GetConVarFloat(SplashRadius) && IsVisibleTo(g_pos, targetVector))
 							{							
 								switch (GetConVarInt(DisplayDamageMessage))
 								{
@@ -95,27 +99,7 @@ public Action:Splashdamage(Handle:timer, any:client)
 									PrintToChat(target, "You've taken Damage from a Boomer Splash!");
 								}
 								
-								DamageEffect(target);
-								
-								new damage = GetConVarInt(SplashDamage);
-								if (!damage) return Plugin_Stop;
-								
-								new hardhp = GetEntProp(target, Prop_Data, "m_iHealth") - 1;
-								
-								if (damage < hardhp || IsPlayerIncapped(target))
-								{
-									SetEntityHealth(target, hardhp - damage);
-								}
-								
-								else if (damage > hardhp)
-								{
-									new Float:temphp = GetEntPropFloat(target, Prop_Send, "m_healthBuffer");
-									
-									if (damage < temphp)
-									{
-										SetEntPropFloat(target, Prop_Send, "m_healthBuffer", FloatSub(temphp, GetConVarFloat(SplashDamage)));
-									}
-								}
+								applyDamage(GetConVarInt(SplashDamage), target, client);
 							}
 						}
 					}
@@ -126,17 +110,92 @@ public Action:Splashdamage(Handle:timer, any:client)
 	return Plugin_Stop;
 }
 
-stock DamageEffect(target)
+// timer idea by dirtyminuth, damage dealing by pimpinjuice http://forums.alliedmods.net/showthread.php?t=111684
+// added some L4D specific checks
+static applyDamage(damage, victim, attacker)
+{ 
+	new Handle:dataPack = CreateDataPack();
+	WritePackCell(dataPack, damage);  
+	WritePackCell(dataPack, victim);
+	WritePackCell(dataPack, attacker);
+	
+	CreateTimer(0.10, timer_stock_applyDamage, dataPack);
+}
+
+public Action:timer_stock_applyDamage(Handle:timer, Handle:dataPack)
 {
-	new pointHurt = CreateEntityByName("point_hurt");			// Create point_hurt
-	DispatchKeyValue(target, "targetname", "hurtme");			// mark target
-	DispatchKeyValue(pointHurt, "Damage", "0");					// No Damage, just HUD display. Does stop Reviving though
-	DispatchKeyValue(pointHurt, "DamageTarget", "hurtme");		// Target Assignment
-	DispatchKeyValue(pointHurt, "DamageType", "65536");			// Type of damage
-	DispatchSpawn(pointHurt);									// Spawn descriped point_hurt
-	AcceptEntityInput(pointHurt, "Hurt"); 						// Trigger point_hurt execute
-	AcceptEntityInput(pointHurt, "Kill"); 						// Remove point_hurt
-	DispatchKeyValue(target, "targetname",	"cake");			// Clear target's mark
+	ResetPack(dataPack);
+	new damage = ReadPackCell(dataPack);  
+	new victim = ReadPackCell(dataPack);
+	new attacker = ReadPackCell(dataPack);
+	CloseHandle(dataPack);
+	
+	decl Float:victimPos[3], String:strDamage[16], String:strDamageTarget[16];
+	
+	if (!IsClientInGame(victim)) return;
+	GetClientEyePosition(victim, victimPos);
+	IntToString(damage, strDamage, sizeof(strDamage));
+	Format(strDamageTarget, sizeof(strDamageTarget), "hurtme%d", victim);
+	
+	new entPointHurt = CreateEntityByName("point_hurt");
+	if(!entPointHurt) return;
+	
+	// Config, create point_hurt
+	DispatchKeyValue(victim, "targetname", strDamageTarget);
+	DispatchKeyValue(entPointHurt, "DamageTarget", strDamageTarget);
+	DispatchKeyValue(entPointHurt, "Damage", strDamage);
+	DispatchKeyValue(entPointHurt, "DamageType", "65536");
+	DispatchSpawn(entPointHurt);
+	
+	// Teleport, activate point_hurt
+	TeleportEntity(entPointHurt, victimPos, NULL_VECTOR, NULL_VECTOR);
+	AcceptEntityInput(entPointHurt, "Hurt", (attacker > 0 && attacker < MaxClients && IsClientInGame(attacker)) ? attacker : -1);
+	
+	// Config, delete point_hurt
+	DispatchKeyValue(entPointHurt, "classname", "point_hurt");
+	DispatchKeyValue(victim, "targetname", "null");
+	RemoveEdict(entPointHurt);
+}
+
+static bool:IsVisibleTo(Float:position[3], Float:targetposition[3])
+{
+	decl Float:vAngles[3], Float:vLookAt[3];
+	
+	MakeVectorFromPoints(position, targetposition, vLookAt); // compute vector from start to target
+	GetVectorAngles(vLookAt, vAngles); // get angles from vector for trace
+	
+	// execute Trace
+	new Handle:trace = TR_TraceRayFilterEx(position, vAngles, MASK_SHOT, RayType_Infinite, _TraceFilter);
+	
+	new bool:isVisible = false;
+	if (TR_DidHit(trace))
+	{
+		decl Float:vStart[3];
+		TR_GetEndPosition(vStart, trace); // retrieve our trace endpoint
+		
+		if ((GetVectorDistance(position, vStart, false) + TRACE_TOLERANCE) >= GetVectorDistance(position, targetposition))
+		{
+			isVisible = true; // if trace ray lenght plus tolerance equal or bigger absolute distance, you hit the target
+		}
+	}
+	else
+	{
+		LogError("Tracer Bug: Player-Zombie Trace did not hit anything, WTF");
+		isVisible = true;
+	}
+	CloseHandle(trace);
+	
+	return isVisible;
+}
+
+public bool:_TraceFilter(entity, contentsMask)
+{
+	if (!entity || !IsValidEntity(entity)) // dont let WORLD, or invalid entities be hit
+	{
+		return false;
+	}
+	
+	return true;
 }
 
 public Action:EraseGhostExploit(Handle:timer, Handle:client)

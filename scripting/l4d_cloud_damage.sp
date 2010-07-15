@@ -2,11 +2,13 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "2.17"
+#define PLUGIN_VERSION "2.18"
 #define CVAR_FLAGS          FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY
 
 #define DEBUG 0
 
+
+static const Float:TRACE_TOLERANCE 			= 25.0;
 
 new Handle:CloudEnabled = INVALID_HANDLE;
 new Handle:CloudDuration = INVALID_HANDLE;
@@ -177,7 +179,9 @@ public Action:Point_Hurt(Handle:timer, Handle:hurt)
 
 		GetClientEyePosition(target, targetVector);
 		distance = GetVectorDistance(targetVector, g_pos);
-		if (distance > radiussetting) continue;
+		
+		if (distance > radiussetting
+		|| !IsVisibleTo(g_pos, targetVector)) continue;
 
 		EmitSoundToClient(target, soundFilePath);
 		switch (GetConVarInt(DisplayDamageMessage))
@@ -318,4 +322,45 @@ public Action:timer_stock_applyDamage(Handle:timer, Handle:dataPack)
 	DispatchKeyValue(entPointHurt, "classname", "point_hurt");
 	DispatchKeyValue(victim, "targetname", "null");
 	RemoveEdict(entPointHurt);
+}
+
+static bool:IsVisibleTo(Float:position[3], Float:targetposition[3])
+{
+	decl Float:vAngles[3], Float:vLookAt[3];
+	
+	MakeVectorFromPoints(position, targetposition, vLookAt); // compute vector from start to target
+	GetVectorAngles(vLookAt, vAngles); // get angles from vector for trace
+	
+	// execute Trace
+	new Handle:trace = TR_TraceRayFilterEx(position, vAngles, MASK_SHOT, RayType_Infinite, _TraceFilter);
+	
+	new bool:isVisible = false;
+	if (TR_DidHit(trace))
+	{
+		decl Float:vStart[3];
+		TR_GetEndPosition(vStart, trace); // retrieve our trace endpoint
+		
+		if ((GetVectorDistance(position, vStart, false) + TRACE_TOLERANCE) >= GetVectorDistance(position, targetposition))
+		{
+			isVisible = true; // if trace ray lenght plus tolerance equal or bigger absolute distance, you hit the target
+		}
+	}
+	else
+	{
+		LogError("Tracer Bug: Player-Zombie Trace did not hit anything, WTF");
+		isVisible = true;
+	}
+	CloseHandle(trace);
+	
+	return isVisible;
+}
+
+public bool:_TraceFilter(entity, contentsMask)
+{
+	if (!entity || !IsValidEntity(entity)) // dont let WORLD, or invalid entities be hit
+	{
+		return false;
+	}
+	
+	return true;
 }

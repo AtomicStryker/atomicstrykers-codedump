@@ -28,9 +28,9 @@ public OnPluginStart()
 	
 	RegAdminCmd("sm_getvscomp", Cmd7, ADMFLAG_CHEATS, "sm_getvscomp <charint> <int>");
 	
-	RegAdminCmd("sm_readscores", Cmd8, ADMFLAG_CHEATS, " sm_readscores ");
+	RegAdminCmd("sm_bile", Cmd8, ADMFLAG_CHEATS, " sm_bile <target> ");
 	
-	RegAdminCmd("sm_setscore", Cmd9, ADMFLAG_CHEATS, " sm_setscore <score table id> <score> ");
+	RegAdminCmd("sm_high", Cmd9, ADMFLAG_CHEATS, " sm_high ");
 	
 	RegAdminCmd("sm_dodamage", Cmd10, ADMFLAG_CHEATS, " sm_dodamage <target> <damage>");
 	
@@ -147,62 +147,191 @@ public Action:Cmd10(client, args)
 
 public Action:Cmd8(client, args)
 {
-	new managerent = FindEntityByClassname(-1, "terror_player_manager");
-	
-	if (!IsValidEdict(managerent))
+	if (args < 1)
 	{
-		ReplyToCommand(client, "Could not find terror_player_manager entity");
+		ReplyToCommand(client, "Usage: sm_bile <target>");
 		return Plugin_Handled;
 	}
 	
-	new scoreoffset = FindSendPropInfo("CTerrorPlayerResource", "m_iScore");
+	decl String:arg[256];
+	GetCmdArg(1, arg, sizeof(arg));
+	new target = FindTarget(client, arg, false, false);
 	
-	for (new i = 0; i <= 32; i++)
+	if (target < 1)
 	{
-		PrintToConsole(client, "m_iScore offset %i, id %i: %i", i*4, i, GetEntData(managerent, scoreoffset+(i*4), 2));
+		ReplyToCommand(client, "Invalid target specified");
+		return Plugin_Handled;
 	}
+	
+	switch (GetClientTeam(target))
+	{
+		case 1:
+		{
+			ReplyToCommand(client, "Dont use on Spectators.");
+			return Plugin_Handled;
+		}
+		
+		case 2:
+		{
+			L4D2_VomitPlayer(client, target, true);
+		}
+		
+		case 3:
+		{
+			L4D2_BileJarPlayer(target, client);
+		}	
+	}
+	
+	/*
+	SetEntProp(target, Prop_Send, "m_iGlowType", 3)
+	SetEntProp(target, Prop_Send, "m_glowColorOverride", -4713783)
+	CreateTimer(25.0, _DisableGlow, target)
+	
+	new chase_ent = CreateEntityByName("info_goal_infected_chase");	
+	decl Float:pos[3];
+	GetEntPropVector(target, Prop_Data, "m_vecAbsOrigin", pos);
+
+	decl String:name[MAX_NAME_LENGTH];
+	GetClientName(target, name, sizeof(name));
+	DispatchKeyValue(target, "targetname", name);
+	SetVariantString(name);
+
+	DispatchSpawn(chase_ent);
+	TeleportEntity(chase_ent, pos, NULL_VECTOR, NULL_VECTOR);
+	AcceptEntityInput(chase_ent, "SetParent", -1, -1, 0);
+	AcceptEntityInput(chase_ent, "SetTarget", -1, -1, 0);
+	AcceptEntityInput(chase_ent, "Enable");
+	CreateTimer(25.0, _DeleteEntity, chase_ent);
+	*/
+	
+	ReplyToCommand(client, "Biled %N", target);
 	return Plugin_Handled;
 }
+
+// CTerrorPlayer::OnVomitedUpon(CTerrorPlayer*, bool)
+L4D2_VomitPlayer(client, target, bool:boolean)
+{
+	DebugPrintToAll("OnVomitedUpon being called, client %N target %N bool %b", client, target, boolean);
+	
+	new Handle:MySDKCall = INVALID_HANDLE;
+	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "CTerrorPlayer_OnVomitedUpon");
+	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
+	MySDKCall = EndPrepSDKCall();
+	CloseHandle(ConfigFile);
+	
+	if (MySDKCall == INVALID_HANDLE)
+	{
+		LogError("Cant initialize OnVomitedUpon SDKCall");
+		return;
+	}
+	
+	SDKCall(MySDKCall, target, client, boolean);
+}
+
+// CTerrorPlayer::OnHitByVomitJar(CBaseCombatCharacter *)
+L4D2_BileJarPlayer(client, entity)
+{
+	DebugPrintToAll("OnHitByVomitJar being called, client %N entity %i", client, entity);
+	
+	new Handle:MySDKCall = INVALID_HANDLE;
+	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "CTerrorPlayer_OnHitByVomitJar");
+	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
+	MySDKCall = EndPrepSDKCall();
+	CloseHandle(ConfigFile);
+	
+	if (MySDKCall == INVALID_HANDLE)
+	{
+		LogError("Cant initialize CTerrorPlayer_OnHitByVomitJar SDKCall");
+		return;
+	}
+	
+	SDKCall(MySDKCall, client, entity);
+}
+
+// Infected::OnHitByVomitJar(CBaseCombatCharacter *)
+L4D2_BileJarInfected(infected, entity)
+{
+	DebugPrintToAll("OnHitByVomitJar being called, infected %i entity %i", infected, entity);
+	
+	new Handle:MySDKCall = INVALID_HANDLE;
+	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
+	StartPrepSDKCall(SDKCall_Entity);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "Infected_OnHitByVomitJar");
+	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
+	MySDKCall = EndPrepSDKCall();
+	CloseHandle(ConfigFile);
+	
+	if (MySDKCall == INVALID_HANDLE)
+	{
+		LogError("Cant initialize Infected_OnHitByVomitJar SDKCall");
+		return;
+	}
+	
+	SDKCall(MySDKCall, infected, entity);
+}
+
+/*
+public Action:_DeleteEntity(Handle:timer, any:ent)
+{
+	if (ent && IsValidEdict(ent))
+	{
+		RemoveEdict(ent);
+	}
+}
+
+public Action:_DisableGlow(Handle:timer, any:ent)
+{
+	SetEntProp(ent, Prop_Send, "m_iGlowType", 0)
+	SetEntProp(ent, Prop_Send, "m_glowColorOverride", 0)
+	DispatchKeyValue(ent, "targetname", "null");
+}
+*/
 
 public Action:Cmd9(client, args)
 {
 	if (!client) return Plugin_Handled;
 	
-	if (args < 2)
-	{
-		ReplyToCommand(client, "Usage: sm_setscore <score table id> <score>");
-		return Plugin_Handled;
-	}
-	
-	new managerent = FindEntityByClassname(-1, "terror_player_manager");
-	
-	if (!IsValidEdict(managerent))
-	{
-		ReplyToCommand(client, "Could not find terror_player_manager entity");
-		return Plugin_Handled;
-	}
-	
-	new scoreoffset = FindSendPropInfo("CTerrorPlayerResource", "m_iScore");
-	
-	decl String:arg[64];
-	GetCmdArg(1, arg, sizeof(arg));
-	
-	new idoffset = StringToInt(arg);
-	
-	if (!idoffset || idoffset > 32)
-	{
-		ReplyToCommand(client, "Valid ID range is 1 to 32");
-		return Plugin_Handled;
-	}
-	
-	GetCmdArg(2, arg, sizeof(arg));
-	
-	SetEntData(managerent, scoreoffset+(idoffset*4), StringToInt(arg), 2, true);
-	
-	PrintToChat(client, "Set Score OffsetID %i, ID %i score to %i", idoffset*4, idoffset, StringToInt(arg));
-	// has no effect. need extension ... sigh
+	ReplyToCommand(client, "Your height above ground: %f", GetHeightAboveGround(client));
 	
 	return Plugin_Handled;
+}
+
+static const Float:ANGLE_STRAIGHT_DOWN[3]	= { 90.0 , 0.0 , 0.0 };
+
+static Float:GetHeightAboveGround(client)
+{
+	decl Float:pos[3];
+	GetClientAbsOrigin(client, pos);
+	
+	// execute Trace straight down
+	new Handle:trace = TR_TraceRayFilterEx(pos, ANGLE_STRAIGHT_DOWN, MASK_SHOT, RayType_Infinite, _TraceFilter);
+	
+	if (!TR_DidHit(trace))
+	{
+		LogError("Tracer Bug: Trace did not hit anything, WTF");
+	}
+
+	decl Float:vEnd[3];
+	TR_GetEndPosition(vEnd, trace); // retrieve our trace endpoint
+	
+	CloseHandle(trace);
+	
+	return GetVectorDistance(pos, vEnd, false);
+}
+
+public bool:_TraceFilter(entity, contentsMask)
+{
+	if (!entity || !IsValidEntity(entity)) // dont let WORLD, or invalid entities be hit
+	{
+		return false;
+	}
+	
+	return true;
 }
 
 public Action:Cmd1(client, args)
