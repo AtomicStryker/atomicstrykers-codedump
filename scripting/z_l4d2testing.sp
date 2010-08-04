@@ -4,6 +4,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
+#include <left4downtown>
 
 static const 		OUT_SERVER								= 	 1;
 static const 		OUT_LOG									= 	 2;
@@ -12,7 +13,7 @@ static Handle:cvarDebugOut									= INVALID_HANDLE;
 
 public OnPluginStart()
 {
-	cvarDebugOut = CreateConVar("testingplugin_debug", "1", "Sum of debug flags for debug outputs (1-console, 2-log, 4-chat)", FCVAR_PLUGIN|FCVAR_NOTIFY);
+	cvarDebugOut = CreateConVar("testingplugin_debug", "3", "Sum of debug flags for debug outputs (1-console, 2-log, 4-chat)", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	
 	RegAdminCmd("sm_takeover", Cmd1, ADMFLAG_CHEATS, "Take Over Zombie Bot <player>");
 	
@@ -30,11 +31,117 @@ public OnPluginStart()
 	
 	RegAdminCmd("sm_bile", Cmd8, ADMFLAG_CHEATS, " sm_bile <target> ");
 	
-	RegAdminCmd("sm_high", Cmd9, ADMFLAG_CHEATS, " sm_high ");
+	RegAdminCmd("sm_stagger", Cmd9, ADMFLAG_CHEATS, " sm_stagger ");
 	
 	RegAdminCmd("sm_dodamage", Cmd10, ADMFLAG_CHEATS, " sm_dodamage <target> <damage>");
 	
 	RegAdminCmd("sm_isreachable", Cmd11, ADMFLAG_CHEATS, "sm_isreachable <player> <targetent>");
+	
+	RegAdminCmd("sm_regforb", Cmd12, ADMFLAG_CHEATS, " sm_regforb <targetent>");
+	
+	RegAdminCmd("sm_unregforb", Cmd13, ADMFLAG_CHEATS, "sm_unregforb <targetent>");
+}
+
+public Action:Cmd12(client, args)
+{
+	if (!args)
+	{
+		ReplyToCommand(client, "sm_regforb <targetent>");
+		return Plugin_Handled;
+	}
+	
+	decl String:buffer[10];
+	GetCmdArg(1, buffer, sizeof(buffer));
+	
+	new entity = StringToInt(buffer);
+
+	if (!IsValidEdict(entity))
+	{
+		ReplyToCommand(client, "invalid target ent");
+		return Plugin_Handled;
+	}
+	
+	RegisterForbiddenTarget(entity);
+}
+
+public Action:Cmd13(client, args)
+{
+	if (!args)
+	{
+		ReplyToCommand(client, "sm_unregforb <targetent>");
+		return Plugin_Handled;
+	}
+	
+	decl String:buffer[10];
+	GetCmdArg(1, buffer, sizeof(buffer));
+	
+	new entity = StringToInt(buffer);
+	
+	if (!IsValidEdict(entity))
+	{
+		ReplyToCommand(client, "invalid target ent");
+		return Plugin_Handled;
+	}
+	
+	UnRegisterForbiddenTarget(entity);
+}
+
+RegisterForbiddenTarget(entity)
+{
+	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
+	new Handle:sdkRegisterForbiddenTarget = INVALID_HANDLE;
+	new Address:pTheDirector = GameConfGetAddress(ConfigFile, "CDirector");
+
+	if(pTheDirector == Address_Null)
+	{
+		SetFailState("Could not load the CDirector pointer");
+	}
+	
+	StartPrepSDKCall(SDKCall_Entity);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "CDirector_RegisterForbiddenTarget");
+	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
+	sdkRegisterForbiddenTarget = EndPrepSDKCall();
+	
+	if (sdkRegisterForbiddenTarget == INVALID_HANDLE)
+	{
+		SetFailState("Could not prep the CDirector_RegisterForbiddenTarget sdk call");
+	}
+	
+	CloseHandle(ConfigFile);
+	
+	DebugPrintToAll("RegisterForbiddenTarget being called, target entity %i", entity);
+	DebugPrintToAll("CDirector pointer: 0x%x", pTheDirector);
+	
+	SDKCall(sdkRegisterForbiddenTarget, pTheDirector, entity);
+}
+
+UnRegisterForbiddenTarget(entity)
+{
+	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
+	new Handle:sdkUnRegisterForbiddenTarget = INVALID_HANDLE;
+	new Address:pTheDirector = GameConfGetAddress(ConfigFile, "CDirector");
+
+	if(pTheDirector == Address_Null)
+	{
+		SetFailState("Could not load the CDirector pointer");
+	}
+	
+	StartPrepSDKCall(SDKCall_Entity);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "CDirector_UnRegisterForbiddenTarget");
+	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
+	sdkUnRegisterForbiddenTarget = EndPrepSDKCall();
+	
+	if (sdkUnRegisterForbiddenTarget == INVALID_HANDLE)
+	{
+		SetFailState("Could not prep the CDirector_UnRegisterForbiddenTarget sdk call");
+	}
+	
+	CloseHandle(ConfigFile);
+	
+	DebugPrintToAll("UnRegisterForbiddenTarget being called, target entity %i", entity);
+	DebugPrintToAll("CDirector pointer: 0x%x", pTheDirector);
+	
+	SDKCall(sdkUnRegisterForbiddenTarget, pTheDirector, entity);
 }
 
 stock bool:L4D2_OnFinaleMap()
@@ -253,85 +360,41 @@ L4D2_BileJarPlayer(client, entity)
 	SDKCall(MySDKCall, client, entity);
 }
 
-// Infected::OnHitByVomitJar(CBaseCombatCharacter *)
-L4D2_BileJarInfected(infected, entity)
-{
-	DebugPrintToAll("OnHitByVomitJar being called, infected %i entity %i", infected, entity);
-	
-	new Handle:MySDKCall = INVALID_HANDLE;
-	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
-	StartPrepSDKCall(SDKCall_Entity);
-	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "Infected_OnHitByVomitJar");
-	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
-	MySDKCall = EndPrepSDKCall();
-	CloseHandle(ConfigFile);
-	
-	if (MySDKCall == INVALID_HANDLE)
-	{
-		LogError("Cant initialize Infected_OnHitByVomitJar SDKCall");
-		return;
-	}
-	
-	SDKCall(MySDKCall, infected, entity);
-}
-
-/*
-public Action:_DeleteEntity(Handle:timer, any:ent)
-{
-	if (ent && IsValidEdict(ent))
-	{
-		RemoveEdict(ent);
-	}
-}
-
-public Action:_DisableGlow(Handle:timer, any:ent)
-{
-	SetEntProp(ent, Prop_Send, "m_iGlowType", 0)
-	SetEntProp(ent, Prop_Send, "m_glowColorOverride", 0)
-	DispatchKeyValue(ent, "targetname", "null");
-}
-*/
 
 public Action:Cmd9(client, args)
 {
 	if (!client) return Plugin_Handled;
 	
-	ReplyToCommand(client, "Your height above ground: %f", GetHeightAboveGround(client));
+	decl Float:vec[3];
+	GetClientEyeAngles(client, vec);
+	
+	//L4D2_StaggerPlayer(client, client, vec);
+	L4D_StaggerPlayer(client, client, vec);
 	
 	return Plugin_Handled;
 }
 
-static const Float:ANGLE_STRAIGHT_DOWN[3]	= { 90.0 , 0.0 , 0.0 };
-
-static Float:GetHeightAboveGround(client)
+// CTerrorPlayer::OnStaggered(CBaseEntity *, Vector  const*)
+static L4D2_StaggerPlayer(target, entity, const Float:vector[3])
 {
-	decl Float:pos[3];
-	GetClientAbsOrigin(client, pos);
+	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
+
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "CTerrorPlayer_OnStaggered");
+	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
+	PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_Plain);
+
+	new Handle:sdkcall = EndPrepSDKCall();
+	CloseHandle(ConfigFile);
 	
-	// execute Trace straight down
-	new Handle:trace = TR_TraceRayFilterEx(pos, ANGLE_STRAIGHT_DOWN, MASK_SHOT, RayType_Infinite, _TraceFilter);
-	
-	if (!TR_DidHit(trace))
+	if (sdkcall == INVALID_HANDLE)
 	{
-		LogError("Tracer Bug: Trace did not hit anything, WTF");
+		SetFailState("Cant initialize CTerrorPlayer_OnStaggered SDKCall");
 	}
 
-	decl Float:vEnd[3];
-	TR_GetEndPosition(vEnd, trace); // retrieve our trace endpoint
+	DebugPrintToAll("OnStaggered(CBaseEntity *, Vector  const*) being called, target %N, entity %i", target, entity);
 	
-	CloseHandle(trace);
-	
-	return GetVectorDistance(pos, vEnd, false);
-}
-
-public bool:_TraceFilter(entity, contentsMask)
-{
-	if (!entity || !IsValidEntity(entity)) // dont let WORLD, or invalid entities be hit
-	{
-		return false;
-	}
-	
-	return true;
+	SDKCall(sdkcall, target, entity, vector);
 }
 
 public Action:Cmd1(client, args)

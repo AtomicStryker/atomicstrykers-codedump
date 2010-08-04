@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION 						  "1.0.0"
+#define PLUGIN_VERSION 						  "1.0.4"
 
 #define TEST_DEBUG 		0
 #define TEST_DEBUG_LOG 	0
@@ -16,6 +16,8 @@ static Handle:cvarisEnabled					= INVALID_HANDLE;
 static Handle:triggeringHeight				= INVALID_HANDLE;
 static Handle:chargerTimer					= INVALID_HANDLE;
 static Handle:karmaTime						= INVALID_HANDLE;
+static Handle:cvarNotify					= INVALID_HANDLE;
+static Handle:cvarModeSwitch				= INVALID_HANDLE;
 static bool:isEnabled						= true;
 static Float:lethalHeight					= 475.0;
 
@@ -34,10 +36,12 @@ public OnPluginStart()
 	HookEvent("charger_carry_start", event_ChargerGrab);
 	HookEvent("charger_carry_end", event_GrabEnded);
 	
-	CreateConVar("l4d2_karma_charge_version", 						PLUGIN_VERSION, " L4D2 Karma Charge Plugin Version ", 		FCVAR_PLUGIN|FCVAR_REPLICATED|FCVAR_DONTRECORD);
-	triggeringHeight = 	CreateConVar("l4d2_karma_charge_height",	"475.0", 		" What Height is considered karma ", 		FCVAR_PLUGIN|FCVAR_REPLICATED);
-	karmaTime =			CreateConVar("l4d2_karma_charge_slowtime", 	"1.5", 			" How long does Time get slowed ", 			FCVAR_PLUGIN|FCVAR_REPLICATED);
-	cvarisEnabled = 	CreateConVar("l4d2_karma_charge_enabled", 	"1", 			" Turn Karma Charge on and off ", 			FCVAR_PLUGIN|FCVAR_REPLICATED);
+	CreateConVar("l4d2_karma_charge_version", 						PLUGIN_VERSION, " L4D2 Karma Charge Plugin Version ", 									FCVAR_PLUGIN|FCVAR_REPLICATED|FCVAR_DONTRECORD);
+	triggeringHeight = 	CreateConVar("l4d2_karma_charge_height",	"475.0", 		" What Height is considered karma ", 									FCVAR_PLUGIN|FCVAR_REPLICATED);
+	karmaTime =			CreateConVar("l4d2_karma_charge_slowtime", 	"1.5", 			" How long does Time get slowed ", 										FCVAR_PLUGIN|FCVAR_REPLICATED);
+	cvarisEnabled = 	CreateConVar("l4d2_karma_charge_enabled", 	"1", 			" Turn Karma Charge on and off ", 										FCVAR_PLUGIN|FCVAR_REPLICATED);
+	cvarNotify = 		CreateConVar("l4d2_karma_charge_notify", 	"1", 			" Turn Chat Announcement on and off ", 									FCVAR_PLUGIN|FCVAR_REPLICATED);
+	cvarModeSwitch =	CreateConVar("l4d2_karma_charge_slowmode", 	"0", 			" 0 - Entire Server gets slowed, 1 - Only Charger and Survivor do ", 	FCVAR_PLUGIN|FCVAR_REPLICATED);
 	
 	HookConVarChange(cvarisEnabled, 	_cvarChange);
 	HookConVarChange(triggeringHeight, 	_cvarChange);
@@ -140,11 +144,55 @@ public bool:_TraceFilter(entity, contentsMask)
 
 static AnnounceKarmaCharge(client)
 {
-	SlowTime();
-	
 	EmitSoundToAll(SOUND_EFFECT, client);
+	
+	if (GetConVarBool(cvarModeSwitch))
+	{
+		SlowChargeCouple(client);
+	}
+	else
+	{
+		SlowTime();
+		if (GetConVarBool(cvarNotify))
+		{
+			PrintToChatAll("\x03%N\x01 did a Karma Charge, for great justice!!", client);
+		}
+	}
+}
 
-	PrintToChatAll("\x03%N\x01 did a Karma Charge, for great justice!!", client);
+static SlowChargeCouple(client)
+{
+	new target = GetCarryVictim(client);
+	if (target == -1) return;
+	
+	SetEntPropFloat(client, Prop_Send, "m_flLaggedMovementValue", 0.2);
+	SetEntPropFloat(target, Prop_Send, "m_flLaggedMovementValue", 0.2);
+	
+	CreateTimer(GetConVarFloat(karmaTime), _revertCoupleTimeSlow, client);
+}
+
+public Action:_revertCoupleTimeSlow(Handle:timer, any:client)
+{
+	if (!IsClientInGame(client)) return;
+	SetEntPropFloat(client, Prop_Send, "m_flLaggedMovementValue", 1.0);
+	
+	new target = GetCarryVictim(client);
+	if (target == -1) return;
+	
+	SetEntPropFloat(target, Prop_Send, "m_flLaggedMovementValue", 1.0);
+}
+
+static GetCarryVictim(client)
+{
+	new victim = GetEntPropEnt(client, Prop_Send, "m_carryVictim");
+	if (victim < 1
+	|| victim > MaxClients
+	|| !IsClientInGame(victim))
+	{
+		return -1;
+	}
+	
+	return victim;
 }
 
 stock SlowTime(const String:desiredTimeScale[] = "0.2", const String:re_Acceleration[] = "2.0", const String:minBlendRate[] = "1.0", const String:blendDeltaMultiplier[] = "2.0")

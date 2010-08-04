@@ -3,7 +3,7 @@
 #pragma semicolon				1
 
 
-#define PLUGIN_VERSION 			"0.8.7"
+#define PLUGIN_VERSION 			"0.8.8"
 #define TEST_DEBUG				0
 #define TEST_DEBUG_LOG			1
 
@@ -246,7 +246,7 @@ static IndexWeaponSpawns()
 	new entcount = GetEntityCount();
 	for (new i = 32; i <= entcount; i++)
 	{
-		if (IsValidEntity(i))
+		if (IsValidEdict(i))
 		{
 			GetEdictClassname(i, EdictClassName, sizeof(EdictClassName));
 			if (StrEqual(EdictClassName, "weapon_spawn"))
@@ -291,7 +291,7 @@ static IndexWeaponSpawns()
 		
 		for (new i = 32; i <= entcount; i++)
 		{
-			if (IsValidEntity(i))
+			if (IsValidEdict(i))
 			{
 				GetEdictClassname(i, EdictClassName, sizeof(EdictClassName));
 				if (IsWantedGunEntity(EdictClassName))

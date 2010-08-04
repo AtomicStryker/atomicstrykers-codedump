@@ -3,7 +3,7 @@
 #include <sdktools>
 #include <left4downtown>
 
-#define PLUGIN_VERSION "1.0.3"
+#define PLUGIN_VERSION "1.0.4"
 
 #define TEST_DEBUG 0
 #define TEST_DEBUG_LOG 1
@@ -29,6 +29,12 @@ static bool:withinTimeLimit							= false;
 static bool:isFinale								= false;
 static primaryTankPlayer							= -1;
 
+static Handle:sdkTakeOverZombieBot = INVALID_HANDLE;
+static Handle:sdkReplaceWithBot = INVALID_HANDLE;
+static Handle:sdkCullZombie = INVALID_HANDLE;
+static Handle:sdkReplaceTank = INVALID_HANDLE;
+static Address:g_pZombieManager;
+
 public Plugin:myinfo = 
 {
 	name = "L4D2 Tank Swap",
@@ -41,6 +47,8 @@ public Plugin:myinfo =
 public OnPluginStart()
 {
 	Require_L4D2();
+	
+	PrepSDKCalls();
 
 	CreateConVar("l4d2_tankswap_version", PLUGIN_VERSION, " Version of L4D2 Tank Swap on this server ", FCVAR_PLUGIN|FCVAR_NOTIFY|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_DONTRECORD);
 	cvar_SurrenderTimeLimit = CreateConVar("l4d2_tankswap_timelimit", "10", " How many seconds can a primary Tank Player surrender control ", FCVAR_PLUGIN|FCVAR_NOTIFY);
@@ -365,28 +373,76 @@ static GetRandomEligibleTank()
 	return pool[ GetRandomInt(1, electables) ];
 }
 
+PrepSDKCalls()
+{
+	new Handle:ConfigFile = LoadGameConfigFile(GAMEDATA_FILENAME);
+	new Handle:MySDKCall = INVALID_HANDLE;
+	
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "TakeOverZombieBot");
+	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+	MySDKCall = EndPrepSDKCall();
+	
+	if (MySDKCall == INVALID_HANDLE)
+	{
+		SetFailState("Cant initialize TakeOverZombieBot SDKCall");
+	}
+	
+	CloneHandle(MySDKCall, sdkTakeOverZombieBot);
+	
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "ReplaceWithBot");
+	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
+	MySDKCall = EndPrepSDKCall();
+	
+	if (MySDKCall == INVALID_HANDLE)
+	{
+		SetFailState("Cant initialize ReplaceWithBot SDKCall");
+	}
+	
+	CloneHandle(MySDKCall, sdkReplaceWithBot);
+	
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "CullZombie");
+	MySDKCall = EndPrepSDKCall();
+	
+	if (MySDKCall == INVALID_HANDLE)
+	{
+		SetFailState("Cant initialize CullZombie SDKCall");
+	}
+	
+	CloneHandle(MySDKCall, sdkCullZombie);
+	
+	g_pZombieManager = GameConfGetAddress(ConfigFile, "CZombieManager");
+	if(g_pZombieManager == Address_Null)
+	{
+		SetFailState("Could not load the ZombieManager pointer");
+	}
+	
+	StartPrepSDKCall(SDKCall_Raw);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "ReplaceTank");
+	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+	MySDKCall = EndPrepSDKCall();
+	
+	if (MySDKCall == INVALID_HANDLE)
+	{
+		SetFailState("Cant initialize ReplaceTank SDKCall");
+	}
+	
+	CloneHandle(MySDKCall, sdkReplaceTank);
+	
+	CloseHandle(ConfigFile);
+	CloseHandle(MySDKCall);
+}
+
 // CTerrorPlayer::TakeOverZombieBot(CTerrorPlayer*)
 // Client takes control of an Infected Bot - Tank included. Causes odd shit to happen if an alive client's current SI class doesnt match the taken over one, exception tank
 // i suggest CullZombie or State Transitioning until classes match before calling this
 stock L4D2_TakeOverZombieBot(client, target)
 {
 	DebugPrintToAll("TakeOverZombieBot being called, client %N target %N", client, target);
-
-	new Handle:MySDKCall = INVALID_HANDLE;
-	new Handle:ConfigFile = LoadGameConfigFile(GAMEDATA_FILENAME);
-	StartPrepSDKCall(SDKCall_Player);
-	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "TakeOverZombieBot");
-	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
-	MySDKCall = EndPrepSDKCall();
-	CloseHandle(ConfigFile);
-	
-	if (MySDKCall == INVALID_HANDLE)
-	{
-		LogError("Cant initialize TakeOverZombieBot SDKCall");
-		return;
-	}
-	
-	SDKCall(MySDKCall, client, target);
+	SDKCall(sdkTakeOverZombieBot, client, target);
 }
 
 // CTerrorPlayer::ReplaceWithBot(bool)
@@ -396,22 +452,7 @@ stock L4D2_TakeOverZombieBot(client, target)
 stock L4D2_ReplaceWithBot(client, boolean)
 {
 	DebugPrintToAll("ReplaceWithBot being called, client %N boolean %b", client, boolean);
-
-	new Handle:MySDKCall = INVALID_HANDLE;
-	new Handle:ConfigFile = LoadGameConfigFile(GAMEDATA_FILENAME);
-	StartPrepSDKCall(SDKCall_Player);
-	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "ReplaceWithBot");
-	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
-	MySDKCall = EndPrepSDKCall();
-	CloseHandle(ConfigFile);
-	
-	if (MySDKCall == INVALID_HANDLE)
-	{
-		LogError("Cant initialize ReplaceWithBot SDKCall");
-		return;
-	}
-	
-	SDKCall(MySDKCall, client, boolean);
+	SDKCall(sdkReplaceWithBot, client, boolean);
 }
 
 // CTerrorPlayer::CullZombie(void)
@@ -419,21 +460,7 @@ stock L4D2_ReplaceWithBot(client, boolean)
 stock L4D2_CullZombie(target)
 {
 	DebugPrintToAll("CullZombie being called, target %N", target);
-
-	new Handle:MySDKCall = INVALID_HANDLE;
-	new Handle:ConfigFile = LoadGameConfigFile(GAMEDATA_FILENAME);
-	StartPrepSDKCall(SDKCall_Player);
-	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "CullZombie");
-	MySDKCall = EndPrepSDKCall();
-	CloseHandle(ConfigFile);
-	
-	if (MySDKCall == INVALID_HANDLE)
-	{
-		LogError("Cant initialize CullZombie SDKCall");
-		return;
-	}
-	
-	SDKCall(MySDKCall, target);
+	SDKCall(sdkCullZombie, target);
 }
 
 
@@ -444,34 +471,8 @@ stock L4D2_CullZombie(target)
 stock L4D2_ReplaceTank(client, target)
 {
 	DebugPrintToAll("ReplaceTank being called, client %N target %N", client, target);
-
-	new Handle:ConfigFile = LoadGameConfigFile(GAMEDATA_FILENAME);
-	new Address:g_pZombieManager = GameConfGetAddress(ConfigFile, "CZombieManager");
-	if(g_pZombieManager == Address_Null)
-	{
-		LogError("Could not load the ZombieManager pointer");
-		DebugPrintToAll("Could not load the ZombieManager pointer");
-		return;
-	}
-	
 	DebugPrintToAll("ZombieManager pointer: 0x%x", g_pZombieManager);
-	
-	new Handle:MySDKCall = INVALID_HANDLE;
-	StartPrepSDKCall(SDKCall_Raw);
-	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "ReplaceTank");
-	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
-	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
-	MySDKCall = EndPrepSDKCall();
-	CloseHandle(ConfigFile);
-	
-	if (MySDKCall == INVALID_HANDLE)
-	{
-		LogError("Cant initialize ReplaceTank SDKCall");
-		DebugPrintToAll("Cant initialize ReplaceTank SDKCall");
-		return;
-	}
-	
-	SDKCall(MySDKCall, g_pZombieManager, client, target);
+	SDKCall(sdkReplaceTank, g_pZombieManager, client, target);
 }
 
 stock DebugPrintToAll(const String:format[], any:...)
