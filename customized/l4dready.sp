@@ -127,6 +127,7 @@ new Handle:cvarConnectEnabled = INVALID_HANDLE;
 new Handle:fwdOnReadyRoundRestarted = INVALID_HANDLE;
 
 new Handle:teamPlacementTrie = INVALID_HANDLE;
+new Handle:casterTrie = INVALID_HANDLE;
 
 new hookedPlayerHurt; //if we hooked player_hurt event?
 
@@ -191,6 +192,7 @@ public OnPluginStart()
 	RegConsoleCmd("sm_ready", readyUp);
 	RegConsoleCmd("sm_unready", readyDown);
 	RegConsoleCmd("sm_notready", readyDown); //alias for people who are bad at reading instructions
+	RegConsoleCmd("sm_cast", regCaster);
 	
 	RegConsoleCmd("sm_pause", readyPause);
 	RegConsoleCmd("sm_unpause", readyUnpause);
@@ -272,6 +274,7 @@ public OnPluginStart()
 	cvarGod = FindConVar("god");
 	
 	teamPlacementTrie = CreateTrie();
+	casterTrie = CreateTrie();
 	
 	HookConVarChange(cvarEnforceReady, ConVarChange_ReadyEnabled);
 	HookConVarChange(cvarReadyCompetition, ConVarChange_ReadyCompetition);
@@ -447,13 +450,20 @@ public OnClientAuthorized(client,const String:SteamID[])
 
 checkStatus()
 {
-	new humans, ready;
+	new humans, ready, team;
+	decl String:authid[96];
 	
 	//count number of non-bot players in-game
 	for (new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
 	{
-		if (IsClientConnected(i) && !IsFakeClient(i) && GetClientTeam(i) != L4D_TEAM_SPECTATE)
+		if (IsClientConnected(i) && !IsFakeClient(i))
 		{
+			team = GetClientTeam(i);
+			GetClientAuthString(i, authid, sizeof(authid));
+		
+			if (team != L4D_TEAM_SPECTATE
+			|| (team == L4D_TEAM_SPECTATE && IsClientCaster(i)))
+		
 			humans++;
 			if (readyStatus[i]) ready++;
 		}
@@ -809,6 +819,9 @@ OnNewCampaign()
 	
 	CloseHandle(teamPlacementTrie);
 	teamPlacementTrie = CreateTrie();
+	
+	CloseHandle(casterTrie);
+	casterTrie = CreateTrie();
 }
 
 public Action:Event_TankSpawn(Handle:event, const String:name[], bool:dontBroadcast)
@@ -1164,11 +1177,17 @@ public Action:Command_Say(client, args)
 		return Plugin_Continue;
 	}
 	
+	/*
 	if (client && GetClientTeam(client) == L4D_TEAM_SPECTATE)
 	{
-		Command_Teamsay(client, args);
-		return Plugin_Handled;
+		if (!IsClientCaster(client))
+		{
+			Command_Teamsay(client, args);
+			PrintHintText(client, "Spectators cannot global chat in ready modes");
+			return Plugin_Handled;
+		}
 	}
+	*/
 	
 	decl String:sayWord[MAX_NAME_LENGTH];
 	GetCmdArg(1, sayWord, sizeof(sayWord));
@@ -1191,6 +1210,13 @@ public Action:Command_Say(client, args)
 	if(idx == 1)
 	{
 		readyUp(client, args);
+		return Plugin_Handled;
+	}
+	
+	idx = StrContains(sayWord, "cast", false);
+	if(idx == 1)
+	{
+		regCaster(client, args);
 		return Plugin_Handled;
 	}
 	
@@ -1239,6 +1265,13 @@ public Action:Command_Teamsay(client, args)
 		return Plugin_Handled;
 	}
 	
+	idx = StrContains(sayWord, "cast", false);
+	if(idx == 1)
+	{
+		regCaster(client, args);
+		return Plugin_Handled;
+	}
+	
 	if (isPaused) //Do our own chat output when the game is paused
 	{
 		decl String:sText[256];
@@ -1281,7 +1314,7 @@ public Action:readyUp(client, args)
 	if (!readyMode
 	|| !client
 	|| readyStatus[client]
-	|| GetClientTeam(client) == L4D_TEAM_SPECTATE)
+	|| (GetClientTeam(client) == L4D_TEAM_SPECTATE && !IsClientCaster(client)))
 	{
 		return Plugin_Handled;
 	}
@@ -1312,7 +1345,7 @@ public Action:readyDown(client, args)
 	if (!readyMode
 	|| !client
 	|| !readyStatus[client]
-	|| GetClientTeam(client) == L4D_TEAM_SPECTATE
+	|| (GetClientTeam(client) == L4D_TEAM_SPECTATE && !IsClientCaster(client))
 	|| isCampaignBeingRestarted
 	|| insideCampaignRestart)
 	{
@@ -1330,6 +1363,24 @@ public Action:readyDown(client, args)
 	
 	return Plugin_Handled;
 }
+
+public Action:regCaster(client, args)
+{
+	if (!readyMode
+	|| !client
+	|| GetClientTeam(client) != L4D_TEAM_SPECTATE)
+	{
+		return Plugin_Handled;
+	}
+	
+	decl String:authid[96];
+	GetClientAuthString(client, authid, sizeof(authid));
+	SetTrieValue(casterTrie, authid, 1);
+	
+	ReplyToCommand(client, "You have registered as match caster, readying up will wait for you");
+	return Plugin_Handled;
+}
+
 public Action:Command_Unpause(client, args)
 {
 	if (isPaused
@@ -1368,8 +1419,8 @@ public Action:readyWho(client, args)
 	readyPlayers[0] = 0;
 	unreadyPlayers[0] = 0;
 	
-	new numPlayers = 0;
-	new numPlayers2 = 0;
+	new numPlayersRdy = 0;
+	new numPlayersNotRdy = 0;
 	
 	new i;
 	for(i = 1; i < L4D_MAXCLIENTS_PLUS1; i++) 
@@ -1381,30 +1432,30 @@ public Action:readyWho(client, args)
 			
 			if(readyStatus[i]) 
 			{
-				if(numPlayers > 0 )
+				if(numPlayersRdy > 0 )
 					StrCat(readyPlayers, 1024, ", ");
 				
 				StrCat(readyPlayers, 1024, name);
 				
-				numPlayers++;
+				numPlayersRdy++;
 			}
 			else
 			{
-				if(numPlayers2 > 0 )
+				if(numPlayersNotRdy > 0 )
 					StrCat(unreadyPlayers, 1024, ", ");
 				
 				StrCat(unreadyPlayers, 1024, name);
 				
-				numPlayers2++;
+				numPlayersNotRdy++;
 			}
 		}
 	}
 	
-	if(numPlayers == 0) 
+	if(numPlayersRdy == 0) 
 	{
 		StrCat(readyPlayers, 1024, "NONE");
 	}
-	if(numPlayers2 == 0) 
+	if(numPlayersNotRdy == 0) 
 	{
 		StrCat(unreadyPlayers, 1024, "NONE");
 	}
@@ -1432,18 +1483,27 @@ DrawReadyPanelList()
 	
 	readyPlayers[0] = 0;
 	
-	new numPlayers, numPlayers2, numPlayers3;	
+	new numPlayersRdy, numPlayersNotRdy, numPlayersSpec;	
 	new ready, unready, spec;
+	new bool:isCaster[L4D_MAXCLIENTS_PLUS1];
+	
 	for(new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++) 
 	{
 		if(IsClientInGameHuman(i)) 
 		{
-			if (GetClientTeam(i) == L4D_TEAM_SPECTATE)
+			isCaster[i] = IsClientCaster(i);
+
+			if (GetClientTeam(i) == L4D_TEAM_SPECTATE && !isCaster[i])
+			{
 				spec++;
-			if(readyStatus[i]) 
-				ready++;
+			}
 			else
-				unready++;
+			{
+				if(readyStatus[i])
+					ready++;
+				else
+					unready++;
+			}
 		}
 	}
 	
@@ -1464,8 +1524,9 @@ DrawReadyPanelList()
 				
 				if(readyStatus[i]) 
 				{
-					numPlayers++;
-					Format(readyPlayers, 1024, "->%d. %s", numPlayers, name);
+					numPlayersRdy++;
+					Format(readyPlayers, 1024, "->%d. %s%s", numPlayersRdy, name, isCaster[i] ? " [CASTER]" : "" );
+
 					DrawPanelText(panel, readyPlayers);
 					
 					#if READY_DEBUG
@@ -1488,8 +1549,9 @@ DrawReadyPanelList()
 				
 				if(!readyStatus[i]) 
 				{
-					numPlayers2++;
-					Format(readyPlayers, 1024, "->%d. %s", numPlayers2, name);
+					numPlayersNotRdy++;
+					Format(readyPlayers, 1024, "->%d. %s%s", numPlayersNotRdy, name, isCaster[i] ? " [CASTER]" : "" );
+
 					DrawPanelText(panel, readyPlayers);
 					#if READY_DEBUG
 					DrawPanelText(panel, readyPlayers);
@@ -1509,8 +1571,8 @@ DrawReadyPanelList()
 			{
 				GetClientName(i, name, sizeof(name));
 			
-				numPlayers3++;
-				Format(readyPlayers, 1024, "->%d. %s", numPlayers3, name);
+				numPlayersSpec++;
+				Format(readyPlayers, 1024, "->%d. %s", numPlayersSpec, name);
 				DrawPanelText(panel, readyPlayers);
 			}
 		}
@@ -2518,6 +2580,18 @@ SaveSpectators()
 	}
 }
 
+bool:IsClientCaster(client)
+{
+	decl String:authid[96];
+	new dummy;
+	GetClientAuthString(client, authid, sizeof(authid));
+	
+	if (GetTrieValue(casterTrie, authid, dummy))
+		return true;
+		
+	return false;
+}
+
 /*
 * Return the opposite team of that the client is on
 */
@@ -3184,14 +3258,18 @@ public Action:UnPauseCountDown(Handle:timer, Handle:pack)
 		isUnpausing = false;
 		Countdown = L4D_UNPAUSE_DELAY-1;
 		UnpauseGame(ReadPackCell(pack));
+		
 		return Plugin_Stop;
 	}
+	
 	PrintToChatAll("Game is going live in %d seconds...", Countdown);
 	if (Countdown >= L4D_UNPAUSE_DELAY-1 || !isUnpausing)
 		isUnpausing = true;
 	Countdown--;
+	
 	return Plugin_Continue;
 }
+
 UnpauseGameDelay(client)
 {
 	isUnpausing = true;
@@ -3200,6 +3278,7 @@ UnpauseGameDelay(client)
 	//WritePackCell(pack, RoundToCeil(GetGameTime()));
 	WritePackCell(pack, client);
 }
+
 public Action:AllCanUnpause(Handle:timer)
 {
 	if (isPaused)
@@ -3209,6 +3288,7 @@ public Action:AllCanUnpause(Handle:timer)
 	}
 	return Plugin_Stop;
 }
+
 public Action:readyPause(client, args)
 {
 	//server can pause without a request

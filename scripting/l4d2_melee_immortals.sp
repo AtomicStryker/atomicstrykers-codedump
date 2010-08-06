@@ -3,18 +3,40 @@
 #include <sdktools>
 #include <left4downtown>
 
-#define PLUGIN_VERSION 						  "1.0.0"
+#define PLUGIN_VERSION 						  "1.0.1"
 
 #define TEST_DEBUG 		0
 #define TEST_DEBUG_LOG 	0
 
 
 static const String:ENTPROP_ZOMBIE_CLASS[] 	= "m_zombieClass";
-static const ZOMBIE_CLASS_BOOMER			= 2;
 static const L4D2_TEAM_SURVIVORS			= 2;
 static const L4D2_TEAM_INFECTED				= 3;
 
+/*
+enum SI_ZOMBIE_CLASSES
+{
+	CLASS_SMOKER = 1,
+	CLASS_BOOMER = 2,
+	CLASS_HUNTER = 3,
+	CLASS_SPITTER = 4,
+	CLASS_JOCKEY = 5
+}
+*/
+
+enum SI_FLAGS
+{
+	FLAG_SMOKER = 1,
+	FLAG_BOOMER = 2,
+	FLAG_HUNTER	= 4,
+	FLAG_SPITTER = 8,
+	FLAG_JOCKEY	= 16
+}
+
+static flag[SI_FLAGS];
+
 static Handle:cvarisEnabled					= INVALID_HANDLE;
+static Handle:cvarFlags						= INVALID_HANDLE;
 static bool:isEnabled						= true;
 
 
@@ -29,9 +51,10 @@ public Plugin:myinfo =
 
 public OnPluginStart()
 {
-	CreateConVar(					"l4d2_melee_immortals_version", PLUGIN_VERSION, " L4D2 Melee Immortals Plugin Version ", 	FCVAR_PLUGIN|FCVAR_REPLICATED|FCVAR_DONTRECORD);
-	cvarisEnabled = CreateConVar(	"l4d2_melee_immortals_enabled", "1", 			" Turn Melee Immortals on and off ", 		FCVAR_PLUGIN|FCVAR_REPLICATED);
-	
+	CreateConVar(					"l4d2_melee_immortals_version", PLUGIN_VERSION, " L4D2 Melee Immortals Plugin Version ", 														FCVAR_PLUGIN|FCVAR_REPLICATED|FCVAR_DONTRECORD);
+	cvarFlags =		CreateConVar(	"l4d2_melee_immortals_flags", 	"31", 			" binary flag of immortal SI. 1 = smoker, 2 = boomer, 4 = hunter, 8 = spitter, 16 = jockey", 	FCVAR_PLUGIN | FCVAR_NOTIFY);
+	cvarisEnabled = CreateConVar(	"l4d2_melee_immortals_enabled", "1", 			" Turn Melee Immortals on and off ", 															FCVAR_PLUGIN|FCVAR_REPLICATED);
+
 	HookConVarChange(cvarisEnabled, _cvarChange);
 	
 	isEnabled = GetConVarBool(cvarisEnabled);
@@ -51,7 +74,7 @@ public Action:L4D_OnShovedBySurvivor(attacker, client, const Float:vector[3])
 	|| !IsClientInGame(attacker)
 	|| GetClientTeam(client) != L4D2_TEAM_INFECTED
 	|| GetClientTeam(attacker) != L4D2_TEAM_SURVIVORS
-	|| GetEntProp(client, Prop_Send, ENTPROP_ZOMBIE_CLASS) == ZOMBIE_CLASS_BOOMER)
+	|| !(GetSIFlag(client) & GetConVarInt(cvarFlags)))
 	{
 		return Plugin_Continue;
 	}
@@ -61,6 +84,11 @@ public Action:L4D_OnShovedBySurvivor(attacker, client, const Float:vector[3])
 	L4D_StaggerPlayer(client, attacker, NULL_VECTOR);
 
 	return Plugin_Handled;
+}
+
+static GetSIFlag(client)
+{
+	return flag[GetEntProp(client, Prop_Send, ENTPROP_ZOMBIE_CLASS)];
 }
 
 stock DebugPrintToAll(const String:format[], any:...)
