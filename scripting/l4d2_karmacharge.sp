@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION 						  "1.0.4"
+#define PLUGIN_VERSION 						  "1.0.5"
 
 #define TEST_DEBUG 		0
 #define TEST_DEBUG_LOG 	0
@@ -98,6 +98,8 @@ public Action:_timer_Check(Handle:timer, any:client)
 		return Plugin_Stop;
 	}
 	
+	if (GetEntityFlags(client) & FL_ONGROUND) return Plugin_Continue;
+	
 	new Float:height = GetHeightAboveGround(client);
 	
 	DebugPrintToAll("Karma Check - Charger Height is now: %f", height);
@@ -146,17 +148,14 @@ static AnnounceKarmaCharge(client)
 {
 	EmitSoundToAll(SOUND_EFFECT, client);
 	
-	if (GetConVarBool(cvarModeSwitch))
+	new victim = GetCarryVictim(client);
+	if (victim == -1) return;
+	
+	GetConVarBool(cvarModeSwitch) ? SlowChargeCouple(client) : SlowTime();
+	
+	if (GetConVarBool(cvarNotify))
 	{
-		SlowChargeCouple(client);
-	}
-	else
-	{
-		SlowTime();
-		if (GetConVarBool(cvarNotify))
-		{
-			PrintToChatAll("\x03%N\x01 did a Karma Charge, for great justice!!", client);
-		}
+		PrintToChatAll("\x03%N\x01 Karma Charge'd %N, for great justice!!", client, victim);
 	}
 }
 

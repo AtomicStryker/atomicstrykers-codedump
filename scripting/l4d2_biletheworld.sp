@@ -3,7 +3,7 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define PLUGIN_VERSION "1.0.2"
+#define PLUGIN_VERSION "1.0.3"
 
 #define STRINGLENGTH_CLASSES				  64
 
@@ -112,8 +112,7 @@ static VomitSplash(bool:BoomerDeath, Float:pos[3])
 		new maxents = GetMaxEntities();
 		for (new i = MaxClients+1; i <= maxents; i++)
 		{
-			if (!IsValidEntity(i)) continue;
-			
+			if (!IsValidEdict(i)) continue;
 			GetEdictClassname(i, class, sizeof(class));
 			
 			if (!StrEqual(class, CLASS_ZOMBIE)

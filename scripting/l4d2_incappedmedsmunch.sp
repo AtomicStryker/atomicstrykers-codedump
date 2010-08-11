@@ -4,8 +4,8 @@
 
 #define PLUGIN_VERSION "1.1.4"
 
-#define TEST_DEBUG			1
-#define TEST_DEBUG_LOG		1
+#define TEST_DEBUG			0
+#define TEST_DEBUG_LOG		0
 
 static const TEAM_SURVIVORS						= 2;
 static const PILLS_ADRENALINE_SLOT				= 4;
@@ -226,9 +226,8 @@ static InterruptMunch(client)
 	if (MunchTimer[client] != INVALID_HANDLE)
 	{
 		KillTimer(MunchTimer[client]);
+		MunchTimer[client] = INVALID_HANDLE;
 	}
-	
-	MunchTimer[client] = INVALID_HANDLE;
 	
 	if (GetConVarBool(DropCVAR))
 	{
@@ -439,8 +438,8 @@ stock DebugPrintToAll(const String:format[], any:...)
 	VFormat(buffer, sizeof(buffer), format, 2);
 	
 	#if TEST_DEBUG
-	PrintToChatAll("[GUNCONTROL] %s", buffer);
-	PrintToConsole(0, "[GUNCONTROL] %s", buffer);
+	PrintToChatAll("[MEDMUNCH] %s", buffer);
+	PrintToConsole(0, "[MEDMUNCH] %s", buffer);
 	#endif
 	
 	LogMessage("%s", buffer);
