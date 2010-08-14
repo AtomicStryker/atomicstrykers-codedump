@@ -2,29 +2,28 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.1.4"
+#define PLUGIN_VERSION		"1.1.5"
 
-#define TEST_DEBUG			0
-#define TEST_DEBUG_LOG		0
 
+#define STRING_LENGTH		32
 static const TEAM_SURVIVORS						= 2;
 static const PILLS_ADRENALINE_SLOT				= 4;
 static const PASS_PILLS_MINIMUM_DISTANCE		= 200;
 
-new bool:buttondelay[MAXPLAYERS+1];
-new bool:IsBeingPwnt[MAXPLAYERS+1];
-new bool:IsBeingRevived[MAXPLAYERS+1];
-new bool:IncapDelay[MAXPLAYERS+1];
 
-new bool:CanUsePills;
-new bool:DelayedAdvertise[MAXPLAYERS+1];
+static Handle:MunchTimer[MAXPLAYERS+1]; //if run through, revives the player. gets aborted by button or hurt event
+static bool:buttondelay[MAXPLAYERS+1];
+static bool:IncapDelay[MAXPLAYERS+1];
+static bool:DelayedAdvertise[MAXPLAYERS+1];
+static bool:IsMunchingMed[MAXPLAYERS+1]; //lets the hooks find the players they need to check up
 
-new Handle:DelaySetting = INVALID_HANDLE;
-new Handle:DropCVAR = INVALID_HANDLE;
+static Handle:DelaySetting = INVALID_HANDLE;
+static Handle:DropCVAR = INVALID_HANDLE;
+static Handle:DurationCVAR = INVALID_HANDLE;
+static Handle:sdkRevive = INVALID_HANDLE;
+static bool:InRound = false;
 
-new Handle:DurationCVAR = INVALID_HANDLE;
-new bool:IsMunchingMed[MAXPLAYERS+1]; //lets the hooks find the players they need to check up
-new Handle:MunchTimer[MAXPLAYERS+1]; //if run through, revives the player. gets aborted by button or hurt event
+static String:GrabProps[4][STRING_LENGTH+1];
 
 
 public Plugin:myinfo = 
@@ -38,47 +37,60 @@ public Plugin:myinfo =
 
 public OnPluginStart()
 {
+	PrepSDKCall();
+	InitArray();
+	
 	CreateConVar("l4d2_incappedmedsmunch_version", PLUGIN_VERSION, " Version of L4D2 Incapped Meds Munch on this server ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_DONTRECORD);
-
+	
 	DelaySetting = CreateConVar("l4d2_incappedmedsmunch_delaytime", "5.0", " How long before an Incapped Survivor can use meds ", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	DurationCVAR = CreateConVar("l4d2_incappedmedsmunch_duration", "3.0", " How long do you need for reviving yourself ", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	DropCVAR = CreateConVar("l4d2_incappedmedsmunch_dropmeds", "1", " Does being interrupted cause you to drop meds ", FCVAR_PLUGIN|FCVAR_NOTIFY);
-
+	
 	AutoExecConfig(true, "l4d2_incappedmedsmunch");
-
+	
+	HookEvent("player_hurt", Event_PlayerHurt);
 	HookEvent("player_incapacitated", Event_Incap);
 	
-	HookEvent("lunge_pounce", Event_StartPwn);
-	HookEvent("pounce_stopped", Event_EndPwn);
-	HookEvent("tongue_grab", Event_StartPwn);
-	HookEvent("tongue_release", Event_EndPwn);
-	
-	HookEventEx("jockey_ride", Event_StartPwn);
-	HookEventEx("jockey_ride_end", Event_EndPwn);
-	HookEventEx("charger_carry_start", Event_StartPwn);
-	HookEventEx("charger_carry_end", Event_EndPwn);
-	HookEventEx("charger_pummel_start", Event_StartPwn);
-	HookEventEx("charger_pummel_end", Event_EndPwn);
-	
-	HookEvent("revive_begin", Event_StartRevive, EventHookMode_Pre);
-	HookEvent("revive_end", Event_EndRevive);
-	HookEvent("revive_success", Event_EndRevive);
-	
+	HookEvent("round_start", RoundStart);
 	HookEvent("round_start", Event_RoundChange);
 	HookEvent("round_end", Event_RoundChange);
-	
-	HookEvent("player_spawn", UnPwnUserid);
-	HookEvent("player_death", UnPwnUserid);
-	HookEvent("player_connect_full", UnPwnUserid);
-	HookEvent("player_disconnect", UnPwnUserid);
-	
 	HookEvent("round_end", RoundEnd);
 	HookEvent("mission_lost", RoundEnd);
 	HookEvent("finale_win", RoundEnd);
+}
+
+static InitArray()
+{
+	strcopy(GrabProps[0], STRING_LENGTH, "m_tongueOwner");
+	strcopy(GrabProps[1], STRING_LENGTH, "m_pounceAttacker");
+	strcopy(GrabProps[2], STRING_LENGTH, "m_jockeyAttacker");
+	strcopy(GrabProps[3], STRING_LENGTH, "m_pummelAttacker");
+}
+
+static PrepSDKCall()
+{
+	new Handle:config = LoadGameConfigFile("l4d2medsmunch");
 	
-	HookEvent("round_start", RoundStart);
+	if (config == INVALID_HANDLE)
+	{
+		SetFailState("Cant load medsmunch gamedata file");
+	}
+
+	StartPrepSDKCall(SDKCall_Player);
 	
-	HookEvent("player_hurt", Event_PlayerHurt);
+	if (!PrepSDKCall_SetFromConf(config, SDKConf_Signature, "CTerrorPlayer_OnRevived"))
+	{
+		CloseHandle(config);
+		SetFailState("Cant find CTerrorPlayer_OnRevived Signature in gamedata file");
+	}
+	
+	CloseHandle(config);
+	sdkRevive = EndPrepSDKCall();
+
+	if (sdkRevive == INVALID_HANDLE)
+	{
+		SetFailState("Cant initialize CTerrorPlayer_OnRevived SDKCall, Signature broken");
+	}
 }
 
 public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:angles[3], &weapon)
@@ -87,7 +99,7 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 	{
 		if (GetClientTeam(client)!=TEAM_SURVIVORS) return Plugin_Continue;
 		if (!IsPlayerIncapped(client)) return Plugin_Continue;
-		if (!CanUsePills) return Plugin_Continue;
+		if (!InRound) return Plugin_Continue;
 		if (IncapDelay[client]) return Plugin_Continue;
 		
 		// Whoever pressed USE must be valid, connected, ingame, Survivor and Incapped
@@ -96,14 +108,14 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 		CreateTimer(1.0, ResetDelay, client);
 		
 		// Check for an Infected making love to you first.
-		if (IsBeingPwnt[client])
+		if (IsBeingPwnt(client))
 		{
 			PrintToChat(client, "\x04Get that Infected off you first.");
 			return Plugin_Continue;
 		}
 		
 		// Check for the Survivor Pendant
-		if (IsBeingRevived[client])
+		if (IsBeingRevived(client))
 		{
 			PrintToChat(client, "\x04You're being revived already.");
 			return Plugin_Continue;
@@ -167,21 +179,15 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 			return Plugin_Continue;
 		}
 		
-		if (IsValidEntity(Meds))
+		if (IsValidEdict(Meds))
 		{
-			DebugPrintToAll("Trying to remove %N's %s, entid", client, medstring, Meds);
 			RemovePlayerItem(client, Meds);
 		}
-		if (IsValidEntity(Meds))
-		{
-			DebugPrintToAll("First Remove Failed, RemovePlayerItem broken, trying RemoveEdict now");
-			RemoveEdict(Meds);
-		}
 		
-		if (StrEqual(medstring, "weapon_pain_pills", false)) CheatCommand(target, "give", "pain_pills", "");
-		else if (StrEqual(medstring, "weapon_adrenaline", false)) CheatCommand(target, "give", "adrenaline", "");
+		if (StrEqual(medstring, "weapon_pain_pills", false)) CheatCommand(target, "give", "pain_pills");
+		else if (StrEqual(medstring, "weapon_adrenaline", false)) CheatCommand(target, "give", "adrenaline");
 		
-		FakeClientCommand(target, "vocalize PlayerThanks");
+		//FakeClientCommand(target, "vocalize PlayerThanks");
 		
 		PrintToChatAll("\x04%N\x01 passed meds to the incapped \x04%N\x01!", client, target);
 	}
@@ -199,12 +205,15 @@ public Action:AdvertisePills(Handle:timer, any:client)
 	IncapDelay[client] = false;
 	DelayedAdvertise[client] = false;
 	
-	if (!client) return;
-	if (!IsClientInGame(client)) return;
-	if (GetClientTeam(client)!=TEAM_SURVIVORS) return;
-	if (!IsPlayerIncapped(client)) return;
+	if (client < 1
+	|| !IsClientInGame(client)
+	|| GetClientTeam(client) != TEAM_SURVIVORS
+	|| !IsPlayerIncapped(client))
+	{
+		return;
+	}
 	
-	if (IsBeingPwnt[client] || IsBeingRevived[client])
+	if (IsBeingPwnt(client) || IsBeingRevived(client))
 	{
 		DelayedAdvertise[client] = true;
 		return;
@@ -236,7 +245,7 @@ static InterruptMunch(client)
 		decl String:medstring[256];
 		GetEdictClassname(Meds, medstring, sizeof(medstring));
 		
-		if (IsValidEntity(Meds))
+		if (IsValidEdict(Meds))
 		{
 			RemovePlayerItem(client, Meds);
 		}
@@ -286,45 +295,87 @@ public Event_PlayerHurt(Handle:event, const String:name[], bool:dontBroadcast)
 
 public Action:MunchFinished(Handle:timer, any:client)
 {
-	KillProgressBar(client);
 	IsMunchingMed[client] = false;
 	MunchTimer[client] = INVALID_HANDLE;
 	
 	ReviveClient(client);
+	KillProgressBar(client);
 }
 
 static ReviveClient(client)
 {
 	new Meds = GetPlayerWeaponSlot(client, PILLS_ADRENALINE_SLOT);
-	if (IsValidEntity(Meds))
+	if (IsValidEdict(Meds))
 	{
 		RemovePlayerItem(client, Meds);
 	}
 	
 	PrintToChatAll("\x04%N\x01 used his \x04pills/adrenaline\x01 and revived himself!", client);
 	
-	new propincapcounter = FindSendPropInfo("CTerrorPlayer", "m_currentReviveCount");
-	new count = GetEntData(client, propincapcounter, 1);
+	SDKCall(sdkRevive, client);
+	
+	SetEntityMoveType(client, MOVETYPE_WALK);
+	//ReviveWorkAround(client);
+}
+
+/*
+static ReviveWorkAround(client)
+{
+	new count = GetEntProp(client, Prop_Send, "m_currentReviveCount");
 	count++;
 	
-	CheatCommand(client, "give", "health", "");
+	CheatCommand(client, "give", "health");
 	
-	SetEntData(client, propincapcounter, count, 1);
+	SetEntProp(client, Prop_Send, "m_currentReviveCount", count);
 	
-	new Handle:revivehealth = FindConVar("survivor_revive_health"); // set health nicely according to convar.
-	CreateTimer(0.1, SetHP1, client); // set hard health delayed, like tPoncho in Perkmod
-	new temphpoffset = FindSendPropOffs("CTerrorPlayer","m_healthBuffer");
-	SetEntDataFloat(client, temphpoffset, GetConVarFloat(revivehealth), true);
+	CreateTimer(0.1, SetHP1, client); // set hard health delayed
+	SetEntPropFloat(client, Prop_Send, "m_healthBuffer", GetConVarFloat(FindConVar("survivor_revive_health")));
 }
 
 public Action:SetHP1(Handle:timer, any:client)
 {
 	SetEntityHealth(client, 1);
 }
+*/
 
 stock bool:IsPlayerIncapped(client)
 {
-	if (GetEntProp(client, Prop_Send, "m_isIncapacitated", 1) && (GetEntProp(client, Prop_Send, "m_isHangingFromLedge") != 1)) return true;
+	if (GetEntProp(client, Prop_Send, "m_isIncapacitated", 1)
+	&& (GetEntProp(client, Prop_Send, "m_isHangingFromLedge") != 1))
+	{
+		return true;
+	}
+	
+	return false;
+}
+
+stock bool:IsBeingRevived(client)
+{
+	return IsValidClient(GetEntPropEnt(client, Prop_Send, "m_reviveOwner"));
+}
+
+static bool:IsBeingPwnt(client)
+{
+	for (new i = 0; i < sizeof(GrabProps); i++)
+	{
+		if (IsValidClient(GetEntPropEnt(client, Prop_Send, GrabProps[i])))
+		{
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+stock bool:IsValidClient(client)
+{
+	if (client > 0)
+	{
+		if (IsClientInGame(client))
+		{
+			return true;
+		}
+	}
 	return false;
 }
 
@@ -339,16 +390,16 @@ stock KillProgressBar(client)
 {
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarStartTime", GetGameTime());
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarDuration", 0.0);
-	SetEntPropEnt(client, Prop_Send, "m_reviveOwner", 0);
+	SetEntPropEnt(client, Prop_Send, "m_reviveOwner", -1);
 }
 
-stock CheatCommand(client, String:command[], String:parameter1[], String:parameter2[])
+stock CheatCommand(client, const String:command[], const String:args[] = "")
 {
 	new userflags = GetUserFlagBits(client);
-	SetUserFlagBits(client, ADMFLAG_ROOT);
+	if (!(userflags & ADMFLAG_ROOT)) SetUserFlagBits(client, ADMFLAG_ROOT);
 	new flags = GetCommandFlags(command);
 	SetCommandFlags(command, flags & ~FCVAR_CHEAT);
-	FakeClientCommand(client, "%s %s %s", command, parameter1, parameter2);
+	FakeClientCommand(client, "%s %s", command, args);
 	SetCommandFlags(command, flags);
 	SetUserFlagBits(client, userflags);
 }
@@ -359,9 +410,8 @@ public Event_RoundChange (Handle:event, const String:name[], bool:dontBroadcast)
 {
 	for (new i=1 ; i<=MaxClients ; i++)
 	{
-		IsBeingPwnt[i] = false;
+		IsMunchingMed[i] = false;
 		
-		if (IsMunchingMed[i]) IsMunchingMed[i] = false;
 		if (MunchTimer[i] != INVALID_HANDLE)
 		{
 			KillTimer(MunchTimer[i]);
@@ -372,55 +422,17 @@ public Event_RoundChange (Handle:event, const String:name[], bool:dontBroadcast)
 
 public OnMapStart()
 {
-	CanUsePills = true;
-}
-
-public Event_StartPwn (Handle:event, const String:name[], bool:dontBroadcast)
-{
-	new victim = GetClientOfUserId(GetEventInt(event, "victim"));
-	if (!victim) return;
-	IsBeingPwnt[victim] = true;
-}
-
-public Event_StartRevive (Handle:event, const String:name[], bool:dontBroadcast)
-{
-	new client = GetClientOfUserId(GetEventInt(event, "subject"));
-	if (!client) return;
-	IsBeingRevived[client] = true;
-	if (IsMunchingMed[client]) InterruptMunch(client);
-}
-
-public Event_EndPwn (Handle:event, const String:name[], bool:dontBroadcast)
-{
-	new victim = GetClientOfUserId(GetEventInt(event, "victim"));
-	if (!victim) return;
-	IsBeingPwnt[victim] = false;
-}
-
-public Event_EndRevive (Handle:event, const String:name[], bool:dontBroadcast)
-{
-	new client = GetClientOfUserId(GetEventInt(event, "subject"));
-	if (!client) return;
-	IsBeingRevived[client] = false;
-	if (DelayedAdvertise[client]) CreateTimer(1.0, AdvertisePills, client);
-}
-
-public UnPwnUserid (Handle:event, const String:name[], bool:dontBroadcast)
-{
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	if (!client) return;
-	IsBeingPwnt[client] = false;
-	if (DelayedAdvertise[client]) CreateTimer(1.0, AdvertisePills, client);
+	InRound = true;
 }
 
 public Action:RoundEnd(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	CanUsePills = false;
+	InRound = false;
 }
 
 public Action:RoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	CanUsePills = true;
+	InRound = true;
 }
 
 public Event_Incap(Handle:event, const String:name[], bool:dontBroadcast)
@@ -428,26 +440,4 @@ public Event_Incap(Handle:event, const String:name[], bool:dontBroadcast)
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	IncapDelay[client] = true;
 	CreateTimer(GetConVarFloat(DelaySetting), AdvertisePills, client);
-}
-
-stock DebugPrintToAll(const String:format[], any:...)
-{
-	#if (TEST_DEBUG || TEST_DEBUG_LOG)
-	decl String:buffer[256];
-	
-	VFormat(buffer, sizeof(buffer), format, 2);
-	
-	#if TEST_DEBUG
-	PrintToChatAll("[MEDMUNCH] %s", buffer);
-	PrintToConsole(0, "[MEDMUNCH] %s", buffer);
-	#endif
-	
-	LogMessage("%s", buffer);
-	#else
-	//suppress "format" never used warning
-	if(format[0])
-		return;
-	else
-		return;
-	#endif
 }
