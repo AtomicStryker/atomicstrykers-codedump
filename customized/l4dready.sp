@@ -19,7 +19,7 @@
 #define READY_DEBUG 0
 #define READY_DEBUG_LOG 0
 
-#define READY_VERSION "0.17.4"
+#define READY_VERSION "0.17.5"
 #define READY_SCAVENGE_WARMUP 1
 #define READY_LIVE_COUNTDOWN 5
 #define READY_UNREADY_HINT_PERIOD 10.0
@@ -28,15 +28,17 @@
 #define READY_RESTART_MAP_DELAY 5.0
 #define READY_RESTART_SCAVENGE_TIMER 0.1
 
-#define READY_VERSION_REQUIRED_SOURCEMOD "1.3.0"
+#define READY_VERSION_REQUIRED_SOURCEMOD "1.3.4"
 #define READY_VERSION_REQUIRED_SOURCEMOD_NONDEV 0 //1 dont allow -dev version, 0 ignore -dev version
-#define READY_VERSION_REQUIRED_LEFT4DOWNTOWN "0.4.7"
+#define READY_VERSION_REQUIRED_LEFT4DOWNTOWN "0.5.2"
 
 #define L4D_MAXCLIENTS (MaxClients)
 #define L4D_MAXCLIENTS_PLUS1 (MaxClients+1)
 #define L4D_TEAM_SURVIVORS 2
 #define L4D_TEAM_INFECTED 3
 #define L4D_TEAM_SPECTATE 1
+
+#define CONVAR_FLAGS_PLUGIN FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY
 
 #define L4D_SCAVENGE_GAMECLOCK_HALT (-1.0)
 
@@ -75,11 +77,6 @@
 new bool:painPillHolders[256];
 #endif
 
-/*
-* TEST - should be fixed: the "error more than 1 witch spawned in a single round"
-*  keeps being printed
-* even though there isnt an extra witch being spawned or w/e
-*/
 enum PersistentTeam
 {
 	PersistentTeam_Invalid,
@@ -104,30 +101,41 @@ new bool:beforeMapStart = true;
 new forcedStart;
 new readyStatus[MAXPLAYERS + 1];
 
-new Handle:menuPanel = INVALID_HANDLE;
+new Handle:menuPanel 					= INVALID_HANDLE;
 
-new Handle:liveTimer;
-new bool:unreadyTimerExists;
+new Handle:liveTimer 					= INVALID_HANDLE;
+new bool:unreadyTimerExists				= false;
 
-new Handle:cvarEnforceReady = INVALID_HANDLE;
-new Handle:cvarReadyCompetition = INVALID_HANDLE;
-new Handle:cvarReadyMinimum = INVALID_HANDLE;
-new Handle:cvarReadyHalves = INVALID_HANDLE;
-new Handle:cvarReadyServerCfg = INVALID_HANDLE;
-new Handle:cvarReadySearchKeyDisable = INVALID_HANDLE;
-new Handle:cvarSearchKey = INVALID_HANDLE;
-new Handle:cvarGameMode = INVALID_HANDLE;
-new Handle:cvarScavengeSetup = INVALID_HANDLE;
-new Handle:cvarGod = INVALID_HANDLE;
-new Handle:cvarCFGName = INVALID_HANDLE;
-new Handle:cvarPausesAllowed = INVALID_HANDLE;
-new Handle:cvarPauseDuration = INVALID_HANDLE;
-new Handle:cvarConnectEnabled = INVALID_HANDLE;
+new Handle:cvarEnforceReady 			= INVALID_HANDLE;
+new Handle:cvarReadyCompetition 		= INVALID_HANDLE;
+new Handle:cvarReadyMinimum 			= INVALID_HANDLE;
+new Handle:cvarReadyHalves 				= INVALID_HANDLE;
+new Handle:cvarReadyServerCfg 			= INVALID_HANDLE;
+new Handle:cvarReadySearchKeyDisable 	= INVALID_HANDLE;
+new Handle:cvarSearchKey				= INVALID_HANDLE;
+new Handle:cvarGameMode 				= INVALID_HANDLE;
+new Handle:cvarScavengeSetup 			= INVALID_HANDLE;
+new Handle:cvarGod 						= INVALID_HANDLE;
+new Handle:cvarCFGName 					= INVALID_HANDLE;
+new Handle:cvarPausesAllowed 			= INVALID_HANDLE;
+new Handle:cvarPauseDuration 			= INVALID_HANDLE;
+new Handle:cvarConnectEnabled 			= INVALID_HANDLE;
+new Handle:cvarBlockSpecGlobalChat 		= INVALID_HANDLE;
 
-new Handle:fwdOnReadyRoundRestarted = INVALID_HANDLE;
+new Handle:cvarDirectorNoBosses 		= INVALID_HANDLE;
+new Handle:cvarDirectorNoSpecials 		= INVALID_HANDLE;
+new Handle:cvarDirectorNoMobs 			= INVALID_HANDLE;
+new Handle:cvarDirectorReadyDuration 	= INVALID_HANDLE;
+new				DirectorReadyDuration 	= -1;
+new Handle:cvarZCommonLimit 			= INVALID_HANDLE;
+new				ZCommonLimit 			= -1;
+new Handle:cvarZMegaMobSize 			= INVALID_HANDLE;
+new				ZMegaMobSize 			= -1;
 
-new Handle:teamPlacementTrie = INVALID_HANDLE;
-new Handle:casterTrie = INVALID_HANDLE;
+new Handle:fwdOnReadyRoundRestarted 	= INVALID_HANDLE;
+
+new Handle:teamPlacementTrie 			= INVALID_HANDLE;
+new Handle:casterTrie 					= INVALID_HANDLE;
 
 new hookedPlayerHurt; //if we hooked player_hurt event?
 
@@ -164,7 +172,7 @@ new teamPlacementAttempts[256]; //how many times we attempt and fail to place a 
 public Plugin:myinfo =
 {
 	name = "L4D2 Ready Up",
-	author = "Downtown1 and Frustian, some fixes by AtomicStryker",
+	author = "Downtown1 and Frustian, continued by AtomicStryker",
 	description = "Force Players to Ready Up Before Beginning Match",
 	version = READY_VERSION,
 	url = "http://forums.alliedmods.net/showthread.php?t=84086"
@@ -249,29 +257,34 @@ public OnPluginStart()
 	HookEvent("vote_started", eventVoteStarted);
 	HookEvent("vote_passed", eventVotePassed);
 	HookEvent("vote_ended", eventVoteEnded);
-	
-	new Handle:NoBosses = FindConVar("director_no_bosses");
-	HookConVarChange(NoBosses, ConVarChange_DirectorNoBosses);
 	#endif
 	
 	fwdOnReadyRoundRestarted = CreateGlobalForward("OnReadyRoundRestarted", ET_Event);
 	
-	CreateConVar("l4d_ready_version", READY_VERSION, "Version of the ready up plugin.", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
-	cvarEnforceReady = CreateConVar("l4d_ready_enabled", "0", "Make players ready up before a match begins", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
-	cvarReadyCompetition = CreateConVar("l4d_ready_competition", "0", "Disable all plugins but a few competition-allowed ones", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
-	cvarReadyHalves = CreateConVar("l4d_ready_both_halves", "0", "Make players ready up both during the first and second rounds of a map", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
-	cvarReadyMinimum = CreateConVar("l4d_ready_minimum_players", "8", "Minimum # of players before we can ready up", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
-	cvarReadyServerCfg = CreateConVar("l4d_ready_server_cfg", "", "Config to execute when the map is changed (to exec after server.cfg).", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
-	cvarReadySearchKeyDisable = CreateConVar("l4d_ready_search_key_disable", "1", "Automatically disable plugin if sv_search_key is blank", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
-	cvarCFGName = CreateConVar("l4d_ready_cfg_name", "", "CFG Name to display on the RUP Menu", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
-	cvarPausesAllowed = CreateConVar("l4d_ready_pause_allowed", "3", "Number of times each team can pause per campaign", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
-	cvarPauseDuration = CreateConVar("l4d_ready_pause_duration", "90.0", "Minimum duration of pause in seconds before either team can unpause", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
-	cvarConnectEnabled = CreateConVar("l4d_ready_connect_enabled", "1", "Show Announcements When Players Join", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
+	CreateConVar("l4d_ready_version", READY_VERSION, "Version of the ready up plugin.", CONVAR_FLAGS_PLUGIN|FCVAR_DONTRECORD);
+	cvarEnforceReady = CreateConVar("l4d_ready_enabled", "0", "Make players ready up by default before a match begins", CONVAR_FLAGS_PLUGIN);
+	cvarReadyCompetition = CreateConVar("l4d_ready_competition", "0", "Disable all plugins but a few competition-allowed ones", CONVAR_FLAGS_PLUGIN);
+	cvarReadyHalves = CreateConVar("l4d_ready_both_halves", "0", "Make players ready up both during the first and second rounds of a map", CONVAR_FLAGS_PLUGIN);
+	cvarReadyMinimum = CreateConVar("l4d_ready_minimum_players", "8", "Minimum # of players before we can ready up", CONVAR_FLAGS_PLUGIN);
+	cvarReadyServerCfg = CreateConVar("l4d_ready_server_cfg", "", "Config to execute when the map is changed (to exec after server.cfg).", CONVAR_FLAGS_PLUGIN);
+	cvarReadySearchKeyDisable = CreateConVar("l4d_ready_search_key_disable", "1", "Automatically disable plugin if sv_search_key is blank", CONVAR_FLAGS_PLUGIN);
+	cvarCFGName = CreateConVar("l4d_ready_cfg_name", "", "CFG Name to display on the RUP Menu", CONVAR_FLAGS_PLUGIN);
+	cvarPausesAllowed = CreateConVar("l4d_ready_pause_allowed", "3", "Number of times each team can pause per campaign", CONVAR_FLAGS_PLUGIN);
+	cvarPauseDuration = CreateConVar("l4d_ready_pause_duration", "90.0", "Minimum duration of pause in seconds before either team can unpause", CONVAR_FLAGS_PLUGIN);
+	cvarConnectEnabled = CreateConVar("l4d_ready_connect_enabled", "1", "Show Announcements When Players Join", CONVAR_FLAGS_PLUGIN);
+	cvarBlockSpecGlobalChat = CreateConVar("l4d_block_spectator_globalchat", "0", "Prevent non-caster Spectators from global chatting, it gets redirected to teamchat", CONVAR_FLAGS_PLUGIN);
 	
 	cvarSearchKey = FindConVar("sv_search_key");
 	cvarGameMode = FindConVar("mp_gamemode");
 	cvarScavengeSetup = FindConVar("scavenge_round_setup_time");
 	cvarGod = FindConVar("god");
+	
+	cvarDirectorNoBosses 		= FindConVar("director_no_bosses");
+	cvarDirectorNoSpecials 		= FindConVar("director_no_specials");
+	cvarDirectorNoMobs 			= FindConVar("director_no_mobs");
+	cvarDirectorReadyDuration 	= FindConVar("director_ready_duration");
+	cvarZMegaMobSize 			= FindConVar("z_mega_mob_size");
+	cvarZCommonLimit 			= FindConVar("z_common_limit");
 	
 	teamPlacementTrie = CreateTrie();
 	casterTrie = CreateTrie();
@@ -293,7 +306,7 @@ public OnPluginStart()
 	fTOB = EndPrepSDKCall();
 	
 	#if HEALTH_BONUS_FIX
-	CreateConVar("l4d_eb_health_bonus", EBLOCK_VERSION, "Version of the Health Bonus Exploit Blocker", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_REPLICATED);
+	CreateConVar("l4d_eb_health_bonus", EBLOCK_VERSION, "Version of the Health Bonus Exploit Blocker", CONVAR_FLAGS_PLUGIN|FCVAR_REPLICATED);
 	
 	HookEvent("item_pickup", Event_ItemPickup);	
 	HookEvent("pills_used", Event_PillsUsed);
@@ -308,6 +321,13 @@ public OnPluginStart()
 	#endif
 	#endif
 	
+}
+
+public OnConfigsExecuted()
+{
+	DirectorReadyDuration 	= GetConVarInt(cvarDirectorReadyDuration);
+	ZCommonLimit 			= GetConVarInt(cvarZCommonLimit);
+	ZMegaMobSize			= GetConVarInt(cvarZMegaMobSize);
 }
 
 public OnAllPluginsLoaded()
@@ -362,9 +382,11 @@ public OnMapEnd()
 		SetConVarFlags(cvarGod,GetConVarFlags(cvarGod) & ~FCVAR_NOTIFY);
 		SetConVarInt(cvarGod, 0);
 		SetConVarFlags(cvarGod,GetConVarFlags(cvarGod) | FCVAR_NOTIFY);
-		ResetConVar(FindConVar("director_no_mobs"));
-		ResetConVar(FindConVar("director_ready_duration"));
-		ResetConVar(FindConVar("z_common_limit"));
+		
+		ResetConVar(cvarDirectorNoMobs);
+		ResetConVar(cvarDirectorReadyDuration);
+		ResetConVar(cvarZCommonLimit);
+		
 		SetConVarInt(FindConVar("sv_alltalk"), iInitialAllTalk);
 		SetConVarInt(FindConVar("z_ghost_delay_max"), iInitialGhostTimeMax);
 		SetConVarInt(FindConVar("z_ghost_delay_min"), iInitialGhostTimeMin);
@@ -961,13 +983,6 @@ public Action:eventVoteEnded(Handle:event, const String:name[], bool:dontBroadca
 	DebugPrintToAll("[DEBUG] Vote ended");
 }
 
-
-public ConVarChange_DirectorNoBosses(Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	DebugPrintToAll("director_no_bosses changed from %s to %s", oldValue, newValue);
-	
-}
-
 public Action:SendVoteRestartPassed(client, args)
 {
 	new Handle:event = CreateEvent("vote_passed");	
@@ -1177,17 +1192,15 @@ public Action:Command_Say(client, args)
 		return Plugin_Continue;
 	}
 	
-	/*
 	if (client && GetClientTeam(client) == L4D_TEAM_SPECTATE)
 	{
-		if (!IsClientCaster(client))
+		if (!IsClientCaster(client) && GetConVarBool(cvarBlockSpecGlobalChat))
 		{
 			Command_Teamsay(client, args);
 			PrintHintText(client, "Spectators cannot global chat in ready modes");
 			return Plugin_Handled;
 		}
 	}
-	*/
 	
 	decl String:sayWord[MAX_NAME_LENGTH];
 	GetCmdArg(1, sayWord, sizeof(sayWord));
@@ -1685,12 +1698,12 @@ directorStop()
 	#endif
 	
 	//doing director_stop on the server sets the below variables like so
-	SetConVarInt(FindConVar("director_no_bosses"), 1);
-	SetConVarInt(FindConVar("director_no_specials"), 1);
-	SetConVarInt(FindConVar("director_no_mobs"), 1);
-	SetConVarInt(FindConVar("director_ready_duration"), 0);
-	SetConVarInt(FindConVar("z_common_limit"), 0);
-	SetConVarInt(FindConVar("z_mega_mob_size"), 1); //why not 0? only Valve knows
+	SetConVarInt(cvarDirectorNoBosses, 1);
+	SetConVarInt(cvarDirectorNoSpecials, 1);
+	SetConVarInt(cvarDirectorNoMobs, 1);
+	SetConVarInt(cvarDirectorReadyDuration, 0);
+	SetConVarInt(cvarZCommonLimit, 0);
+	SetConVarInt(cvarZMegaMobSize, 1);
 	
 	//empty teams of survivors dont cycle the round
 	SetConVarInt(FindConVar("sb_all_bot_team"), 1);
@@ -1702,12 +1715,12 @@ directorStart()
 	DebugPrintToAll("[DEBUG] Director started.");
 	#endif
 	
-	ResetConVar(FindConVar("director_no_bosses"));
-	ResetConVar(FindConVar("director_no_specials"));
-	ResetConVar(FindConVar("director_no_mobs"));
-	ResetConVar(FindConVar("director_ready_duration"));
-	ResetConVar(FindConVar("z_common_limit"));
-	ResetConVar(FindConVar("z_mega_mob_size"));
+	ResetConVar(cvarDirectorNoBosses);
+	ResetConVar(cvarDirectorNoSpecials);
+	ResetConVar(cvarDirectorNoMobs);
+	SetConVarInt(cvarDirectorReadyDuration, DirectorReadyDuration);
+	SetConVarInt(cvarZCommonLimit, ZCommonLimit);
+	SetConVarInt(cvarZMegaMobSize, ZMegaMobSize);
 }
 
 //freeze everyone until they ready up
@@ -1832,9 +1845,11 @@ readyOff()
 		SetConVarFlags(cvarGod,GetConVarFlags(cvarGod) & ~FCVAR_NOTIFY);
 		SetConVarInt(cvarGod, 0);
 		SetConVarFlags(cvarGod,GetConVarFlags(cvarGod) | FCVAR_NOTIFY);
+		
 		ResetConVar(FindConVar("director_no_mobs"));
-		ResetConVar(FindConVar("director_ready_duration"));
-		ResetConVar(FindConVar("z_common_limit"));
+		SetConVarInt(cvarDirectorReadyDuration, DirectorReadyDuration);
+		SetConVarInt(cvarZCommonLimit, ZCommonLimit);
+		
 		SetConVarInt(FindConVar("sv_alltalk"), iInitialAllTalk);
 		SetConVarInt(FindConVar("z_ghost_delay_max"), iInitialGhostTimeMax);
 		SetConVarInt(FindConVar("z_ghost_delay_min"), iInitialGhostTimeMin);
@@ -2788,7 +2803,7 @@ DebugPrintToAll(const String:format[], any:...)
 #endif
 }
 
-CheckDependencyVersions(bool:throw=false)
+CheckDependencyVersions(bool:throw = false)
 {
 #if !READY_DEBUG
 	if(!IsSourcemodVersionValid())
