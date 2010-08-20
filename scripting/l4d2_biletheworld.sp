@@ -42,7 +42,7 @@ public OnPluginStart()
 
 	HookEvent("player_death", event_PlayerDeath);
 	
-	CreateConVar("l4d2_bile_the_world_version", PLUGIN_VERSION, " L4D2 Bile the World Plugin Version ", 					FCVAR_PLUGIN|FCVAR_REPLICATED|FCVAR_DONTRECORD);
+	CreateConVar("l4d2_bile_the_world_version", PLUGIN_VERSION, " L4D2 Bile the World Plugin Version ", 					FCVAR_PLUGIN|FCVAR_REPLICATED|FCVAR_DONTRECORD|FCVAR_NOTIFY);
 	splashRadius = 	CreateConVar("l4d2_bile_the_world_radius", 	"200", 			" Radius of Bile Splash on Boomer Death and Vomit Jar ", 	FCVAR_PLUGIN|FCVAR_REPLICATED);
 	isEnabled = 	CreateConVar("l4d2_bile_the_world_enabled", "1", 			" Turn Bile the World on and off ", 						FCVAR_PLUGIN|FCVAR_REPLICATED);
 }
