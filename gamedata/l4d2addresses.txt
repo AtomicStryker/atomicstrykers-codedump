@@ -198,12 +198,12 @@
 				"linux"		"@TheDirector"
 			}
 			
-			/* Used solely to get the offset for TheZombieManager */
+			/* Used solely to get the offset for TheZombieManager, find using string "resource/ModEvents.res", second call after that */
 			"InstallBotControl"
 			{
 				"library"	"server"
-				"windows"       "\x8B\x0D\x2A\x2A\x2A\x2A\x85\xC9\x74\x2A\x8B\x01\x8B\x10\x6A\x2A\xFF\xD2\xA1\x30\x2A\x2A\x2A\x8B\x08"
-				/* 8B 0D ? ? ? ? 85 C9 74 ? 8B 01 8B 10 6A ? FF D2 A1 30 ? ? ? 8B 08 */
+				"windows"       "\x8B\x0D\x2A\x2A\x2A\x2A\x85\xC9\x74\x2A\x8B\x01\x8B\x10\x6A\x2A\xFF\xD2\xA1\x2A\x2A\x2A\x2A\x8B\x08"
+				/* 8B 0D ? ? ? ? 85 C9 74 ? 8B 01 8B 10 6A ? FF D2 A1 ? ? ? ? 8B 08 */
 			}
 
 			/* Find the ZombieManager singleton class in linux */

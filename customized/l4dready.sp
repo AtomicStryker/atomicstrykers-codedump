@@ -478,7 +478,7 @@ checkStatus()
 	//count number of non-bot players in-game
 	for (new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
 	{
-		if (IsClientConnected(i) && !IsFakeClient(i))
+		if (IsClientInGame(i) && !IsFakeClient(i))
 		{
 			team = GetClientTeam(i);
 			GetClientAuthString(i, authid, sizeof(authid));
@@ -1310,7 +1310,7 @@ public Action:Command_Teamsay(client, args)
 		}
 		for (new i = 1; i <= MaxClients; i++) 
 		{
-			if (IsClientConnected(i) && IsClientInGame(i) && !IsFakeClient(i))
+			if (IsClientInGame(i) && !IsFakeClient(i))
 			{
 				if (GetClientTeam(i) == iTeam) //Is teamchat so only display it to people on the same team
 				{
@@ -2556,7 +2556,7 @@ TryTeamPlacement()
 		//the player is a bot, or disconnected, etc.
 		else 
 		{
-			if(!IsClientConnected(i) || IsFakeClient(i)) 
+			if(!IsClientInGame(i) || IsFakeClient(i)) 
 			{
 				if(teamPlacementArray[i])
 					DebugPrintToAll("TP: Defaultly removing %d from placement consideration", i);
@@ -2670,7 +2670,7 @@ stock bool:ChangePlayerTeam(client, team)
 	new bot;
 	
 	for(bot = 1; 
-		bot < L4D_MAXCLIENTS_PLUS1 && (!IsClientConnected(bot) || !IsFakeClient(bot) || (GetClientTeam(bot) != L4D_TEAM_SURVIVORS));
+		bot < L4D_MAXCLIENTS_PLUS1 && (!IsClientInGame(bot) || !IsFakeClient(bot) || (GetClientTeam(bot) != L4D_TEAM_SURVIVORS));
 		bot++) {}
 	
 	if(bot == L4D_MAXCLIENTS_PLUS1)
@@ -2774,7 +2774,7 @@ public GetAnyClient()
 	new i;
 	for(i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
 	{
-		if (IsClientConnected(i) && IsClientInGameHuman(i))
+		if (IsClientInGameHuman(i))
 		{
 			return i;
 		}
@@ -3311,7 +3311,7 @@ public Action:readyPause(client, args)
 	{
 		for(new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
 		{
-			if(IsClientConnected(i) && IsClientInGame(i))
+			if(IsClientInGame(i))
 			{
 				PauseGame(i);
 				return Plugin_Handled;
@@ -3330,7 +3330,7 @@ public Action:readyUnpause(client, args)
 	{
 		for(new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
 		{
-			if(IsClientConnected(i) && IsClientInGame(i))
+			if(IsClientInGame(i))
 			{
 				UnpauseGame(i);
 				return Plugin_Handled;
