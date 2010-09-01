@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#define PLUGIN_VERSION						  "1.0.0"
+#define PLUGIN_VERSION						  "1.0.1"
 
 #define TEST_DEBUG							   0
 #define TEST_DEBUG_LOG						   0
@@ -16,12 +16,16 @@ static const ANIM_SEQUENCES_DOWNED_END		= 132;
 static const ANIM_SEQUENCE_WALLED			= 138;
 static const Float:DOWNED_ANIM_MIN_CYCLE	= 0.27;
 static const Float:DOWNED_ANIM_MAX_CYCLE	= 0.53;
+static const Float:STOMP_MOVE_PENALTY		= 0.25;
 
 static const String:STOMP_SOUND_PATH[]		= "player/survivor/hit/rifle_swing_hit_infected9.wav";
 static const String:CLASSNAME_INFECTED[]	= "infected";
 static const String:ENTPROP_ANIM_SEQUENCE[]	= "m_nSequence";
 static const String:ENTPROP_ANIM_CYCLE[]	= "m_flCycle";
 static const String:ENT_INPUT_TO_KILL[]		= "BecomeRagdoll";
+static const String:SPEED_MODIFY_ENTPROP[]	= "m_flVelocityModifier";
+
+static 		Handle:cvarSlowSurvivor			= INVALID_HANDLE;
 
 
 public Plugin:myinfo =
@@ -43,6 +47,8 @@ public OnPluginStart()
 	}
 
 	CreateConVar("l4d2_mightystompfoot_version", PLUGIN_VERSION, "L4D2 Mighty Stomp Foot Version", FCVAR_PLUGIN|FCVAR_REPLICATED|FCVAR_DONTRECORD);
+	
+	cvarSlowSurvivor = CreateConVar("l4d2_mightystompfoot_stompslow", "0", " Does Stomping slow down Survivors momentarily ", FCVAR_PLUGIN|FCVAR_NOTIFY);
 }
 
 public OnClientPostAdminCheck(client)
@@ -70,6 +76,11 @@ public Action:_MF_Touch(entity, other)
 			{
 				DebugPrintToAll("Infected found downed. STOMPING HIM!!!");
 				SmashInfected(other);
+				
+				if (GetConVarBool(cvarSlowSurvivor))
+				{
+					SetEntPropFloat(entity, Prop_Data, SPEED_MODIFY_ENTPROP, GetEntPropFloat(entity, Prop_Data, SPEED_MODIFY_ENTPROP) - STOMP_MOVE_PENALTY);
+				}
 			}
 		}
 	}

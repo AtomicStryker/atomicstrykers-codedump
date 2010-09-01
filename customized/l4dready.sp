@@ -1237,7 +1237,7 @@ public Action:Command_Say(client, args)
 	{
 		decl String:sText[256];
 		GetCmdArg(1, sText, sizeof(sText));
-		if (client == 0 || (IsChatTrigger() && sText[0] == '/')) //Ignore if it is a server message or a silent chat trigger
+		if (!client || (IsChatTrigger() && sText[0] == '/')) //Ignore if it is a server message or a silent chat trigger
 		{
 			return Plugin_Continue;
 		}
@@ -1396,14 +1396,14 @@ public Action:regCaster(client, args)
 
 public Action:Command_Unpause(client, args)
 {
-	if (isPaused
-	|| !client
-	|| GetClientTeam(client) == L4D_TEAM_SPECTATE)
+	if (isPaused)
 	{
 		return Plugin_Handled;
 	}
+	
 	return Plugin_Continue;
 }
+
 public Action:Command_Reready(client, args)
 {
 	if (readyMode) return Plugin_Handled;
@@ -2771,8 +2771,7 @@ CountInGameHumans()
 
 public GetAnyClient()
 {
-	new i;
-	for(i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
+	for(new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
 	{
 		if (IsClientInGameHuman(i))
 		{
@@ -3250,6 +3249,11 @@ PauseGame(any:client)
 
 UnpauseGame(any:client)
 {
+	if (!client)
+	{
+		client = GetAnyClient();
+	}
+	
 	isPaused = false;
 	SetConVarInt(FindConVar("sv_pausable"), 1); //Ensure sv_pausable is set to 1
 	FakeClientCommand(client, "unpause"); //Send unpause command
