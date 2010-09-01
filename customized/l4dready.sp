@@ -262,7 +262,7 @@ public OnPluginStart()
 	fwdOnReadyRoundRestarted = CreateGlobalForward("OnReadyRoundRestarted", ET_Event);
 	
 	CreateConVar("l4d_ready_version", READY_VERSION, "Version of the ready up plugin.", CONVAR_FLAGS_PLUGIN|FCVAR_DONTRECORD);
-	cvarEnforceReady = CreateConVar("l4d_ready_enabled", "0", "Make players ready up by default before a match begins", CONVAR_FLAGS_PLUGIN);
+	cvarEnforceReady = CreateConVar("l4d_ready_enabled", "1", "Make players ready up by default before a match begins", CONVAR_FLAGS_PLUGIN);
 	cvarReadyCompetition = CreateConVar("l4d_ready_competition", "0", "Disable all plugins but a few competition-allowed ones", CONVAR_FLAGS_PLUGIN);
 	cvarReadyHalves = CreateConVar("l4d_ready_both_halves", "0", "Make players ready up both during the first and second rounds of a map", CONVAR_FLAGS_PLUGIN);
 	cvarReadyMinimum = CreateConVar("l4d_ready_minimum_players", "8", "Minimum # of players before we can ready up", CONVAR_FLAGS_PLUGIN);
@@ -321,13 +321,6 @@ public OnPluginStart()
 	#endif
 	#endif
 	
-}
-
-public OnConfigsExecuted()
-{
-	DirectorReadyDuration 	= GetConVarInt(cvarDirectorReadyDuration);
-	ZCommonLimit 			= GetConVarInt(cvarZCommonLimit);
-	ZMegaMobSize			= GetConVarInt(cvarZMegaMobSize);
 }
 
 public OnAllPluginsLoaded()
@@ -1696,6 +1689,13 @@ directorStop()
 	#if READY_DEBUG
 	DebugPrintToAll("[DEBUG] Director stopped.");
 	#endif
+	
+	if (ZCommonLimit == -1)
+	{
+		DirectorReadyDuration 	= GetConVarInt(cvarDirectorReadyDuration);
+		ZCommonLimit 			= GetConVarInt(cvarZCommonLimit);
+		ZMegaMobSize			= GetConVarInt(cvarZMegaMobSize);
+	}
 	
 	//doing director_stop on the server sets the below variables like so
 	SetConVarInt(cvarDirectorNoBosses, 1);
