@@ -1,5 +1,5 @@
 #include <sourcemod>
-#define PLUGIN_VERSION "1.0.6"
+#define PLUGIN_VERSION "1.0.7"
 
 public Plugin:myinfo = 
 {
@@ -18,16 +18,6 @@ public OnPluginStart()
 	RegAdminCmd("sm_kickloading", KickLoaders, ADMFLAG_KICK, "Kicks everyone Connected but not ingame");
 	CreateConVar(				"l4d_kickloadstuckers_version", 	PLUGIN_VERSION, " Version of L4D Kick Load Stuckers on this server ", 							FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	cvarDuration = CreateConVar("l4d_kickloadstuckers_duration", 	"60", 			" How long before a connected but not ingame player is kicked. (default 60) ", 	FCVAR_PLUGIN|FCVAR_NOTIFY);
-}
-
-public OnMapEnd()
-{
-	KillAllTimers();
-}
-
-public OnPluginEnd()
-{
-	KillAllTimers();
 }
 
 public Action:KickLoaders(clients, args)
@@ -54,6 +44,7 @@ public OnClientConnected(client)
 public OnClientDisconnect(client)
 {
 	if ( !AreHumansConnected() ) return;
+	
 	if (LoadingTimer[client] != INVALID_HANDLE) 
 	{
 		KillTimer(LoadingTimer[client]);
@@ -84,19 +75,8 @@ public Action:CheckClientIngame(Handle:timer, any:client)
 		
 		LogToFileEx(file, "%s - %N", steamid, client); // this logs their steamids and names. to be banned.
 	}
+	
 	LoadingTimer[client] = INVALID_HANDLE
-}
-
-static KillAllTimers()
-{
-	for (new i = 1; i <= MaxClients; i++)
-	{
-		if (LoadingTimer[i] != INVALID_HANDLE) 
-		{
-			KillTimer(LoadingTimer[i]);
-			LoadingTimer[i] = INVALID_HANDLE;
-		}
-	}
 }
 
 stock bool:AreHumansConnected()

@@ -1695,6 +1695,16 @@ directorStop()
 		DirectorReadyDuration 	= GetConVarInt(cvarDirectorReadyDuration);
 		ZCommonLimit 			= GetConVarInt(cvarZCommonLimit);
 		ZMegaMobSize			= GetConVarInt(cvarZMegaMobSize);
+		
+		if (ZCommonLimit == 0) //confogl bugfix
+		{
+			ZCommonLimit = 30;
+		}
+		
+		if (ZMegaMobSize == 0) //confogl bugfix
+		{
+			ZMegaMobSize = 50;
+		}
 	}
 	
 	//doing director_stop on the server sets the below variables like so

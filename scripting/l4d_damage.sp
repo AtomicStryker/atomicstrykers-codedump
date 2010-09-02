@@ -1,7 +1,7 @@
 #pragma semicolon 1
 #include <sourcemod>
 #include <sdktools>
-#define PLUGIN_VERSION								"1.0.4"
+#define PLUGIN_VERSION								"1.0.5"
 
 #define TEST_DEBUG									0
 #define TEST_DEBUG_LOG								0
@@ -90,7 +90,10 @@ public Action:_DM_PlayerHurt_Event(Handle:event, const String:name[], bool:dontB
 	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	
-	if (!client || !attacker || ignoreNextDamageDealt[attacker]) return Plugin_Continue; // both must be valid players.
+	if (!client
+	|| !attacker
+	|| !IsClientInGame(attacker)
+	|| ignoreNextDamageDealt[attacker]) return Plugin_Continue; // both must be valid players.
 	
 	decl Float:multiplierWeapon, String:weaponname[64];
 	
@@ -147,7 +150,10 @@ public Action:_DM_InfectedHurt_Event(Handle:event, const String:name[], bool:don
 	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
 	new entity = (GetEventInt(event, "entityid"));
 	
-	if (!attacker || !IsValidEntity(entity) || ignoreNextDamageDealt[attacker]) return; //both must be valid
+	if (!attacker
+	|| !IsClientInGame(attacker)
+	|| !IsValidEntity(entity)
+	|| ignoreNextDamageDealt[attacker]) return; //both must be valid
 	
 	decl String:entname[32];
 	GetEdictClassname(entity, entname, sizeof(entname));
