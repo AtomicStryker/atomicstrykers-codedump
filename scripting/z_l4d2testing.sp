@@ -37,111 +37,32 @@ public OnPluginStart()
 	
 	RegAdminCmd("sm_isreachable", Cmd11, ADMFLAG_CHEATS, "sm_isreachable <player> <targetent>");
 	
-	RegAdminCmd("sm_regforb", Cmd12, ADMFLAG_CHEATS, " sm_regforb <targetent>");
-	
-	RegAdminCmd("sm_unregforb", Cmd13, ADMFLAG_CHEATS, "sm_unregforb <targetent>");
+	RegAdminCmd("sm_splitstring", Cmd12, ADMFLAG_CHEATS, "sm_splitstring <testing string>");
 }
 
 public Action:Cmd12(client, args)
 {
+	decl String:buffer[56];
+	decl String:buffer2[56];
+	
 	if (!args)
 	{
-		ReplyToCommand(client, "sm_regforb <targetent>");
+		ReplyToCommand(client, "sm_splitstring <testing string>");
 		return Plugin_Handled;
 	}
 	
-	decl String:buffer[10];
 	GetCmdArg(1, buffer, sizeof(buffer));
 	
-	new entity = StringToInt(buffer);
-
-	if (!IsValidEdict(entity))
+	new answer = SplitString(buffer, "_spawn", buffer2, sizeof(buffer2));
+	
+	if (answer == -1)
 	{
-		ReplyToCommand(client, "invalid target ent");
-		return Plugin_Handled;
+		strcopy(buffer2, sizeof(buffer2), "nope");
 	}
 	
-	RegisterForbiddenTarget(entity);
-}
-
-public Action:Cmd13(client, args)
-{
-	if (!args)
-	{
-		ReplyToCommand(client, "sm_unregforb <targetent>");
-		return Plugin_Handled;
-	}
+	ReplyToCommand(client, "SplitString reports %i, resulting String: %s", answer, buffer2);
 	
-	decl String:buffer[10];
-	GetCmdArg(1, buffer, sizeof(buffer));
-	
-	new entity = StringToInt(buffer);
-	
-	if (!IsValidEdict(entity))
-	{
-		ReplyToCommand(client, "invalid target ent");
-		return Plugin_Handled;
-	}
-	
-	UnRegisterForbiddenTarget(entity);
-}
-
-RegisterForbiddenTarget(entity)
-{
-	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
-	new Handle:sdkRegisterForbiddenTarget = INVALID_HANDLE;
-	new Address:pTheDirector = GameConfGetAddress(ConfigFile, "CDirector");
-
-	if(pTheDirector == Address_Null)
-	{
-		SetFailState("Could not load the CDirector pointer");
-	}
-	
-	StartPrepSDKCall(SDKCall_Entity);
-	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "CDirector_RegisterForbiddenTarget");
-	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
-	sdkRegisterForbiddenTarget = EndPrepSDKCall();
-	
-	if (sdkRegisterForbiddenTarget == INVALID_HANDLE)
-	{
-		SetFailState("Could not prep the CDirector_RegisterForbiddenTarget sdk call");
-	}
-	
-	CloseHandle(ConfigFile);
-	
-	DebugPrintToAll("RegisterForbiddenTarget being called, target entity %i", entity);
-	DebugPrintToAll("CDirector pointer: 0x%x", pTheDirector);
-	
-	SDKCall(sdkRegisterForbiddenTarget, pTheDirector, entity);
-}
-
-UnRegisterForbiddenTarget(entity)
-{
-	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
-	new Handle:sdkUnRegisterForbiddenTarget = INVALID_HANDLE;
-	new Address:pTheDirector = GameConfGetAddress(ConfigFile, "CDirector");
-
-	if(pTheDirector == Address_Null)
-	{
-		SetFailState("Could not load the CDirector pointer");
-	}
-	
-	StartPrepSDKCall(SDKCall_Entity);
-	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "CDirector_UnRegisterForbiddenTarget");
-	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
-	sdkUnRegisterForbiddenTarget = EndPrepSDKCall();
-	
-	if (sdkUnRegisterForbiddenTarget == INVALID_HANDLE)
-	{
-		SetFailState("Could not prep the CDirector_UnRegisterForbiddenTarget sdk call");
-	}
-	
-	CloseHandle(ConfigFile);
-	
-	DebugPrintToAll("UnRegisterForbiddenTarget being called, target entity %i", entity);
-	DebugPrintToAll("CDirector pointer: 0x%x", pTheDirector);
-	
-	SDKCall(sdkUnRegisterForbiddenTarget, pTheDirector, entity);
+	return Plugin_Handled;
 }
 
 stock bool:L4D2_OnFinaleMap()

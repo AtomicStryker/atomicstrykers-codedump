@@ -1728,9 +1728,19 @@ directorStart()
 	ResetConVar(cvarDirectorNoBosses);
 	ResetConVar(cvarDirectorNoSpecials);
 	ResetConVar(cvarDirectorNoMobs);
-	SetConVarInt(cvarDirectorReadyDuration, DirectorReadyDuration);
-	SetConVarInt(cvarZCommonLimit, ZCommonLimit);
-	SetConVarInt(cvarZMegaMobSize, ZMegaMobSize);
+	
+	if (ZCommonLimit == -1)
+	{
+		ResetConVar(cvarDirectorReadyDuration);
+		ResetConVar(cvarZCommonLimit);
+		ResetConVar(cvarZMegaMobSize);
+	}
+	else
+	{
+		SetConVarInt(cvarDirectorReadyDuration, DirectorReadyDuration);
+		SetConVarInt(cvarZCommonLimit, ZCommonLimit);
+		SetConVarInt(cvarZMegaMobSize, ZMegaMobSize);
+	}
 }
 
 //freeze everyone until they ready up
