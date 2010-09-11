@@ -3,7 +3,8 @@
 #include <sdktools>
 #include <left4downtown>
 
-#define PLUGIN_VERSION 						  "1.0.1"
+
+#define PLUGIN_VERSION 						  "1.0.2"
 
 #define TEST_DEBUG 		0
 #define TEST_DEBUG_LOG 	0
@@ -24,16 +25,15 @@ enum SI_ZOMBIE_CLASSES
 }
 */
 
-enum SI_FLAGS
+static flag[] =
 {
-	FLAG_SMOKER = 1,
-	FLAG_BOOMER = 2,
-	FLAG_HUNTER	= 4,
-	FLAG_SPITTER = 8,
-	FLAG_JOCKEY	= 16
-}
-
-static flag[SI_FLAGS];
+	0, // UNDEF
+	1, // SMOKER
+	2, // BOOMER
+	4, // HUNTER
+	8, // SPITTER
+	16 // JOCKEY
+};
 
 static Handle:cvarisEnabled					= INVALID_HANDLE;
 static Handle:cvarFlags						= INVALID_HANDLE;
@@ -99,8 +99,8 @@ stock DebugPrintToAll(const String:format[], any:...)
 	VFormat(buffer, sizeof(buffer), format, 2);
 	
 	#if TEST_DEBUG
-	PrintToChatAll("[PK] %s", buffer);
-	PrintToConsole(0, "[PK] %s", buffer);
+	PrintToChatAll("[MI] %s", buffer);
+	PrintToConsole(0, "[MI] %s", buffer);
 	#endif
 	
 	LogMessage("%s", buffer);
