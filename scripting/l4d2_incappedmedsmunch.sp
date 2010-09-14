@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION		"1.1.5"
+#define PLUGIN_VERSION		"1.1.6"
 
 
 #define STRING_LENGTH		32
@@ -162,8 +162,7 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 		
 		if (!IsPlayerIncapped(target)) return Plugin_Continue;
 		
-		Meds = GetPlayerWeaponSlot(target, PILLS_ADRENALINE_SLOT);
-		if (Meds != -1)
+		if (GetPlayerWeaponSlot(target, PILLS_ADRENALINE_SLOT) != -1)
 		{
 			PrintToChat(client, "\x04Target already has Meds");
 			return Plugin_Continue;
@@ -181,7 +180,7 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 		
 		if (IsValidEdict(Meds))
 		{
-			RemovePlayerItem(client, Meds);
+			RemoveEdict(Meds);
 		}
 		
 		if (StrEqual(medstring, "weapon_pain_pills", false)) CheatCommand(target, "give", "pain_pills");
@@ -247,7 +246,7 @@ static InterruptMunch(client)
 		
 		if (IsValidEdict(Meds))
 		{
-			RemovePlayerItem(client, Meds);
+			RemoveEdict(Meds);
 		}
 		
 		new droppedstuff = CreateEntityByName(medstring);
@@ -307,7 +306,7 @@ static ReviveClient(client)
 	new Meds = GetPlayerWeaponSlot(client, PILLS_ADRENALINE_SLOT);
 	if (IsValidEdict(Meds))
 	{
-		RemovePlayerItem(client, Meds);
+		RemoveEdict(Meds);
 	}
 	
 	PrintToChatAll("\x04%N\x01 used his \x04pills/adrenaline\x01 and revived himself!", client);
