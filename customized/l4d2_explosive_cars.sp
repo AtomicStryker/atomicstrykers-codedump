@@ -2,34 +2,31 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define GETVERSION "1.0"
-
-
-#define FIRE_PARTICLE "gas_explosion_ground_fire"
+#define GETVERSION "1.0A"
 #define ARRAY_SIZE 10000
-#define EXPLOSION_PARTICLE "weapon_pipebomb"
-#define EXPLOSION_PARTICLE2 "weapon_grenade_explosion"
-#define EXPLOSION_PARTICLE3 "explosion_huge_b"
-#define FIRE_SOUND "ambient/fire/interior_fire01_stereo.wav"
-#define EXPLOSION_SOUND "ambient/explosions/explode_1.wav"
-#define EXPLOSION_SOUND2 "ambient/explosions/explode_2.wav"
-#define EXPLOSION_SOUND3 "ambient/explosions/explode_3.wav"
-#define EXPLOSION_DEBRIS "animation/van_inside_debris.wav"
-#define EXPLOSION_BIRDS "animation/crow_flock_farm_05.wav"
 
-#define DAMAGE_WHITE_SMOKE "minigun_overheat_smoke"
-#define DAMAGE_BLACK_SMOKE "smoke_burning_engine_01"
-#define DAMAGE_FIRE_SMALL "burning_engine_01"
-#define DAMAGE_FIRE_HUGE "fire_window_hotel2"
+static const String:FIRE_PARTICLE[] = 		"gas_explosion_ground_fire";
+static const String:EXPLOSION_PARTICLE[] = 	"weapon_pipebomb";
+static const String:EXPLOSION_PARTICLE2[] = "weapon_grenade_explosion";
+static const String:EXPLOSION_PARTICLE3[] = "explosion_huge_b";
+static const String:EXPLOSION_SOUND[] = 	"ambient/explosions/explode_1.wav";
+static const String:EXPLOSION_SOUND2[] = 	"ambient/explosions/explode_2.wav";
+static const String:EXPLOSION_SOUND3[] = 	"ambient/explosions/explode_3.wav";
+static const String:EXPLOSION_DEBRIS[] = 	"animation/van_inside_debris.wav";
+static const String:EXPLOSION_BIRDS[] = 	"animation/crow_flock_farm_05.wav";
+static const String:DAMAGE_WHITE_SMOKE[] = 	"minigun_overheat_smoke";
+static const String:DAMAGE_BLACK_SMOKE[] = 	"smoke_burning_engine_01";
+static const String:DAMAGE_FIRE_SMALL[] = 	"burning_engine_01";
+static const String:DAMAGE_FIRE_HUGE[] = 	"fire_window_hotel2";
+//static const String:FIRE_SOUND[] = 			"ambient/fire/interior_fire01_stereo.wav";
 
+new bool:g_bLowWreck[ARRAY_SIZE] = false;
+new bool:g_bMidWreck[ARRAY_SIZE] = false;
+new bool:g_bHighWreck[ARRAY_SIZE] = false;
+new bool:g_bCritWreck[ARRAY_SIZE] = false;
+new bool:g_bExploded[ARRAY_SIZE] = false;
 new g_iEntityDamage[ARRAY_SIZE] = 0;
-new g_bLowWreck[ARRAY_SIZE] = false;
-new g_bMidWreck[ARRAY_SIZE] = false;
-new g_bHighWreck[ARRAY_SIZE] = false;
-new g_bCritWreck[ARRAY_SIZE] = false;
-new g_bExploded[ARRAY_SIZE] = false;
 new g_iParticle[ARRAY_SIZE] = -1;
-new g_iTimesExploded[ARRAY_SIZE] = 0;
 
 new Handle:g_hGameConf = INVALID_HANDLE;
 new Handle:sdkCallPushPlayer = INVALID_HANDLE;
@@ -55,7 +52,7 @@ public OnPluginStart()
 	GetGameFolderName(sGame, sizeof(sGame));
 	if (!StrEqual(sGame, "left4dead2", false))
 	{
-		SetFailState("Advanced Deathmatch supports Left 4 dead 2 only!");
+		SetFailState("Explosive Cars supports Left 4 dead 2 only!");
 	}
 	
 	//Convars
@@ -113,13 +110,22 @@ public Event_RoundStart(Handle:event, String:event_name[], bool:dontBroadcast)
 		g_bCritWreck[i] = false;
 		g_bExploded[i] = false;
 		g_iParticle[i] = -1;
-		g_iTimesExploded[i] = 0;
 	}
 }
 
 public OnEntityCreated(entity, const String:classname[])
 {
-	if(StrEqual(classname, "prop_physics") || StrEqual(classname, "prop_car_alarm") || StrEqual(classname, "prop_physics_override"))
+	if(StrEqual(classname, "prop_physics")
+	|| StrEqual(classname, "prop_physics_override"))
+	{
+		decl String:model[256];
+		GetEntPropString(entity, Prop_Data, "m_ModelName", model, sizeof(model))
+		if(StrContains(model, "vehicle", false) != -1)
+		{
+			SDKHook(entity, SDKHook_OnTakeDamagePost, OnTakeDamagePost);
+		}
+	}
+	else if(StrEqual(classname, "prop_car_alarm"))
 	{
 		SDKHook(entity, SDKHook_OnTakeDamagePost, OnTakeDamagePost);
 	}
@@ -130,54 +136,64 @@ public OnTakeDamagePost(victim, attacker, inflictor, Float:damage, damagetype)
 	decl String:class1[256], String:class2[256];
 	GetEdictClassname(victim, class1, sizeof(class1));
 	GetEdictClassname(attacker, class2, sizeof(class2));
+	
 	new MaxDamageHandle = GetConVarInt(g_cvarMaxHealth)/5;
-	if(StrEqual(class2, "weapon_melee"))
+	
+	if(StrEqual(class1, "prop_car_alarm")
+	|| StrEqual(class1, "prop_physics")
+	|| StrEqual(class1, "prop_physics_override"))
 	{
-		damage = 5.0;
-	}
-	if(StrEqual(class1, "prop_car_alarm"))
-	{
+		if(StrEqual(class2, "weapon_melee"))
+		{
+			damage = 5.0;
+		}
+	
 		g_iEntityDamage[victim]+= RoundToFloor(damage);
 	}
-	else if(StrEqual(class1, "prop_physics") || StrEqual(class1, "prop_physics_override"))
-	{
-		decl String:model[256];
-		GetEntPropString(victim, Prop_Data, "m_ModelName", model, sizeof(model))
-		if(StrContains(model, "vehicle", false) >= 0)
-		{
-			g_iEntityDamage[victim]+= RoundToFloor(damage);
-		}
-	}
+	else return;
+	
 	new tdamage = g_iEntityDamage[victim];
-	if(tdamage >= MaxDamageHandle && tdamage < MaxDamageHandle*2 && !g_bLowWreck[victim])
+	
+	if(tdamage >= MaxDamageHandle
+	&& tdamage < MaxDamageHandle*2
+	&& !g_bLowWreck[victim])
 	{
 		AttachParticle(victim, DAMAGE_WHITE_SMOKE);
 		g_bLowWreck = true;
 	}
-	if(tdamage >= MaxDamageHandle*2 && tdamage < MaxDamageHandle*3 && !g_bMidWreck[victim])
+	
+	else if(tdamage >= MaxDamageHandle*2
+	&& tdamage < MaxDamageHandle*3
+	&& !g_bMidWreck[victim])
 	{
 		AttachParticle(victim, DAMAGE_BLACK_SMOKE);
 		g_bMidWreck = true;
 	}
-	if(tdamage >= MaxDamageHandle*3 && tdamage < MaxDamageHandle*4 && !g_bHighWreck[victim])
+	
+	else if(tdamage >= MaxDamageHandle*3
+	&& tdamage < MaxDamageHandle*4
+	&& !g_bHighWreck[victim])
 	{
 		AttachParticle(victim, DAMAGE_FIRE_SMALL);
 		g_bHighWreck = true;
 	}
-	if(tdamage >= MaxDamageHandle*4 && tdamage < MaxDamageHandle*5 && !g_bCritWreck[victim])
+	
+	else if(tdamage >= MaxDamageHandle*4
+	&& tdamage < MaxDamageHandle*5
+	&& !g_bCritWreck[victim])
 	{
 		AttachParticle(victim, DAMAGE_FIRE_HUGE);
 		g_bCritWreck = true;
 	}
-	if(tdamage > MaxDamageHandle*5 && !g_bExploded[victim] && g_iTimesExploded[victim] <= 0)
+	
+	else if(tdamage > MaxDamageHandle*5
+	&& !g_bExploded[victim])
 	{
 		g_bExploded[victim] = true;
-		g_iTimesExploded[victim]++;
 		decl Float:pos[3];
 		GetEntPropVector(victim, Prop_Data, "m_vecOrigin", pos);
 		CreateExplosion(pos);
 		LaunchCar(victim);
-		g_bExploded[victim] = true;
 	}
 }
 
@@ -185,14 +201,10 @@ stock LaunchCar(car)
 {
 	decl Float:vel[3];
 	GetEntPropVector(car, Prop_Data, "m_vecVelocity", vel);
-	if(vel[2] == 0.0)
-	{
-		vel[2] = 2500.0;
-	}
-	else
-	{
-		vel[2]+= 2500.0;
-	}
+	vel[0]+= GetRandomFloat(50.0, 300.0);
+	vel[1]+= GetRandomFloat(50.0, 300.0);
+	vel[2]+= GetRandomFloat(1000.0, 2500.0);
+	
 	TeleportEntity(car, NULL_VECTOR, NULL_VECTOR, vel);
 	CreateTimer(7.0, timerNormalVelocity, car, TIMER_FLAG_NO_MAPCHANGE);
 }
@@ -201,10 +213,7 @@ public Action:timerNormalVelocity(Handle:timer, any:car)
 {
 	if(IsValidEntity(car))
 	{
-		decl Float:vel[3];
-		vel[0] = 0.0;
-		vel[1] = 0.0;
-		vel[2] = 0.0;
+		new Float:vel[3];
 		SetEntPropVector(car, Prop_Data, "m_vecVelocity", vel);
 	}
 }
@@ -334,32 +343,21 @@ CreateExplosion(Float:pos[3])
 	WritePackCell(pack2, exHurt);
 	CreateTimer(GetConVarFloat(g_cvarTrace)+1.5, timerDeleteParticles, pack2, TIMER_FLAG_NO_MAPCHANGE);
 	
-	
 	new Handle:pack = CreateDataPack();
 	WritePackCell(pack, exTrace);
 	WritePackCell(pack, exHurt);
 	CreateTimer(GetConVarFloat(g_cvarTrace), timerStopFire, pack, TIMER_FLAG_NO_MAPCHANGE);
-	decl Float:distance[3], Float:tpos[3], Float:ratio[3], Float:addVel[3], Float:tvec[3];
+	decl Float:tpos[3], Float:ratio[3], Float:addVel[3];
 	for(new i=1; i<=MaxClients; i++)
 	{
-		if(i == 0 || !IsValidEntity(i) || !IsClientInGame(i) || !IsPlayerAlive(i))
+		if(!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != 2)
 		{
 			continue;
 		}
-		if(GetClientTeam(i) != 2)
-		{
-			continue;
-		}
+
 		GetEntPropVector(i, Prop_Data, "m_vecOrigin", tpos);
-		distance[0] = (pos[0] - tpos[0]);
-		distance[1] = (pos[1] - tpos[1]);
-		distance[2] = (pos[2] - tpos[2]);
-		
-		new Float:realdistance = SquareRoot(FloatMul(distance[0],distance[0])+FloatMul(distance[1],distance[1]));
-		if(realdistance <= flMxDistance)
+		if(GetVectorDistance(pos, tpos) <= flMxDistance)
 		{			
-			GetEntPropVector(i, Prop_Data, "m_vecVelocity", tvec);
-			
 			addVel[0] = FloatMul(ratio[0]*-1, power);
 			addVel[1] = FloatMul(ratio[1]*-1, power);
 			addVel[2] = power;
@@ -373,6 +371,8 @@ public Action:timerStopFire(Handle:timer, Handle:pack)
 	ResetPack(pack);
 	new particle = ReadPackCell(pack);
 	new hurt = ReadPackCell(pack);
+	CloseHandle(pack);
+	
 	if(IsValidEntity(particle))
 	{
 		AcceptEntityInput(particle, "Stop");
@@ -386,41 +386,18 @@ public Action:timerStopFire(Handle:timer, Handle:pack)
 public Action:timerDeleteParticles(Handle:timer, Handle:pack)
 {
 	ResetPack(pack);
-	new entity1 = ReadPackCell(pack);
-	new entity2 = ReadPackCell(pack);
-	new entity3 = ReadPackCell(pack);
-	new entity4 = ReadPackCell(pack);
-	new entity5 = ReadPackCell(pack);
-	new entity6 = ReadPackCell(pack);
-	new entity7 = ReadPackCell(pack);
-	if(IsValidEntity(entity1))
+	
+	new entity;
+	for (new i = 1; i <= 7; i++)
 	{
-		AcceptEntityInput(entity1, "Kill");
+		entity = ReadPackCell(pack);
+		
+		if(IsValidEntity(entity))
+		{
+			AcceptEntityInput(entity, "Kill");
+		}
 	}
-	if(IsValidEntity(entity2))
-	{
-		AcceptEntityInput(entity2, "Kill");
-	}
-	if(IsValidEntity(entity3))
-	{
-		AcceptEntityInput(entity3, "Kill");
-	}
-	if(IsValidEntity(entity4))
-	{
-		AcceptEntityInput(entity4, "Kill");
-	}
-	if(IsValidEntity(entity5))
-	{
-		AcceptEntityInput(entity5, "Kill");
-	}
-	if(IsValidEntity(entity6))
-	{
-		AcceptEntityInput(entity6, "Kill");
-	}
-	if(IsValidEntity(entity7))
-	{
-		AcceptEntityInput(entity7, "Kill");
-	}
+	CloseHandle(pack);
 }
 
 stock FlingPlayer(target, Float:vector[3], attacker, Float:stunTime = 3.0)
@@ -428,7 +405,7 @@ stock FlingPlayer(target, Float:vector[3], attacker, Float:stunTime = 3.0)
 	SDKCall(sdkCallPushPlayer, target, vector, 76, attacker, stunTime);
 }
 
-stock PrecacheParticle(String:ParticleName[])
+stock PrecacheParticle(const String:ParticleName[])
 {
 	new Particle = CreateEntityByName("info_particle_system");
 	if(IsValidEntity(Particle) && IsValidEdict(Particle))
@@ -443,13 +420,13 @@ stock PrecacheParticle(String:ParticleName[])
 
 public Action:timerRemovePrecacheParticle(Handle:timer, any:Particle)
 {
-	if(IsValidEntity(Particle) && IsValidEdict(Particle))
+	if(IsValidEdict(Particle))
 	{
 		AcceptEntityInput(Particle, "Kill");
 	}
 }
 
-stock AttachParticle(car, String:Particle_Name[])
+stock AttachParticle(car, const String:Particle_Name[])
 {
 	decl Float:pos[3], String:sName[64], String:sTargetName[64];
 	new Particle = CreateEntityByName("info_particle_system");
@@ -481,7 +458,6 @@ stock AttachParticle(car, String:Particle_Name[])
 
 stock PanicEvent()
 {
-	PrintToChatAll("\x04[SM] \x03The car exploded and the infected heard the noise!");
 	new Director = CreateEntityByName("info_director");
 	DispatchSpawn(Director);
 	AcceptEntityInput(Director, "ForcePanicEvent");
