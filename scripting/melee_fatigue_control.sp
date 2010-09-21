@@ -8,6 +8,8 @@
 
 static const fatigueAddedOnQuickSwing		= 3; // how much fatigue will be added if a client if he quick swings
 static const maxExistingFatigue				= 3; // how much fatigue already on a client will cause this Plugin to abort
+
+static const Float:MELEE_DURATION			= 0.6;
 // 
 
 static bool:soundHookDelay[MAXPLAYERS+1] = false;
@@ -31,7 +33,7 @@ public Action:HookSound_Callback(Clients[64], &NumClients, String:StrSample[PLAT
 	//add in a delay so this doesnt fire every frame
 	if (soundHookDelay[Entity]) return Plugin_Continue; //note 'Entity' means 'client' here
 	soundHookDelay[Entity] = true;
-	CreateTimer(0.6, ResetsoundHookDelay, Entity);
+	CreateTimer(MELEE_DURATION, ResetsoundHookDelay, Entity);
 	
 	DebugPrintToAll("New Melee caught by %N", Entity);
 	

@@ -63,7 +63,7 @@ public OnPluginStart()
 	SetConVarFlags(hTags,(GetConVarFlags(hTags) & ~FCVAR_NOTIFY));
 	
 	CreateConVar("snarespeak_version",PLUGIN_VERSION,"SnareSpeak Version",FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
-	hPrintChannel = CreateConVar("snarespeak_printchannel","1","Print to player chat when a voice channel is created and destroyed",FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
+	hPrintChannel = CreateConVar("snarespeak_printchannel","0","Print to player chat when a voice channel is created and destroyed",FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
 	hEndRoundAllTalk = CreateConVar("snarespeak_endofround_alltalk","0","Turns on all talk when the round ends",FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
 	hAllowBoomer = CreateConVar("snarespeak_allow_boomer","1","Allow the boomer to create an audio channel when it vomits on a survivor.",FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
 	hBoomerTime = CreateConVar("snarespeak_boomertime","10","Time in seconds the boomer channel is left open. Set to 0 for expiration when puke wears off.",FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
