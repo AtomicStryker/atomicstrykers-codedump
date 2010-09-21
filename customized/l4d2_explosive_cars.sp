@@ -3,7 +3,10 @@
 #include <sdkhooks>
 
 #define GETVERSION "1.0A"
-#define ARRAY_SIZE 10000
+#define ARRAY_SIZE 5000
+
+#define TEST_DEBUG 		0
+#define TEST_DEBUG_LOG 	0
 
 static const String:FIRE_PARTICLE[] = 		"gas_explosion_ground_fire";
 static const String:EXPLOSION_PARTICLE[] = 	"weapon_pipebomb";
@@ -39,7 +42,7 @@ new Handle:g_cvarPanic = INVALID_HANDLE;
 public Plugin:myinfo = 
 {
 	name = "[L4D2] Explosive Cars",
-	author = "honorcode23",
+	author = "honorcode23, fixed up by AtomicStryker",
 	description = "Cars explode after they take some damage",
 	version = GETVERSION,
 	url = "http://forums.alliedmods.net/showthread.php?t=138644"
@@ -57,13 +60,13 @@ public OnPluginStart()
 	
 	//Convars
 	CreateConVar("l4d2_explosive_cars_version", GETVERSION, "Version of the [L4D2] Explosive Cars plugin", FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_DONTRECORD);
-	g_cvarMaxHealth = CreateConVar("l4d2_explosive_cars_health", "5000", "Maximum health of the cars", FCVAR_PLUGIN);
+	g_cvarMaxHealth = CreateConVar("l4d2_explosive_cars_health", "3500", "Maximum health of the cars", FCVAR_PLUGIN);
 	g_cvarRadius = CreateConVar("l4d2_explosive_cars_radius", "420", "Maximum radius of the explosion", FCVAR_PLUGIN);
 	g_cvarPower = CreateConVar("l4d2_explosive_cars_power", "300", "Power of the explosion when the car explodes", FCVAR_PLUGIN);
 	g_cvarTrace = CreateConVar("l4d2_explosive_cars_trace", "25", "Time before the fire trace left by the explosion expires", FCVAR_PLUGIN);
 	g_cvarPanic = CreateConVar("l4d2_explosive_cars_panic", "1", "Should the car explosion cause a panic event?", FCVAR_PLUGIN);
 	
-	AutoExecConfig(true, "l4d2_explosive_cars");
+	//AutoExecConfig(true, "l4d2_explosive_cars");
 	
 	//Events
 	HookEvent("round_start_post_nav", Event_RoundStart);
@@ -97,11 +100,13 @@ public OnMapStart()
 	PrecacheParticle(DAMAGE_BLACK_SMOKE);
 	PrecacheParticle(DAMAGE_FIRE_SMALL);
 	PrecacheParticle(DAMAGE_FIRE_HUGE);
+	
+	FindMapCars();
 }
 
 public Event_RoundStart(Handle:event, String:event_name[], bool:dontBroadcast)
 {
-	for(new i=1; i<=ARRAY_SIZE; i++)
+	for(new i=1; i<ARRAY_SIZE; i++)
 	{
 		g_iEntityDamage[i] = 0;
 		g_bLowWreck[i] = false;
@@ -110,6 +115,30 @@ public Event_RoundStart(Handle:event, String:event_name[], bool:dontBroadcast)
 		g_bCritWreck[i] = false;
 		g_bExploded[i] = false;
 		g_iParticle[i] = -1;
+	}
+}
+
+static FindMapCars()
+{
+	new maxEnts = GetMaxEntities();
+	decl String:classname[128], String:model[256];
+	
+	for (new i = MaxClients; i < maxEnts; i++)
+	{
+		if (!IsValidEdict(i)) continue;
+		
+		GetEdictClassname(i, classname, sizeof(classname));
+		
+		if(StrEqual(classname, "prop_physics")
+		|| StrEqual(classname, "prop_physics_override"))
+		{
+			GetEntPropString(i, Prop_Data, "m_ModelName", model, sizeof(model))
+			if(StrContains(model, "vehicle", false) != -1)
+			{
+				SDKHook(i, SDKHook_OnTakeDamagePost, OnTakeDamagePost);
+				DebugPrintToAll("Activated Explosive Car Damage Hook on entity %i, class %s", i, classname);
+			}
+		}
 	}
 }
 
@@ -123,35 +152,31 @@ public OnEntityCreated(entity, const String:classname[])
 		if(StrContains(model, "vehicle", false) != -1)
 		{
 			SDKHook(entity, SDKHook_OnTakeDamagePost, OnTakeDamagePost);
+			DebugPrintToAll("Activated Explosive Car Damage Hook on entity %i, class %s", entity, classname);
 		}
 	}
-	else if(StrEqual(classname, "prop_car_alarm"))
+	
+	if(StrEqual(classname, "prop_car_alarm"))
 	{
 		SDKHook(entity, SDKHook_OnTakeDamagePost, OnTakeDamagePost);
+		DebugPrintToAll("Activated Explosive Car Damage Hook on entity %i, class %s", entity, classname);
 	}
 }
 
 public OnTakeDamagePost(victim, attacker, inflictor, Float:damage, damagetype)
 {
-	decl String:class1[256], String:class2[256];
-	GetEdictClassname(victim, class1, sizeof(class1));
+	decl String:class2[256];
 	GetEdictClassname(attacker, class2, sizeof(class2));
 	
 	new MaxDamageHandle = GetConVarInt(g_cvarMaxHealth)/5;
 	
-	if(StrEqual(class1, "prop_car_alarm")
-	|| StrEqual(class1, "prop_physics")
-	|| StrEqual(class1, "prop_physics_override"))
+	if(StrEqual(class2, "weapon_melee"))
 	{
-		if(StrEqual(class2, "weapon_melee"))
-		{
-			damage = 5.0;
-		}
-	
-		g_iEntityDamage[victim]+= RoundToFloor(damage);
+		damage = 5.0;
 	}
-	else return;
 	
+	g_iEntityDamage[victim]+= RoundToFloor(damage);
+
 	new tdamage = g_iEntityDamage[victim];
 	
 	if(tdamage >= MaxDamageHandle
@@ -190,9 +215,9 @@ public OnTakeDamagePost(victim, attacker, inflictor, Float:damage, damagetype)
 	&& !g_bExploded[victim])
 	{
 		g_bExploded[victim] = true;
-		decl Float:pos[3];
-		GetEntPropVector(victim, Prop_Data, "m_vecOrigin", pos);
-		CreateExplosion(pos);
+		decl Float:carPos[3];
+		GetEntPropVector(victim, Prop_Data, "m_vecOrigin", carPos);
+		CreateExplosion(carPos);
 		LaunchCar(victim);
 	}
 }
@@ -218,7 +243,7 @@ public Action:timerNormalVelocity(Handle:timer, any:car)
 	}
 }
 
-CreateExplosion(Float:pos[3])
+CreateExplosion(Float:carPos[3])
 {
 	decl String:sRadius[256];
 	decl String:sPower[256];
@@ -239,22 +264,22 @@ CreateExplosion(Float:pos[3])
 	DispatchKeyValue(exParticle, "effect_name", EXPLOSION_PARTICLE);
 	DispatchSpawn(exParticle);
 	ActivateEntity(exParticle);
-	TeleportEntity(exParticle, pos, NULL_VECTOR, NULL_VECTOR);
+	TeleportEntity(exParticle, carPos, NULL_VECTOR, NULL_VECTOR);
 	
 	DispatchKeyValue(exParticle2, "effect_name", EXPLOSION_PARTICLE2);
 	DispatchSpawn(exParticle2);
 	ActivateEntity(exParticle2);
-	TeleportEntity(exParticle2, pos, NULL_VECTOR, NULL_VECTOR);
+	TeleportEntity(exParticle2, carPos, NULL_VECTOR, NULL_VECTOR);
 	
 	DispatchKeyValue(exParticle3, "effect_name", EXPLOSION_PARTICLE3);
 	DispatchSpawn(exParticle3);
 	ActivateEntity(exParticle3);
-	TeleportEntity(exParticle3, pos, NULL_VECTOR, NULL_VECTOR);
+	TeleportEntity(exParticle3, carPos, NULL_VECTOR, NULL_VECTOR);
 	
 	DispatchKeyValue(exTrace, "effect_name", FIRE_PARTICLE);
 	DispatchSpawn(exTrace);
 	ActivateEntity(exTrace);
-	TeleportEntity(exTrace, pos, NULL_VECTOR, NULL_VECTOR);
+	TeleportEntity(exTrace, carPos, NULL_VECTOR, NULL_VECTOR);
 	
 	
 	//Set up explosion entity
@@ -263,13 +288,13 @@ CreateExplosion(Float:pos[3])
 	DispatchKeyValue(exEntity, "iRadiusOverride", sRadius);
 	DispatchKeyValue(exEntity, "spawnflags", "828");
 	DispatchSpawn(exEntity);
-	TeleportEntity(exEntity, pos, NULL_VECTOR, NULL_VECTOR);
+	TeleportEntity(exEntity, carPos, NULL_VECTOR, NULL_VECTOR);
 	
 	//Set up physics movement explosion
 	DispatchKeyValue(exPhys, "radius", sRadius);
 	DispatchKeyValue(exPhys, "magnitude", sPower);
 	DispatchSpawn(exPhys);
-	TeleportEntity(exPhys, pos, NULL_VECTOR, NULL_VECTOR);
+	TeleportEntity(exPhys, carPos, NULL_VECTOR, NULL_VECTOR);
 	
 	
 	//Set up hurt point
@@ -278,7 +303,7 @@ CreateExplosion(Float:pos[3])
 	DispatchKeyValue(exHurt, "Damage", "5");
 	DispatchKeyValue(exHurt, "DamageType", "8");
 	DispatchSpawn(exHurt);
-	TeleportEntity(exHurt, pos, NULL_VECTOR, NULL_VECTOR);
+	TeleportEntity(exHurt, carPos, NULL_VECTOR, NULL_VECTOR);
 	
 	switch(GetRandomInt(1,3))
 	{
@@ -347,7 +372,8 @@ CreateExplosion(Float:pos[3])
 	WritePackCell(pack, exTrace);
 	WritePackCell(pack, exHurt);
 	CreateTimer(GetConVarFloat(g_cvarTrace), timerStopFire, pack, TIMER_FLAG_NO_MAPCHANGE);
-	decl Float:tpos[3], Float:ratio[3], Float:addVel[3];
+	
+	decl Float:survivorPos[3], Float:traceVec[3], Float:resultingFling[3], Float:currentVelVec[3];
 	for(new i=1; i<=MaxClients; i++)
 	{
 		if(!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != 2)
@@ -355,13 +381,22 @@ CreateExplosion(Float:pos[3])
 			continue;
 		}
 
-		GetEntPropVector(i, Prop_Data, "m_vecOrigin", tpos);
-		if(GetVectorDistance(pos, tpos) <= flMxDistance)
-		{			
-			addVel[0] = FloatMul(ratio[0]*-1, power);
-			addVel[1] = FloatMul(ratio[1]*-1, power);
-			addVel[2] = power;
-			FlingPlayer(i, addVel, i);
+		GetEntPropVector(i, Prop_Data, "m_vecOrigin", survivorPos);
+		if(GetVectorDistance(carPos, survivorPos) <= flMxDistance)
+		{
+			MakeVectorFromPoints(carPos, survivorPos, traceVec);				// draw a line from car to Survivor
+			GetVectorAngles(traceVec, resultingFling);							// get the angles of that line
+			
+			resultingFling[0] = Cosine(DegToRad(resultingFling[1])) * power;	// use trigonometric magic
+			resultingFling[1] = Sine(DegToRad(resultingFling[1])) * power;
+			resultingFling[2] = power;
+			
+			GetEntPropVector(i, Prop_Data, "m_vecVelocity", currentVelVec);		// add whatever the Survivor had before
+			resultingFling[0] += currentVelVec[0];
+			resultingFling[1] += currentVelVec[1];
+			resultingFling[2] += currentVelVec[2];
+			
+			FlingPlayer(i, resultingFling, i);
 		}
 	}
 }
@@ -428,7 +463,7 @@ public Action:timerRemovePrecacheParticle(Handle:timer, any:Particle)
 
 stock AttachParticle(car, const String:Particle_Name[])
 {
-	decl Float:pos[3], String:sName[64], String:sTargetName[64];
+	decl Float:carPos[3], String:sName[64], String:sTargetName[64];
 	new Particle = CreateEntityByName("info_particle_system");
 	if(g_iParticle[car] > 0 && IsValidEntity(g_iParticle[car]))
 	{
@@ -436,8 +471,8 @@ stock AttachParticle(car, const String:Particle_Name[])
 		g_iParticle[car] = -1;
 	}
 	g_iParticle[car] = Particle;
-	GetEntPropVector(car, Prop_Data, "m_vecOrigin", pos);
-	TeleportEntity(Particle, pos, NULL_VECTOR, NULL_VECTOR);
+	GetEntPropVector(car, Prop_Data, "m_vecOrigin", carPos);
+	TeleportEntity(Particle, carPos, NULL_VECTOR, NULL_VECTOR);
 	DispatchKeyValue(Particle, "effect_name", Particle_Name);
 	
 	new userid = car;
@@ -462,4 +497,26 @@ stock PanicEvent()
 	DispatchSpawn(Director);
 	AcceptEntityInput(Director, "ForcePanicEvent");
 	AcceptEntityInput(Director, "Kill");
+}
+
+stock DebugPrintToAll(const String:format[], any:...)
+{
+	#if (TEST_DEBUG || TEST_DEBUG_LOG)
+	decl String:buffer[256];
+	
+	VFormat(buffer, sizeof(buffer), format, 2);
+	
+	#if TEST_DEBUG
+	PrintToChatAll("[EC] %s", buffer);
+	PrintToConsole(0, "[EC] %s", buffer);
+	#endif
+	
+	LogMessage("%s", buffer);
+	#else
+	//suppress "format" never used warning
+	if(format[0])
+		return;
+	else
+		return;
+	#endif
 }
