@@ -4185,7 +4185,7 @@ public OnPluginEnd()
 	ResetConVar(FindConVar("z_spawn_safety_range"), true, true);
 	ResetConVar(FindConVar("z_spawn_flow_limit"), true, true);
 	//ResetConVar(FindConVar("z_max_player_zombies"), true, true);
-	ResetConVar(FindConVar("sb_all_bot_team"), true, true);
+	//ResetConVar(FindConVar("sb_all_bot_team"), true, true);		// no longer there?
 	
 	// Destroy the persistent storage for client HUD preferences
 	if (usrHUDPref != INVALID_HANDLE)

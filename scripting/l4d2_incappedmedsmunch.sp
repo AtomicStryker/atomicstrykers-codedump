@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION		"1.1.6"
+#define PLUGIN_VERSION		"1.1.7"
 
 
 #define STRING_LENGTH		32
@@ -241,13 +241,14 @@ static InterruptMunch(client)
 	{
 		new Meds = GetPlayerWeaponSlot(client, PILLS_ADRENALINE_SLOT);
 	
+		if (!IsValidEdict(Meds))
+		{
+			return;
+		}
+		
 		decl String:medstring[256];
 		GetEdictClassname(Meds, medstring, sizeof(medstring));
-		
-		if (IsValidEdict(Meds))
-		{
-			RemoveEdict(Meds);
-		}
+		RemoveEdict(Meds);
 		
 		new droppedstuff = CreateEntityByName(medstring);
 		new ticktime = RoundToNearest( FloatDiv( GetGameTime() , GetTickInterval() ) ) + 5;
