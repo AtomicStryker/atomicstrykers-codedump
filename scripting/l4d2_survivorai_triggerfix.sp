@@ -1,7 +1,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.7"
+#define PLUGIN_VERSION "1.0.8"
 
 new bool:MapTrigger;
 new bool:WarpTrigger;
@@ -74,14 +74,14 @@ public OnClientConnected(client)
 	}
 	
 	GameRunning = false;
-	SetConVarInt(FindConVar("sb_all_bot_team"), 0);
+	SetConVarInt(FindConVar("sb_all_bot_game"), 0);
 }
 
 public OnClientPutInServer(client)
 {
 	if (!IsFakeClient(client))
 	{
-		SetConVarInt(FindConVar("sb_all_bot_team"), 1);
+		SetConVarInt(FindConVar("sb_all_bot_game"), 1);
 		GameRunning = true;
 	}
 }
@@ -101,7 +101,7 @@ public OnClientDisconnect_Post(client)
 	}
 	
 	GameRunning = false;
-	SetConVarInt(FindConVar("sb_all_bot_team"), 0);
+	SetConVarInt(FindConVar("sb_all_bot_game"), 0);
 }
 
 public Action:GameEnds(Handle:event, const String:name[], bool:dontBroadcast)
@@ -182,7 +182,6 @@ public Action:CheckAroundTriggers(Handle:timer)
 		new button = FindEntityByClassname(-1, "func_button"); //gunshop button
 		
 		decl Float:pos1[3];
-
 		if (!WarpTrigger)
 		{
 			pos1[0] = -2407.7  // on trashcan blockade
@@ -592,7 +591,7 @@ public Action:CheckAroundTriggers(Handle:timer)
 		
 		new button = FindEntityByName("escape_gate_button,", -1);
 		
-		if (CheckforBots(pos1, 400.0) && !MapTrigger)
+		if (CheckforBots(pos1, 400.0) && !MapTrigger && button)
 		{
 			PrintToChatAll("\x04[BOTFIX] \x01Bot found ready for Finale. Going on...");
 			AcceptEntityInput(button, "Press");
@@ -998,34 +997,7 @@ public Action:Cmd_FindNearEntities(client, args)
 		GetEntPropString(i, Prop_Data, "m_iName", name, sizeof(name));
 		GetEdictClassname(i, classname, 128)
 		
-		// you wouldn't believe how long this took me.
-		if (strcmp(classname, "cs_team_manager") == 0) continue;
-		if (strcmp(classname, "terror_player_manager") == 0) continue;
-		if (strcmp(classname, "terror_gamerules") == 0) continue;
-		if (strcmp(classname, "soundent") == 0) continue;
-		if (strcmp(classname, "vote_controller") == 0) continue;
-		if (strcmp(classname, "move_rope") == 0) continue;
-		if (strcmp(classname, "keyframe_rope") == 0) continue;
-		if (strcmp(classname, "water_lod_control") == 0) continue;
-		if (strcmp(classname, "predicted_viewmodel") == 0) continue;
-		if (strcmp(classname, "beam") == 0) continue;
-		if (strcmp(classname, "info_particle_system") == 0) continue;
-		if (strcmp(classname, "color_correction") == 0) continue;
-		if (strcmp(classname, "shadow_control") == 0) continue;
-		if (strcmp(classname, "env_fog_controller") == 0) continue;
-		if (strcmp(classname, "ability_lunge") == 0) continue;
-		if (strcmp(classname, "cs_ragdoll") == 0) continue;
-		if (strcmp(classname, "instanced_scripted_scene") == 0) continue;
-		if (strcmp(classname, "ability_vomit") == 0) continue;
-		if (strcmp(classname, "ability_tongue") == 0) continue;
-		if (strcmp(classname, "env_wind") == 0) continue;
-		if (strcmp(classname, "env_detail_controller") == 0) continue;
-		if (strcmp(classname, "func_occluder") == 0) continue;
-		if (strcmp(classname, "logic_choreographed_scene") == 0) continue;
-		if (strcmp(classname, "env_sun") == 0) continue;
-		if (strcmp(classname, "ability_spit") == 0) continue;
-		if (strcmp(classname, "ability_leap") == 0) continue;
-		if (strcmp(classname, "ability_charge") == 0) continue;
+		if (FindDataMapOffs(i, "m_iName") == -1) continue;
 		
 		GetEntityAbsOrigin(i, entpos);
 		if (GetVectorDistance(entpos, clientpos) < radius)
@@ -1065,34 +1037,7 @@ stock FindEntityByName(String:name[], any:startcount)
 		
 		GetEdictClassname(i, classname, 128);
 		
-		// you wouldn't believe how long this took me.
-		if (strcmp(classname, "cs_team_manager") == 0) continue;
-		if (strcmp(classname, "terror_player_manager") == 0) continue;
-		if (strcmp(classname, "terror_gamerules") == 0) continue;
-		if (strcmp(classname, "soundent") == 0) continue;
-		if (strcmp(classname, "vote_controller") == 0) continue;
-		if (strcmp(classname, "move_rope") == 0) continue;
-		if (strcmp(classname, "keyframe_rope") == 0) continue;
-		if (strcmp(classname, "water_lod_control") == 0) continue;
-		if (strcmp(classname, "predicted_viewmodel") == 0) continue;
-		if (strcmp(classname, "beam") == 0) continue;
-		if (strcmp(classname, "info_particle_system") == 0) continue;
-		if (strcmp(classname, "color_correction") == 0) continue;
-		if (strcmp(classname, "shadow_control") == 0) continue;
-		if (strcmp(classname, "env_fog_controller") == 0) continue;
-		if (strcmp(classname, "ability_lunge") == 0) continue;
-		if (strcmp(classname, "cs_ragdoll") == 0) continue;
-		if (strcmp(classname, "instanced_scripted_scene") == 0) continue;
-		if (strcmp(classname, "ability_vomit") == 0) continue;
-		if (strcmp(classname, "ability_tongue") == 0) continue;
-		if (strcmp(classname, "env_wind") == 0) continue;
-		if (strcmp(classname, "env_detail_controller") == 0) continue;
-		if (strcmp(classname, "func_occluder") == 0) continue;
-		if (strcmp(classname, "logic_choreographed_scene") == 0) continue;
-		if (strcmp(classname, "env_sun") == 0) continue;
-		if (strcmp(classname, "ability_spit") == 0) continue;
-		if (strcmp(classname, "ability_leap") == 0) continue;
-		if (strcmp(classname, "ability_charge") == 0) continue;
+		if (FindDataMapOffs(i, "m_iName") == -1) continue;
 		
 		decl String:iname[128];
 		GetEntPropString(i, Prop_Data, "m_iName", iname, sizeof(iname));

@@ -19,7 +19,7 @@
 #define READY_DEBUG 0
 #define READY_DEBUG_LOG 0
 
-#define READY_VERSION "0.17.5"
+#define READY_VERSION "0.17.6"
 #define READY_SCAVENGE_WARMUP 1
 #define READY_LIVE_COUNTDOWN 5
 #define READY_UNREADY_HINT_PERIOD 10.0
@@ -1716,7 +1716,7 @@ directorStop()
 	SetConVarInt(cvarZMegaMobSize, 1);
 	
 	//empty teams of survivors dont cycle the round
-	SetConVarInt(FindConVar("sb_all_bot_team"), 1);
+	SetConVarInt(FindConVar("sb_all_bot_game"), 1);
 }
 
 directorStart()
