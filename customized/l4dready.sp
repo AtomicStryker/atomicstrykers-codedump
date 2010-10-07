@@ -19,7 +19,7 @@
 #define READY_DEBUG 0
 #define READY_DEBUG_LOG 0
 
-#define READY_VERSION "0.17.6"
+#define READY_VERSION "0.17.7"
 #define READY_SCAVENGE_WARMUP 1
 #define READY_LIVE_COUNTDOWN 5
 #define READY_UNREADY_HINT_PERIOD 10.0
@@ -205,10 +205,6 @@ public OnPluginStart()
 	RegConsoleCmd("sm_pause", readyPause);
 	RegConsoleCmd("sm_unpause", readyUnpause);
 	RegConsoleCmd("unpause", Command_Unpause);
-	
-	//block all voting if we're enforcing ready mode
-	//we only temporarily allow votes to fake restart the campaign
-	RegConsoleCmd("callvote", callVote);
 	
 	RegConsoleCmd("spectate", Command_Spectate);
 	
@@ -1022,7 +1018,7 @@ public Action:FakeRestartVoteCampaign(client, args)
 {
 	if (IsTargetL4D2())
 	{
-		ReplyToCommand(client, "restartround is not supported in L4D2");
+		ReplyToCommand(client, "Just use the restart Chapter Vote");
 		return Plugin_Handled;
 	}
 	//re-enable ready mode after the restart
@@ -1080,35 +1076,6 @@ RestartMapNow()
 	GetCurrentMap(currentMap, 256);
 	
 	ServerCommand("changelevel %s", currentMap);
-}
-
-public Action:callVote(client, args)
-{
-	if(!GetConVarInt(cvarEnforceReady))
-	{
-		return Plugin_Continue;
-	}
-	
-	decl String:votetype[32];
-	GetCmdArg(1, votetype, sizeof(votetype));
-	
-	// Check for the caller having any admin flag on the server
-	if (GetUserAdmin(client) != INVALID_ADMIN_ID)
-	{
-		if (StrEqual(votetype, "ChangeMission", false) || StrEqual(votetype, "RestartGame", false) || StrEqual(votetype, "ReturnToLobby", false))
-		{
-			#if READY_DEBUG
-			DebugPrintToAll("[DEBUG] Passing *any* Admins vote concerning mapmanagement");
-			#endif
-			
-			return Plugin_Continue;
-		}	
-	}
-
-	#if READY_DEBUG
-	DebugPrintToAll("[DEBUG] Voting is blocked");
-	#endif
-	return Plugin_Handled;
 }
 
 public Action:Command_Spectate(client, args)
