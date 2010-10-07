@@ -1491,7 +1491,7 @@ DrawReadyPanelList()
 		
 		for(new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++) 
 		{
-			if(IsClientInGameHuman(i)) 
+			if(IsClientInGameHuman(i) && GetClientTeam(i) != L4D_TEAM_SPECTATE)
 			{
 				GetClientName(i, name, sizeof(name));
 				
