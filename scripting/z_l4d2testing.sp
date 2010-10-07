@@ -37,30 +37,79 @@ public OnPluginStart()
 	
 	RegAdminCmd("sm_isreachable", Cmd11, ADMFLAG_CHEATS, "sm_isreachable <player> <targetent>");
 	
-	RegAdminCmd("sm_splitstring", Cmd12, ADMFLAG_CHEATS, "sm_splitstring <testing string>");
+	RegAdminCmd("sm_light", Cmd12, ADMFLAG_CHEATS, "sm_light spawn dynamic light");
 }
 
 public Action:Cmd12(client, args)
 {
-	decl String:buffer[56];
-	decl String:buffer2[56];
-	
-	if (!args)
+	if (!client)
 	{
-		ReplyToCommand(client, "sm_splitstring <testing string>");
+		ReplyToCommand(client, "Must be ingame to use this command");
 		return Plugin_Handled;
 	}
 	
-	GetCmdArg(1, buffer, sizeof(buffer));
+	new lightEntity = CreateEntityByName("point_spotlight");
 	
-	new answer = SplitString(buffer, "_spawn", buffer2, sizeof(buffer2));
-	
-	if (answer == -1)
+	if (lightEntity == -1)
 	{
-		strcopy(buffer2, sizeof(buffer2), "nope");
+		ReplyToCommand(client, "Dynamic Light spawn failed!");
+		return Plugin_Handled;
 	}
 	
-	ReplyToCommand(client, "SplitString reports %i, resulting String: %s", answer, buffer2);
+	decl String:targetName[36];
+	Format(targetName, sizeof(targetName), "dynlight%d", client);
+	
+	DispatchKeyValue(lightEntity, "targetname", targetName);
+	DispatchKeyValue(lightEntity, "spawnflags", "1");
+	
+	DispatchKeyValue(lightEntity, "spotlightwidth", "200");
+	DispatchKeyValue(lightEntity, "spotlightlength", "400");
+
+	DispatchKeyValue(lightEntity, "rendermode", "0");
+	DispatchKeyValue(lightEntity, "rendercolor", "252 243 226");
+	DispatchKeyValue(lightEntity, "renderamt", "64");
+	DispatchKeyValue(lightEntity, "HDRColorScale", "0.5");
+	DispatchKeyValue(lightEntity, "HaloScale", "16")
+	DispatchKeyValue(lightEntity, "fadescale", "1");
+	DispatchKeyValue(lightEntity, "fademindist", "-1");
+	DispatchKeyValue(lightEntity, "angles", "0 0 0");
+	
+	DispatchKeyValue(lightEntity, "disablereceiveshadows", "0");
+	
+	decl Float:pos[3];
+	decl Float:angles[3];
+	GetClientAbsOrigin(client, pos);
+	pos[2] += 50.0;
+	GetClientAbsAngles(client, angles);
+	TeleportEntity(lightEntity, pos, angles, NULL_VECTOR);
+	
+	decl String:ang1[10], String:ang2[10], String:ang3[10];
+	FloatToString(angles[0], ang1, sizeof(ang1));
+	FloatToString(angles[1], ang2, sizeof(ang2));
+	FloatToString(angles[2], ang3, sizeof(ang3));
+	
+	decl String:angstring[36];
+	Format(angstring, sizeof(angstring), "%s %s %s", ang1, ang2, ang3);
+
+	// Attach to player
+	decl String:targetstring[128];
+	Format(targetstring, sizeof(targetstring), "target%i", client);
+	DispatchKeyValue(client, "targetname", targetstring);
+	SetVariantString(targetstring);
+	AcceptEntityInput(lightEntity, "SetParent", lightEntity, lightEntity, 0);
+	SetVariantString("mzzle_flash");
+	AcceptEntityInput(lightEntity, "SetParentAttachment", lightEntity, lightEntity, 0);
+	
+	DispatchKeyValue(lightEntity, "angles", angstring);
+	
+	//SetVariantString(targetstring);
+	//AcceptEntityInput(lightEntity, "SetParentAttachmentOffset", lightEntity, lightEntity, 0);
+	
+	DispatchSpawn(lightEntity);
+	ActivateEntity(lightEntity);
+	AcceptEntityInput(lightEntity, "TurnOn");
+	
+	ReplyToCommand(client, "Dynamic Light spawned at your position!!");
 	
 	return Plugin_Handled;
 }

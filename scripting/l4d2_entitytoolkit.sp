@@ -1,7 +1,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.2"
+#define PLUGIN_VERSION "1.0.3"
 
 
 public Plugin:myinfo =
@@ -178,6 +178,10 @@ public Action:Cmd_FindNearEntities(client, args)
 			GetEntPropString(i, Prop_Data, "m_iName", name, sizeof(name));
 			hasname = true;
 		}
+		
+		if (GetEntSendPropOffs(i, "m_vecOrigin") == -1
+		|| GetEntSendPropOffs(i, "m_vecMins") == -1
+		|| GetEntSendPropOffs(i, "m_vecMaxs") == -1) continue;
 		
 		GetEdictClassname(i, classname, sizeof(classname));
 		
