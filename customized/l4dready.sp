@@ -1204,32 +1204,15 @@ public Action:Command_Say(client, args)
 	decl String:sayWord[MAX_NAME_LENGTH];
 	GetCmdArg(1, sayWord, sizeof(sayWord));
 	
-	new idx = StrContains(sayWord, "notready", false);
-	if(idx == 1)
+	if(sayWord[0] == '!' || sayWord[0] == '/')
 	{
-		readyDown(client, args);
-		return Plugin_Handled;
-	}
-	
-	idx = StrContains(sayWord, "unready", false);
-	if(idx == 1)
-	{
-		readyDown(client, args);
-		return Plugin_Handled;
-	}
-	
-	idx = StrContains(sayWord, "ready", false);
-	if(idx == 1)
-	{
-		readyUp(client, args);
-		return Plugin_Handled;
-	}
-	
-	idx = StrContains(sayWord, "cast", false);
-	if(idx == 1)
-	{
-		regCaster(client, args);
-		return Plugin_Handled;
+		if(StrEqual(sayWord[1], "notready")
+		|| StrEqual(sayWord[1], "unready")
+		|| StrEqual(sayWord[1], "ready")
+		|| StrEqual(sayWord[1], "cast"))
+		{
+			return Plugin_Handled;
+		}
 	}
 	
 	if (isPaused) //Do our own chat output when the game is paused
@@ -1246,6 +1229,7 @@ public Action:Command_Say(client, args)
 	}
 	return Plugin_Continue;
 }
+
 public Action:Command_Teamsay(client, args)
 {
 	if (args < 1 || (!readyMode && !isPaused))
@@ -1256,32 +1240,15 @@ public Action:Command_Teamsay(client, args)
 	decl String:sayWord[MAX_NAME_LENGTH];
 	GetCmdArg(1, sayWord, sizeof(sayWord));
 	
-	new idx = StrContains(sayWord, "notready", false);
-	if(idx == 1)
+	if(sayWord[0] == '!' || sayWord[0] == '/')
 	{
-		readyDown(client, args);
-		return Plugin_Handled;
-	}
-	
-	idx = StrContains(sayWord, "unready", false);
-	if(idx == 1)
-	{
-		readyDown(client, args);
-		return Plugin_Handled;
-	}
-	
-	idx = StrContains(sayWord, "ready", false);
-	if(idx == 1)
-	{
-		readyUp(client, args);
-		return Plugin_Handled;
-	}
-	
-	idx = StrContains(sayWord, "cast", false);
-	if(idx == 1)
-	{
-		regCaster(client, args);
-		return Plugin_Handled;
+		if(StrEqual(sayWord[1], "notready")
+		|| StrEqual(sayWord[1], "unready")
+		|| StrEqual(sayWord[1], "ready")
+		|| StrEqual(sayWord[1], "cast"))
+		{
+			return Plugin_Handled;
+		}
 	}
 	
 	if (isPaused) //Do our own chat output when the game is paused
@@ -1321,6 +1288,7 @@ public Action:Command_Teamsay(client, args)
 	}
 	return Plugin_Continue;
 }
+
 public Action:readyUp(client, args)
 {
 	if (!readyMode
