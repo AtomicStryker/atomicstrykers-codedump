@@ -323,6 +323,12 @@ public OnPluginStart()
 	
 }
 
+public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
+{
+	CreateNative("L4DReady_IsGamePaused", nativeIsGamePaused);
+	return APLRes_Success;
+}
+
 public OnAllPluginsLoaded()
 {	
 	new bool:l4dscores = FindConVar("l4d_team_manager_ver") != INVALID_HANDLE;
@@ -3253,6 +3259,11 @@ ClientAttemptsUnpause(client)
 		return;
 	}
 	ReplyToCommand(client, "[SM]Your team can not unpause at this time.");
+}
+
+public nativeIsGamePaused(Handle:plugin, numParams)
+{
+	return isPaused;
 }
 
 PauseGame(any:client)
