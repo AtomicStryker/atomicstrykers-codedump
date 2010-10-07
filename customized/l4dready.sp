@@ -484,12 +484,13 @@ checkStatus()
 		
 			if (team != L4D_TEAM_SPECTATE
 			|| (team == L4D_TEAM_SPECTATE && IsClientCaster(i)))
-		
-			humans++;
-			if (readyStatus[i]) ready++;
+			{
+				humans++;
+				if (readyStatus[i]) ready++;
+			}
 		}
 	}
-	if(humans == 0 || humans < GetConVarInt(cvarReadyMinimum))
+	if(!humans || humans < GetConVarInt(cvarReadyMinimum))
 		return;
 	
 	if (goingLive && (humans == ready)) return;
@@ -625,7 +626,7 @@ public Action:eventRSLiveCallback(Handle:event, const String:name[], bool:dontBr
 			
 		}
 		//last restart, match is now live!
-		else if (insideCampaignRestart == 0)
+		else if (!insideCampaignRestart)
 		{
 			RoundIsLive();
 		}
@@ -1255,7 +1256,7 @@ public Action:Command_Teamsay(client, args)
 	{
 		decl String:sText[256];
 		GetCmdArg(1, sText, sizeof(sText));
-		if (client == 0 || (IsChatTrigger() && sText[0] == '/')) //Ignore if it is a server message or a silent chat trigger
+		if (!client || (IsChatTrigger() && sText[0] == '/')) //Ignore if it is a server message or a silent chat trigger
 		{
 			return Plugin_Continue;
 		}
@@ -1431,11 +1432,11 @@ public Action:readyWho(client, args)
 		}
 	}
 	
-	if(numPlayersRdy == 0) 
+	if(!numPlayersRdy) 
 	{
 		StrCat(readyPlayers, 1024, "NONE");
 	}
-	if(numPlayersNotRdy == 0) 
+	if(!numPlayersNotRdy) 
 	{
 		StrCat(unreadyPlayers, 1024, "NONE");
 	}
@@ -1670,12 +1671,12 @@ directorStop()
 		ZCommonLimit 			= GetConVarInt(cvarZCommonLimit);
 		ZMegaMobSize			= GetConVarInt(cvarZMegaMobSize);
 		
-		if (ZCommonLimit == 0) //confogl bugfix
+		if (!ZCommonLimit) //confogl bugfix
 		{
 			ZCommonLimit = 30;
 		}
 		
-		if (ZMegaMobSize == 0) //confogl bugfix
+		if (!ZMegaMobSize) //confogl bugfix
 		{
 			ZMegaMobSize = 50;
 		}
@@ -2031,7 +2032,7 @@ public ConVarChange_ReadyEnabled(Handle:convar, const String:oldValue[], const S
 				decl String:searchKey[128];
 				GetConVarString(cvarSearchKey, searchKey, 128);
 				
-				if(searchKey[0] == 0)
+				if(!searchKey[0])
 				{
 					LogMessage("Ready plugin will not start while sv_search_key is \"\"");
 					PrintToChatAll("[SM] Ready plugin will not start while sv_search_key is \"\"");
@@ -2108,7 +2109,7 @@ public ConVarChange_SearchKey(Handle:convar, const String:oldValue[], const Stri
 	}
 	else
 	{	
-		if(newValue[0] == 0)
+		if(!newValue[0])
 		{
 			//wait about 5 secs and then disable the ready up mod
 			
@@ -2129,7 +2130,7 @@ public Action:Timer_SearchKeyDisabled(Handle:timer)
 		decl String:searchKey[128];
 		GetConVarString(cvarSearchKey, searchKey, 128);
 		
-		if(searchKey[0] == 0)
+		if(!searchKey[0])
 		{
 			PrintToChatAll("[SM] sv_search_key is not set, the l4dready plugin will now automatically disable itself.");
 			
@@ -3310,7 +3311,7 @@ public Action:AllCanUnpause(Handle:timer)
 public Action:readyPause(client, args)
 {
 	//server can pause without a request
-	if(client == 0)
+	if(!client)
 	{
 		for(new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
 		{
@@ -3329,7 +3330,7 @@ public Action:readyPause(client, args)
 public Action:readyUnpause(client, args)
 {
 	//server can unpause without a request
-	if(client == 0)
+	if(!client)
 	{
 		for(new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
 		{
