@@ -40,6 +40,11 @@ public OnPluginStart()
 	RegAdminCmd("sm_light", Cmd12, ADMFLAG_CHEATS, "sm_light spawn dynamic light");
 }
 
+public Action:L4D_OnKeyValuesGetFloat(const String:key[], &Float:retVal)
+{
+	return Plugin_Continue;
+}
+
 public Action:Cmd12(client, args)
 {
 	if (!client)
@@ -97,8 +102,9 @@ public Action:Cmd12(client, args)
 	DispatchKeyValue(client, "targetname", targetstring);
 	SetVariantString(targetstring);
 	AcceptEntityInput(lightEntity, "SetParent", lightEntity, lightEntity, 0);
-	SetVariantString("mzzle_flash");
-	AcceptEntityInput(lightEntity, "SetParentAttachment", lightEntity, lightEntity, 0);
+	
+	//SetVariantString("mzzle_flash");
+	//AcceptEntityInput(lightEntity, "SetParentAttachment", lightEntity, lightEntity, 0);
 	
 	DispatchKeyValue(lightEntity, "angles", angstring);
 	

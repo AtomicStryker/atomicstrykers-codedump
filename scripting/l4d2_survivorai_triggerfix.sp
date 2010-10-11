@@ -1,7 +1,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.8"
+#define PLUGIN_VERSION "1.0.9"
 
 new bool:MapTrigger;
 new bool:WarpTrigger;
@@ -75,6 +75,7 @@ public OnClientConnected(client)
 	
 	GameRunning = false;
 	SetConVarInt(FindConVar("sb_all_bot_game"), 0);
+	SetConVarInt(FindConVar("allow_all_bot_survivor_team"), 0);
 }
 
 public OnClientPutInServer(client)
@@ -82,6 +83,7 @@ public OnClientPutInServer(client)
 	if (!IsFakeClient(client))
 	{
 		SetConVarInt(FindConVar("sb_all_bot_game"), 1);
+		SetConVarInt(FindConVar("allow_all_bot_survivor_team"), 1);
 		GameRunning = true;
 	}
 }
