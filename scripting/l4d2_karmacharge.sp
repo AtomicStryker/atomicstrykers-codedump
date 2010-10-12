@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION 						  "1.0.5"
+#define PLUGIN_VERSION 						  "1.0.6"
 
 #define TEST_DEBUG 		0
 #define TEST_DEBUG_LOG 	0
@@ -167,18 +167,29 @@ static SlowChargeCouple(client)
 	SetEntPropFloat(client, Prop_Send, "m_flLaggedMovementValue", 0.2);
 	SetEntPropFloat(target, Prop_Send, "m_flLaggedMovementValue", 0.2);
 	
-	CreateTimer(GetConVarFloat(karmaTime), _revertCoupleTimeSlow, client);
+	new Handle:data = CreateDataPack();
+	WritePackCell(data, client);
+	WritePackCell(data, target);
+	
+	CreateTimer(GetConVarFloat(karmaTime), _revertCoupleTimeSlow, data);
 }
 
-public Action:_revertCoupleTimeSlow(Handle:timer, any:client)
+public Action:_revertCoupleTimeSlow(Handle:timer, Handle:data)
 {
-	if (!IsClientInGame(client)) return;
-	SetEntPropFloat(client, Prop_Send, "m_flLaggedMovementValue", 1.0);
+	ResetPack(data);
+	new client = ReadPackCell(data);
+	new target = ReadPackCell(data);
+	CloseHandle(data);
+
+	if (IsClientInGame(client))
+	{
+		SetEntPropFloat(client, Prop_Send, "m_flLaggedMovementValue", 1.0);
+	}
 	
-	new target = GetCarryVictim(client);
-	if (target == -1) return;
-	
-	SetEntPropFloat(target, Prop_Send, "m_flLaggedMovementValue", 1.0);
+	if (IsClientInGame(target))
+	{
+		SetEntPropFloat(target, Prop_Send, "m_flLaggedMovementValue", 1.0);
+	}
 }
 
 static GetCarryVictim(client)

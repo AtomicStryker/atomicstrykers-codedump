@@ -207,6 +207,7 @@ public OnPluginStart()
 	RegConsoleCmd("unpause", Command_Unpause);
 	
 	RegConsoleCmd("spectate", Command_Spectate);
+	RegConsoleCmd("callvote", Command_CallVote);
 	
 	#if READY_DEBUG
 	RegConsoleCmd("unfreezeme1", Command_Unfreezeme1);	
@@ -258,7 +259,7 @@ public OnPluginStart()
 	fwdOnReadyRoundRestarted = CreateGlobalForward("OnReadyRoundRestarted", ET_Event);
 	
 	CreateConVar("l4d_ready_version", READY_VERSION, "Version of the ready up plugin.", CONVAR_FLAGS_PLUGIN|FCVAR_DONTRECORD);
-	cvarEnforceReady = CreateConVar("l4d_ready_enabled", "1", "Make players ready up by default before a match begins", CONVAR_FLAGS_PLUGIN);
+	cvarEnforceReady = CreateConVar("l4d_ready_enabled", "0", "Make players ready up by default before a match begins", CONVAR_FLAGS_PLUGIN);
 	cvarReadyCompetition = CreateConVar("l4d_ready_competition", "0", "Disable all plugins but a few competition-allowed ones", CONVAR_FLAGS_PLUGIN);
 	cvarReadyHalves = CreateConVar("l4d_ready_both_halves", "0", "Make players ready up both during the first and second rounds of a map", CONVAR_FLAGS_PLUGIN);
 	cvarReadyMinimum = CreateConVar("l4d_ready_minimum_players", "8", "Minimum # of players before we can ready up", CONVAR_FLAGS_PLUGIN);
@@ -1076,6 +1077,17 @@ RestartMapNow()
 	GetCurrentMap(currentMap, 256);
 	
 	ServerCommand("changelevel %s", currentMap);
+}
+
+public Action:Command_CallVote(client, args)
+{
+	if (client && IsClientInGame(client) && GetClientTeam(client) != L4D_TEAM_SPECTATE)
+	{
+		return Plugin_Continue;
+	}
+	
+	ReplyToCommand(client, "[SM] You must be ingame and not spectator to vote");
+	return Plugin_Handled;
 }
 
 public Action:Command_Spectate(client, args)

@@ -38,11 +38,34 @@ public OnPluginStart()
 	RegAdminCmd("sm_isreachable", Cmd11, ADMFLAG_CHEATS, "sm_isreachable <player> <targetent>");
 	
 	RegAdminCmd("sm_light", Cmd12, ADMFLAG_CHEATS, "sm_light spawn dynamic light");
+	
+	RegAdminCmd("sm_swteam", Cmd13, ADMFLAG_CHEATS, "sm_swteam calls l4d_directorswap");
 }
 
-public Action:L4D_OnKeyValuesGetFloat(const String:key[], &Float:retVal)
+public Action:Cmd13(client, args)
 {
-	return Plugin_Continue;
+	new Handle:gConfRaw = LoadGameConfigFile("l4d2scores");
+
+	new Address:g_pDirector = GameConfGetAddress(gConfRaw, "CDirector");
+	DebugPrintToAll("PTR to Director loaded at 0x%x", g_pDirector);
+	if(g_pDirector == Address_Null)
+	{
+		ThrowError("Could not load the Director pointer");
+	}
+	
+	StartPrepSDKCall(SDKCall_Raw);
+	if(!PrepSDKCall_SetFromConf(gConfRaw, SDKConf_Signature, "SwapTeams"))
+	{
+		LogError("Could not load the SwapTeams signature");
+	}
+	DebugPrintToAll("SwapTeams Signature prepped");
+	new Handle:fSwapTeams = EndPrepSDKCall();
+	if(fSwapTeams == INVALID_HANDLE)
+	{
+		ThrowError("Could not prep the SwapTeams function");
+	}
+
+	SDKCall(fSwapTeams, g_pDirector);
 }
 
 public Action:Cmd12(client, args)
