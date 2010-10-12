@@ -208,6 +208,7 @@ public OnPluginStart()
 	
 	RegConsoleCmd("spectate", Command_Spectate);
 	RegConsoleCmd("callvote", Command_CallVote);
+	RegConsoleCmd("vote", Command_CallVote);
 	
 	#if READY_DEBUG
 	RegConsoleCmd("unfreezeme1", Command_Unfreezeme1);	
