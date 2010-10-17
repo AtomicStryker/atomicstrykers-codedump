@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION 						  "1.0.6"
+#define PLUGIN_VERSION 						  "1.0.7"
 
 #define TEST_DEBUG 		0
 #define TEST_DEBUG_LOG 	0
@@ -51,6 +51,7 @@ public OnMapStart()
 {
 	PrefetchSound(SOUND_EFFECT);
 	PrecacheSound(SOUND_EFFECT);
+	chargerTimer = INVALID_HANDLE;
 }
 
 public _cvarChange(Handle:convar, const String:oldValue[], const String:newValue[])

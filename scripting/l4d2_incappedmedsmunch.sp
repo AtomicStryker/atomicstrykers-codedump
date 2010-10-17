@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION		"1.1.7"
+#define PLUGIN_VERSION		"1.1.8"
 
 
 #define STRING_LENGTH		32
@@ -158,9 +158,13 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 		GetEdictClassname(Meds, medstring, sizeof(medstring));
 		
 		new target = GetClientAimTarget(client, true);
-		if (target < 1) return Plugin_Continue;
 		
-		if (!IsPlayerIncapped(target)) return Plugin_Continue;
+		if (target < 1
+		|| !IsPlayerIncapped(target)
+		|| GetClientTeam(target) != TEAM_SURVIVORS)
+		{
+			return Plugin_Continue;
+		}
 		
 		if (GetPlayerWeaponSlot(target, PILLS_ADRENALINE_SLOT) != -1)
 		{
