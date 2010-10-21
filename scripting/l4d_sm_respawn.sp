@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.9.1"
+#define PLUGIN_VERSION "1.9.2"
 
 
 public Plugin:myinfo =
@@ -46,13 +46,15 @@ public OnPluginStart()
 		PrepSDKCall_SetFromConf(hGameConf, SDKConf_Signature, "BecomeGhost");
 		PrepSDKCall_AddParameter(SDKType_PlainOldData , SDKPass_Plain);
 		hBecomeGhost = EndPrepSDKCall();
-		if (hBecomeGhost == INVALID_HANDLE) LogError("L4D_SM_Respawn: BecomeGhost Signature broken");
+		if (hBecomeGhost == INVALID_HANDLE && StrEqual(game_name, "left4dead2", false))
+			LogError("L4D_SM_Respawn: BecomeGhost Signature broken");
 
 		StartPrepSDKCall(SDKCall_Player);
 		PrepSDKCall_SetFromConf(hGameConf, SDKConf_Signature, "State_Transition");
 		PrepSDKCall_AddParameter(SDKType_PlainOldData , SDKPass_Plain);
 		hState_Transition = EndPrepSDKCall();
-		if (hState_Transition == INVALID_HANDLE) LogError("L4D_SM_Respawn: State_Transition Signature broken");
+		if (hState_Transition == INVALID_HANDLE && StrEqual(game_name, "left4dead2", false))
+			LogError("L4D_SM_Respawn: State_Transition Signature broken");
 	}
 	else
 	{

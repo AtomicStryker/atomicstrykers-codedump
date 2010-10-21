@@ -1,7 +1,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION		"1.0.8"
+#define PLUGIN_VERSION		"1.0.9"
 #pragma semicolon			1
 #define TEST_DEBUG			0
 #define TEST_DEBUG_LOG		0
@@ -75,10 +75,11 @@ public Action:BC_Event_ChargeEnd(Handle:event, String:event_name[], bool:dontBro
 
 public OnMapEnd()
 {
-	if (ChargerTimer != INVALID_HANDLE)
+	ChargerTimer = INVALID_HANDLE;
+	
+	for (new i = 1; i <= MaxClients; i++)
 	{
-		CloseHandle(ChargerTimer);
-		ChargerTimer = INVALID_HANDLE;
+		ReinCapTimerArray[i] = INVALID_HANDLE;
 	}
 }
 
@@ -128,6 +129,8 @@ public Action:BC_CheckForIncapped(Handle:timer, any:client)
 
 public Action:BC_Reincap(Handle:timer, any:client)
 {
+	if (!IsValidEntity(client)) return;
+	
 	SetPlayerIncapState(client, true);
 	
 	CreateTimer(HEALTH_SET_DELAY, BC_SetHealthDelayed, client);
