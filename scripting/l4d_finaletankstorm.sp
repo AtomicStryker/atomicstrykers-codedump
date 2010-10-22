@@ -2,12 +2,13 @@
 #include <sdktools>
 #define DEBUG 0
 
-#define PLUGIN_VERSION "1.0.1"
+#define PLUGIN_VERSION "1.0.2"
 #define PLUGIN_NAME "L4D Finale Tankstorm"
 
 new Handle:SetTankAmount = INVALID_HANDLE;
 new Handle:HealthDecrease = INVALID_HANDLE;
 new Handle:hMaxZombies = INVALID_HANDLE;
+new Handle:disablePrintsConVar = INVALID_HANDLE;
 new bool:HasHealthReduced[MAXPLAYERS+1];
 new bool:bIsFinale = false;
 new DefaultMaxZombies;
@@ -17,15 +18,17 @@ public Plugin:myinfo = {
 	author = " AtomicStryker ",
 	description = " Spawns X weaker Tanks instead of a single one during Finale waves ",
 	version = PLUGIN_VERSION,
-	url = ""
+	url = "https://forums.alliedmods.net/showthread.php?t=98721"
 };
 
 public OnPluginStart()
 {
 	HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre);
 	
-	SetTankAmount = CreateConVar("l4d_finaletankstorm_tankcount","3"," How many tanks shall spawn ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY, true, 3.0, true, 8.0);
-	HealthDecrease = CreateConVar("l4d_finaletankstorm_hpsetting","0.40"," How much Health each of the X Tanks have compared to a standard one. '1.0' would be full health ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY, true, 0.01, true, 1.00);
+	SetTankAmount = CreateConVar("l4d_finaletankstorm_tankcount", "3"," How many tanks shall spawn ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY, true, 2.0, true, 8.0);
+	HealthDecrease = CreateConVar("l4d_finaletankstorm_hpsetting", "0.40", " How much Health each of the X Tanks have compared to a standard one. '1.0' would be full health ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY, true, 0.01);
+	disablePrintsConVar = CreateConVar("l4d_finaletankstorm_announce", "1", " Does the Plugin announce itself ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY);
+	
 	CreateConVar("l4d_finaletankstorm_version", PLUGIN_VERSION, " Version of L4D Finale Tank Storm on this server ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	
 	AutoExecConfig(true, "l4d_finaletankstorm");
@@ -118,8 +121,11 @@ public Action:SpawnMoreTanks(Handle:timer, any:client)
 	
 	if (CountTanks()+1 > GetConVarInt(SetTankAmount)) return;
 	
-	PrintToChatAll("\x04[Finale Tank Storm Plugin] \x01Spawning %i. of %i Tanks with %i percent Health each!", CountTanks()+1, GetConVarInt(SetTankAmount), RoundFloat(100*GetConVarFloat(HealthDecrease)));
-
+	if (GetConVarBool(disablePrintsConVar))
+	{
+		PrintToChatAll("\x04[Finale Tank Storm Plugin] \x01Spawning %i. of %i Tanks with %i percent Health each!", CountTanks()+1, GetConVarInt(SetTankAmount), RoundFloat(100*GetConVarFloat(HealthDecrease)));
+	}
+	
 	new flags = GetCommandFlags("z_spawn");
 	SetCommandFlags("z_spawn", flags & ~FCVAR_CHEAT);
 	FakeClientCommand(client, "z_spawn tank auto")
@@ -144,7 +150,12 @@ public Action:FinaleBegins(Handle:event, const String:name[], bool:dontBroadcast
 {
 	bIsFinale = true;
 	DefaultMaxZombies = GetConVarInt(hMaxZombies);
-	PrintToChatAll("\x04[Finale Tank Storm Plugin] \x01Finale begins!");
+	
+	if (GetConVarBool(disablePrintsConVar))
+	{
+		PrintToChatAll("\x04[Finale Tank Storm Plugin] \x01Finale begins!");
+	}
+	
 	ResetBool();
 }
 
@@ -179,7 +190,10 @@ public Action:PrintLivingTanks(Handle:timer, Handle:client)
 {
 	new Tanks = CountTanks();
 	
-	PrintToChatAll("\x03[Double Tank] Tanks left alive: %i", Tanks);
+	if (GetConVarBool(disablePrintsConVar))
+	{
+		PrintToChatAll("\x04[Finale Tank Storm Plugin] Tanks left alive: %i", Tanks);
+	}
 	
 	if (Tanks<=0)
 	{
