@@ -1101,6 +1101,7 @@ public Action:Command_Spectate(client, args)
 	{
 		ChangePlayerTeam(client, L4D_TEAM_SPECTATE);
 		PrintToChatAll("[SM] %N has become a spectator.", client);
+		if(readyMode) checkStatus();
 	}
 	//respectate trick to get around spectator camera being stuck
 	else
@@ -1116,6 +1117,7 @@ public Action:Timer_Respectate(Handle:timer, any:client)
 {
 	ChangePlayerTeam(client, L4D_TEAM_SPECTATE);
 	PrintToChatAll("[SM] %N has become a spectator (again).", client);
+	if(readyMode) checkStatus();
 }
 
 public Action:Command_Unfreezeme1(client, args)
