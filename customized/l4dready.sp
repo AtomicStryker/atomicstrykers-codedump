@@ -1106,6 +1106,7 @@ public Action:Command_Spectate(client, args)
 	{
 		ChangePlayerTeam(client, L4D_TEAM_SPECTATE);
 		PrintToChatAll("[SM] %N has become a spectator.", client);
+		if(readyMode) checkStatus();
 	}
 	//respectate trick to get around spectator camera being stuck
 	else
@@ -1121,6 +1122,7 @@ public Action:Timer_Respectate(Handle:timer, any:client)
 {
 	ChangePlayerTeam(client, L4D_TEAM_SPECTATE);
 	PrintToChatAll("[SM] %N has become a spectator (again).", client);
+	if(readyMode) checkStatus();
 }
 
 public Action:Command_Unfreezeme1(client, args)
@@ -1717,6 +1719,7 @@ readyOn()
 	}
 	else
 	{
+		L4D2_CTimerStart(L4D2CT_VersusStartTimer, 99999.9);
 		inWarmUp = false;
 	}
 #else
@@ -2723,6 +2726,8 @@ RoundEndBeforeLive()
 RoundIsLive()
 {
 	UnfreezeAllPlayers();
+	
+	L4D2_CTimerStart(L4D2CT_VersusStartTimer, GetConVarFloat(FindConVar("versus_force_start_time")));
 	
 	CreateTimer(1.0, timerLiveMessageCallback, _, _);
 }
