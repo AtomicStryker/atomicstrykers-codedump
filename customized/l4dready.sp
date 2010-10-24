@@ -1714,6 +1714,7 @@ readyOn()
 	}
 	else
 	{
+		L4D2_CTimerStart(L4D2CT_VersusStartTimer, 99999.9);
 		inWarmUp = false;
 	}
 #else
@@ -2718,6 +2719,8 @@ RoundEndBeforeLive()
 RoundIsLive()
 {
 	UnfreezeAllPlayers();
+	
+	L4D2_CTimerStart(L4D2CT_VersusStartTimer, GetConVarFloat(FindConVar("versus_force_start_time")));
 	
 	CreateTimer(1.0, timerLiveMessageCallback, _, _);
 }
