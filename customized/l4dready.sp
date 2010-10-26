@@ -19,7 +19,7 @@
 #define READY_DEBUG 0
 #define READY_DEBUG_LOG 0
 
-#define READY_VERSION "0.17.7"
+#define READY_VERSION "0.17.8"
 #define READY_SCAVENGE_WARMUP 1
 #define READY_LIVE_COUNTDOWN 5
 #define READY_UNREADY_HINT_PERIOD 10.0
@@ -312,8 +312,6 @@ public OnPluginStart()
 	HookEvent("pills_used", Event_PillsUsed);
 	HookEvent("heal_success", Event_HealSuccess);
 	
-	HookEvent("round_start", Event_RoundStart);
-	
 	#if EBLOCK_DEBUG
 	RegConsoleCmd("sm_updatehealth", Command_UpdateHealth);
 	
@@ -396,8 +394,6 @@ public OnMapEnd()
 		SetConVarInt(FindConVar("sv_alltalk"), iInitialAllTalk);
 	}
 	DebugPrintToAll("Event: Map ended.");
-	
-	SaveSpectators();
 }
 
 public OnMapStart()
@@ -587,6 +583,8 @@ public Action:eventRoundEndCallback(Handle:event, const String:name[], bool:dont
 			DebugPrintToAll("[DEBUG] End of second round detected.");
 		#endif
 		isSecondRound = true;
+		
+		SaveSpectators();
 	}
 	
 	//we just ended the last restart, match will be live soon
@@ -605,6 +603,13 @@ public Action:eventRSLiveCallback(Handle:event, const String:name[], bool:dontBr
 	DebugPrintToAll("[DEBUG] Event round has started");
 	#endif
 	
+	#if HEALTH_BONUS_FIX
+	for (new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
+	{
+		painPillHolders[i] = false;
+	}
+	#endif
+	
 	//currently automating campaign restart before going live?
 	if(insideCampaignRestart > 0) 
 	{
@@ -616,11 +621,11 @@ public Action:eventRSLiveCallback(Handle:event, const String:name[], bool:dontBr
 		//first restart, do one more
 		if(insideCampaignRestart == 1) 
 		{
-#if READY_RESTART_ROUND_DELAY
+		#if READY_RESTART_ROUND_DELAY
 			CreateTimer(READY_RESTART_ROUND_DELAY, timerOneRoundRestart, _, _);
-#else //with RestartScenarioFromVote there is no need to have a delay
+		#else //with RestartScenarioFromVote there is no need to have a delay
 			RestartCampaignAny();
-#endif
+		#endif
 			
 			//PrintHintTextToAll("Match will be live after 1 round restart.");
 			
@@ -2441,7 +2446,7 @@ TryTeamPlacement()
 	free_slots[L4D_TEAM_INFECTED] -= GetTeamHumanCount(L4D_TEAM_INFECTED);
 	
 	DebugPrintToAll("TP: Trying to do team placement (free slots %d/%d)...", free_slots[L4D_TEAM_SURVIVORS], free_slots[L4D_TEAM_INFECTED]);
-		
+	
 	/*
 	* Try to place people on the teams they should be on.
 	*/
@@ -2462,6 +2467,8 @@ TryTeamPlacement()
 				//if client was a spectator before and should go there again.
 				if (GetTrieValue(teamPlacementTrie, authid, anyval))
 				{
+					DebugPrintToAll("TP: %N was spectator before and will be put there again.", i);
+				
 					team = L4D_TEAM_SPECTATE;
 					// also scratch their info from the Trie to avoid repetition effects
 					RemoveFromTrie(teamPlacementTrie, authid);
@@ -3017,8 +3024,6 @@ public Action:Event_PillsUsed(Handle:event, const String:name[], bool:dontBroadc
 	return Plugin_Handled;
 }
 
-
-
 public Action:Event_HealSuccess(Handle:event, const String:name[], bool:dontBroadcast)
 {	
 	#if EBLOCK_DEBUG
@@ -3038,17 +3043,6 @@ public Action:Event_HealSuccess(Handle:event, const String:name[], bool:dontBroa
 	
 	return Plugin_Handled;
 }
-
-public Action:Event_RoundStart(Handle:event, const String:name[], bool:dontBroadcast)
-{	
-	for (new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
-	{
-		painPillHolders[i] = false;
-	}
-	
-	return Plugin_Handled;
-}
-
 
 DelayedUpdateHealthBonus()
 {
