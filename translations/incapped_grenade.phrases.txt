@@ -1,0 +1,15 @@
+﻿"Phrases"
+{
+	"Information"
+	{
+		"en"	"Hint"
+		"ru"	"Информация"
+		"de"	"Tipp"
+	}
+	"Throw a grenade"
+	{
+		"en"	"You can throw grenades while incapacitated, press MOUSE2 to equip them"
+		"ru"	"Вы можете бросить гранату в отключке, используйте MOUSE2 для переключения оружия"
+		"de"	"Man kann Granaten vom Boden aus werfen - drücke MAUS2 um sie in die Hand zu nehmen"
+	}
+}
