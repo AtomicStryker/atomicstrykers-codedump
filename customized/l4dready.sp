@@ -133,6 +133,7 @@ new Handle:cvarZMegaMobSize 			= INVALID_HANDLE;
 new				ZMegaMobSize 			= -1;
 
 new Handle:fwdOnReadyRoundRestarted 	= INVALID_HANDLE;
+new Handle:fwdOnRoundIsLive			= INVALID_HANDLE;
 
 new Handle:teamPlacementTrie 			= INVALID_HANDLE;
 new Handle:casterTrie 					= INVALID_HANDLE;
@@ -258,6 +259,7 @@ public OnPluginStart()
 	#endif
 	
 	fwdOnReadyRoundRestarted = CreateGlobalForward("OnReadyRoundRestarted", ET_Event);
+	fwdOnRoundIsLive = CreateGlobalForward("OnRoundIsLive", ET_Event);
 	
 	CreateConVar("l4d_ready_version", READY_VERSION, "Version of the ready up plugin.", CONVAR_FLAGS_PLUGIN|FCVAR_DONTRECORD);
 	cvarEnforceReady = CreateConVar("l4d_ready_enabled", "0", "Make players ready up by default before a match begins", CONVAR_FLAGS_PLUGIN);
@@ -2721,6 +2723,9 @@ RoundIsLive()
 	UnfreezeAllPlayers();
 	
 	L4D2_CTimerStart(L4D2CT_VersusStartTimer, GetConVarFloat(FindConVar("versus_force_start_time")));
+	
+	Call_StartForward(fwdOnRoundIsLive);
+	Call_Finish();
 	
 	CreateTimer(1.0, timerLiveMessageCallback, _, _);
 }
