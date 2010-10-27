@@ -122,16 +122,6 @@ new Handle:cvarPauseDuration 			= INVALID_HANDLE;
 new Handle:cvarConnectEnabled 			= INVALID_HANDLE;
 new Handle:cvarBlockSpecGlobalChat 		= INVALID_HANDLE;
 
-new Handle:cvarDirectorNoBosses 		= INVALID_HANDLE;
-new Handle:cvarDirectorNoSpecials 		= INVALID_HANDLE;
-new Handle:cvarDirectorNoMobs 			= INVALID_HANDLE;
-new Handle:cvarDirectorReadyDuration 	= INVALID_HANDLE;
-new				DirectorReadyDuration 	= -1;
-new Handle:cvarZCommonLimit 			= INVALID_HANDLE;
-new				ZCommonLimit 			= -1;
-new Handle:cvarZMegaMobSize 			= INVALID_HANDLE;
-new				ZMegaMobSize 			= -1;
-
 new Handle:fwdOnReadyRoundRestarted 	= INVALID_HANDLE;
 new Handle:fwdOnRoundIsLive			= INVALID_HANDLE;
 
@@ -279,13 +269,6 @@ public OnPluginStart()
 	cvarScavengeSetup = FindConVar("scavenge_round_setup_time");
 	cvarGod = FindConVar("god");
 	
-	cvarDirectorNoBosses 		= FindConVar("director_no_bosses");
-	cvarDirectorNoSpecials 		= FindConVar("director_no_specials");
-	cvarDirectorNoMobs 			= FindConVar("director_no_mobs");
-	cvarDirectorReadyDuration 	= FindConVar("director_ready_duration");
-	cvarZMegaMobSize 			= FindConVar("z_mega_mob_size");
-	cvarZCommonLimit 			= FindConVar("z_common_limit");
-	
 	teamPlacementTrie = CreateTrie();
 	casterTrie = CreateTrie();
 	
@@ -379,10 +362,6 @@ public OnMapEnd()
 		SetConVarFlags(cvarGod,GetConVarFlags(cvarGod) & ~FCVAR_NOTIFY);
 		SetConVarInt(cvarGod, 0);
 		SetConVarFlags(cvarGod,GetConVarFlags(cvarGod) | FCVAR_NOTIFY);
-		
-		ResetConVar(cvarDirectorNoMobs);
-		ResetConVar(cvarDirectorReadyDuration);
-		ResetConVar(cvarZCommonLimit);
 		
 		SetConVarInt(FindConVar("sv_alltalk"), iInitialAllTalk);
 		SetConVarInt(FindConVar("z_ghost_delay_max"), iInitialGhostTimeMax);
@@ -1648,65 +1627,6 @@ public Menu_ReadyPanel(Handle:menu, MenuAction:action, param1, param2)
 	
 }
 
-directorStop()
-{
-	#if READY_DEBUG
-	DebugPrintToAll("[DEBUG] Director stopped.");
-	#endif
-	
-	if (ZCommonLimit == -1)
-	{
-		DirectorReadyDuration 	= GetConVarInt(cvarDirectorReadyDuration);
-		ZCommonLimit 			= GetConVarInt(cvarZCommonLimit);
-		ZMegaMobSize			= GetConVarInt(cvarZMegaMobSize);
-		
-		if (!ZCommonLimit) //confogl bugfix
-		{
-			ZCommonLimit = 30;
-		}
-		
-		if (!ZMegaMobSize) //confogl bugfix
-		{
-			ZMegaMobSize = 50;
-		}
-	}
-	
-	//doing director_stop on the server sets the below variables like so
-	SetConVarInt(cvarDirectorNoBosses, 1);
-	SetConVarInt(cvarDirectorNoSpecials, 1);
-	SetConVarInt(cvarDirectorNoMobs, 1);
-	SetConVarInt(cvarDirectorReadyDuration, 0);
-	SetConVarInt(cvarZCommonLimit, 0);
-	SetConVarInt(cvarZMegaMobSize, 1);
-	
-	//empty teams of survivors dont cycle the round
-	SetConVarInt(FindConVar("sb_all_bot_game"), 1);
-}
-
-directorStart()
-{
-	#if READY_DEBUG
-	DebugPrintToAll("[DEBUG] Director started.");
-	#endif
-	
-	ResetConVar(cvarDirectorNoBosses);
-	ResetConVar(cvarDirectorNoSpecials);
-	ResetConVar(cvarDirectorNoMobs);
-	
-	if (ZCommonLimit == -1)
-	{
-		ResetConVar(cvarDirectorReadyDuration);
-		ResetConVar(cvarZCommonLimit);
-		ResetConVar(cvarZMegaMobSize);
-	}
-	else
-	{
-		SetConVarInt(cvarDirectorReadyDuration, DirectorReadyDuration);
-		SetConVarInt(cvarZCommonLimit, ZCommonLimit);
-		SetConVarInt(cvarZMegaMobSize, ZMegaMobSize);
-	}
-}
-
 //freeze everyone until they ready up
 readyOn()
 {
@@ -1721,7 +1641,7 @@ readyOn()
 	}
 	else
 	{
-		L4D2_CTimerStart(L4D2CT_VersusStartTimer, 99999.9);
+		
 		inWarmUp = false;
 	}
 #else
@@ -1745,7 +1665,7 @@ readyOn()
 		}
 		else //versus
 		{
-			directorStop();
+			L4D2_CTimerStart(L4D2CT_VersusStartTimer, 99999.9);
 		}
 		
 		for (new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
@@ -1811,12 +1731,7 @@ readyOff()
 		hookedPlayerHurt = 0;
 	}
 	if (!inWarmUp)
-	{
-		if(!IsScavengeMode())
-		{
-			directorStart();
-		}
-		
+	{		
 		if(insidePluginEnd)
 		{
 			UnfreezeAllPlayers();
@@ -1831,9 +1746,6 @@ readyOff()
 		SetConVarInt(cvarGod, 0);
 		SetConVarFlags(cvarGod,GetConVarFlags(cvarGod) | FCVAR_NOTIFY);
 		
-		ResetConVar(FindConVar("director_no_mobs"));
-		SetConVarInt(cvarDirectorReadyDuration, DirectorReadyDuration);
-		SetConVarInt(cvarZCommonLimit, ZCommonLimit);
 		
 		SetConVarInt(FindConVar("sv_alltalk"), iInitialAllTalk);
 		SetConVarInt(FindConVar("z_ghost_delay_max"), iInitialGhostTimeMax);
