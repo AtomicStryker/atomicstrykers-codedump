@@ -783,22 +783,6 @@ public Action:L4D_OnSpawnWitch(const Float:vector[3], const Float:qangle[3])
 	}
 }
 
-public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
-{
-	if(readyMode && IsVersusMode())
-	{
-		/*
-		* prevent the automatic 90 second force versus start
-		*   this means SI will be able to spawn as normal
-		*   and there will not be a random horde as soon as it goes live
-		*/
-		DebugPrintToAll("Blocking OnFirstSurvivorLeftSafeArea...");
-		return Plugin_Handled;
-	}
-
-	return Plugin_Continue;
-}
-
 public Action:L4D_OnSetCampaignScores(&scoreA, &scoreB)
 {
 	teamScores[PersistentTeam_A] = scoreA;
