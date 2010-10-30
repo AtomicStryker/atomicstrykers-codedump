@@ -28,10 +28,6 @@
 #define READY_RESTART_MAP_DELAY 5.0
 #define READY_RESTART_SCAVENGE_TIMER 0.1
 
-#define READY_VERSION_REQUIRED_SOURCEMOD "1.3.4"
-#define READY_VERSION_REQUIRED_SOURCEMOD_NONDEV 0 //1 dont allow -dev version, 0 ignore -dev version
-#define READY_VERSION_REQUIRED_LEFT4DOWNTOWN "0.5.0.2"
-
 #define L4D_MAXCLIENTS (MaxClients)
 #define L4D_MAXCLIENTS_PLUS1 (MaxClients+1)
 #define L4D_TEAM_SURVIVORS 2
@@ -52,30 +48,8 @@
 #define SCORE_DELAY_EMPTY_SERVER 5.0
 #define SCORE_DELAY_SCORE_SWAPPED 0.1
 
-#define CEVO_ADD_NOTICE 0
-#define GAMECONFIG_FILE (IsTargetL4D2() ? "left4downtown.l4d2" : "left4downtown.l4d")
+#define GAMECONFIG_FILE "left4downtown.l4d2"
 #define L4D_UNPAUSE_DELAY 5
-
-#define HEALTH_BONUS_FIX 0
-
-#if HEALTH_BONUS_FIX
-
-#define EBLOCK_DEBUG READY_DEBUG
-
-#define EBLOCK_BONUS_UPDATE_DELAY 0.01
-
-#define EBLOCK_VERSION "0.1.2"
-
-#if EBLOCK_DEBUG
-#define EBLOCK_BONUS_HEALTH_BUFFER 10.0
-#else
-#define EBLOCK_BONUS_HEALTH_BUFFER 1.0
-#endif
-
-#define EBLOCK_USE_DELAYED_UPDATES 0
-
-new bool:painPillHolders[256];
-#endif
 
 enum PersistentTeam
 {
@@ -173,13 +147,7 @@ public OnPluginStart()
 {
 	if(!IsTargetL4D2())
 	{
-		if(!IsTargetL4D1())
-		{
-			ThrowError("Plugin does not support any games besides L4D/L4D2");
-		}
-		//the l4d1 extension doesn't have this native
-		//but it won't get called on l4d2 either
-		MarkNativeAsOptional("L4D_ScavengeBeginRoundSetupTime");
+		ThrowError("Plugin does not support any games besides L4D2");
 	}
 	
 	LoadTranslations("common.phrases");
@@ -201,30 +169,7 @@ public OnPluginStart()
 	RegConsoleCmd("callvote", Command_CallVote);
 	RegConsoleCmd("vote", Command_CallVote);
 	
-	#if READY_DEBUG
-	RegConsoleCmd("unfreezeme1", Command_Unfreezeme1);	
-	RegConsoleCmd("unfreezeme2", Command_Unfreezeme2);	
-	RegConsoleCmd("unfreezeme3", Command_Unfreezeme3);	
-	RegConsoleCmd("unfreezeme4", Command_Unfreezeme4);
-	
-	RegConsoleCmd("sm_printclients", printClients);
-	
-	RegConsoleCmd("sm_votestart", SendVoteRestartStarted);
-	RegConsoleCmd("sm_votepass", SendVoteRestartPassed);
-	
-	RegConsoleCmd("sm_whoready", readyWho);
-	
-	RegConsoleCmd("sm_drawready", readyDraw);
-	
-	RegConsoleCmd("sm_dumpentities", Command_DumpEntities);
-	RegConsoleCmd("sm_dumpgamerules", Command_DumpGameRules);
-	RegConsoleCmd("sm_scanproperties", Command_ScanProperties);
-	
-	RegAdminCmd("sm_begin", compReady, ADMFLAG_BAN, "sm_begin");
-	#endif
-	
 	RegAdminCmd("sm_restartmap", CommandRestartMap, ADMFLAG_CHANGEMAP, "sm_restartmap - changelevels to the current map");
-	RegAdminCmd("sm_restartround", FakeRestartVoteCampaign, ADMFLAG_CHANGEMAP, "sm_restartround - executes a restart campaign vote and makes everyone votes yes");
 	
 	RegAdminCmd("sm_abort", compAbort, ADMFLAG_BAN, "sm_abort");
 	RegAdminCmd("sm_forcestart", compStart, ADMFLAG_BAN, "sm_forcestart");
@@ -235,18 +180,8 @@ public OnPluginStart()
 	HookEvent("player_bot_replace", eventPlayerBotReplaceCallback);
 	HookEvent("bot_player_replace", eventBotPlayerReplaceCallback);
 	
-	HookEvent("player_spawn", eventSpawnReadyCallback);
-	HookEvent("tank_spawn", Event_TankSpawn);
-	HookEvent("witch_spawn", Event_WitchSpawn);
-	HookEvent("player_left_start_area", Event_PlayerLeftStartArea);
-	
+	HookEvent("player_spawn", eventSpawnReadyCallback);	
 	HookEvent("player_team", Event_PlayerTeam);
-	
-	#if READY_DEBUG
-	HookEvent("vote_started", eventVoteStarted);
-	HookEvent("vote_passed", eventVotePassed);
-	HookEvent("vote_ended", eventVoteEnded);
-	#endif
 	
 	fwdOnReadyRoundRestarted = CreateGlobalForward("OnReadyRoundRestarted", ET_Event);
 	fwdOnRoundIsLive = CreateGlobalForward("OnRoundIsLive", ET_Event);
@@ -286,22 +221,7 @@ public OnPluginStart()
 	StartPrepSDKCall(SDKCall_Player);
 	PrepSDKCall_SetFromConf(gConf, SDKConf_Signature, "TakeOverBot");
 	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
-	fTOB = EndPrepSDKCall();
-	
-	#if HEALTH_BONUS_FIX
-	CreateConVar("l4d_eb_health_bonus", EBLOCK_VERSION, "Version of the Health Bonus Exploit Blocker", CONVAR_FLAGS_PLUGIN|FCVAR_REPLICATED);
-	
-	HookEvent("item_pickup", Event_ItemPickup);	
-	HookEvent("pills_used", Event_PillsUsed);
-	HookEvent("heal_success", Event_HealSuccess);
-	
-	#if EBLOCK_DEBUG
-	RegConsoleCmd("sm_updatehealth", Command_UpdateHealth);
-	
-	//RegConsoleCmd("sm_givehealth", Command_GiveHealth);
-	#endif
-	#endif
-	
+	fTOB = EndPrepSDKCall();	
 }
 
 public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
@@ -314,7 +234,7 @@ public OnAllPluginsLoaded()
 {	
 	new bool:l4dscores = FindConVar("l4d_team_manager_ver") != INVALID_HANDLE;
 	
-	if(l4dscores || IsTargetL4D2())
+	if(l4dscores)
 	{
 		// allow reready because it will fix scores when rounds are restarted?
 		RegConsoleCmd("sm_reready", Command_Reready);
@@ -330,8 +250,6 @@ public OnAllPluginsLoaded()
 		RegAdminCmd("sm_swapto", Command_SwapTo, ADMFLAG_BAN, "sm_swapto <player1> [player2] ... [playerN] <teamnum> - swap all listed players to <teamnum> (1,2, or 3)");
 		RegAdminCmd("sm_swapteams", Command_SwapTeams, ADMFLAG_BAN, "sm_swapteams2 - swap the players between both teams");
 	}
-	
-	CheckDependencyVersions(true);
 }
 
 new bool:insidePluginEnd = false;
@@ -537,8 +455,6 @@ public Action:timerLiveCountCallback(Handle:timer)
 
 bool:ShouldResetRoundTwiceToGoLive()
 {
-	if(IsTargetL4D1())
-		return true;
 	
 	if(inWarmUp)	//scavenge pre-first round warmup
 		return true;
@@ -580,13 +496,6 @@ public Action:eventRSLiveCallback(Handle:event, const String:name[], bool:dontBr
 {
 	#if READY_DEBUG
 	DebugPrintToAll("[DEBUG] Event round has started");
-	#endif
-	
-	#if HEALTH_BONUS_FIX
-	for (new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
-	{
-		painPillHolders[i] = false;
-	}
 	#endif
 	
 	//currently automating campaign restart before going live?
@@ -724,23 +633,9 @@ public Action:timerUnreadyCallback(Handle:timer)
 
 public Action:eventSpawnReadyCallback(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	if(!readyMode)
+	if (readyMode && !inWarmUp)
 	{
-		#if READY_DEBUG
 		new player = GetClientOfUserId(GetEventInt(event, "userid"));
-		
-		decl String:curname[128];
-		GetClientName(player,curname,128);
-		DebugPrintToAll("[DEBUG] Spawned %s [%d], doing nothing.", curname, player);
-		#endif
-		
-		return Plugin_Handled;
-	}
-	
-	new player = GetClientOfUserId(GetEventInt(event, "userid"));
-	
-	if (!inWarmUp)
-	{
 		#if READY_DEBUG
 		decl String:curname[128];
 		GetClientName(player,curname,128);
@@ -814,28 +709,6 @@ OnNewCampaign()
 	casterTrie = CreateTrie();
 }
 
-public Action:Event_TankSpawn(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	/* print notify warning since OnTankSpawn block isn't working on Windows/L4D2 */
-	if(readyMode && IsVersusMode())
-	{
-		PrintToChatAll("[ERROR] A tank has spawned during ready-up mode, a map restart may be needed");
-	}
-}
-
-public Action:Event_WitchSpawn(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	/* print notify warning since OnWitchSpawn block isn't working on Windows/L4D2 */
-	if(readyMode && IsVersusMode())
-	{
-		PrintToChatAll("[ERROR] A witch has spawned during ready-up mode, a map restart may be needed");
-	}
-}
-
-public Action:Event_PlayerLeftStartArea(Handle:event, const String:name[], bool:dontBroadcast)
-{
-}
-
 //When a player replaces a bot (i.e. player joins survivors team)
 public Action:eventBotPlayerReplaceCallback(Handle:event, const String:name[], bool:dontBroadcast)
 {
@@ -852,14 +725,6 @@ public Action:eventBotPlayerReplaceCallback(Handle:event, const String:name[], b
 		#endif
 		
 		ToggleFreezePlayer(player, true);
-	}
-	else
-	{
-		#if READY_DEBUG
-		decl String:curname[128];
-		GetClientName(player,curname,128);
-		DebugPrintToAll("[DEBUG] Player %s [%d] replacing bot, doing nothing.", curname, player);
-		#endif	
 	}
 	
 	return Plugin_Handled;
@@ -883,14 +748,6 @@ public Action:eventPlayerBotReplaceCallback(Handle:event, const String:name[], b
 		
 		ToggleFreezePlayer(player, false);
 	}
-	else
-	{
-		#if READY_DEBUG
-		decl String:curname[128];
-		GetClientName(player,curname,128);
-		DebugPrintToAll("[DEBUG] Bot replacing player %s [%d], doing nothing.", curname, player);
-		#endif	
-	}
 	
 	return Plugin_Handled;
 }
@@ -910,96 +767,6 @@ public Action:eventPlayerHurt(Handle:event, const String:name[], bool:dontBroadc
 	#endif
 	
 	SetEntityHealth(player, health + dmg_health);
-}
-
-public Action:eventVotePassed(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	decl String:details[128];
-	decl String:param1[128];
-	new team;
-	
-	GetEventString(event, "details", details, 128);
-	GetEventString(event, "param1", param1, 128);
-	team = GetEventInt(event, "team");
-	
-	//[DEBUG] Vote passed, details=#L4D_vote_passed_restart_game, param1=, team=[-1].
-	
-	DebugPrintToAll("[DEBUG] Vote passed, details=%s, param1=%s, team=[%d].", details, param1, team);
-	
-	return Plugin_Handled;
-}
-
-public Action:eventVoteStarted(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	decl String:issue[128];
-	decl String:param1[128];
-	new team;
-	new initiator;
-	
-	GetEventString(event, "issue", issue, 128);
-	GetEventString(event, "param1", param1, 128);
-	team = GetEventInt(event, "team");
-	initiator = GetEventInt(event, "initiator");
-	
-	//[DEBUG] Vote started, issue=#L4D_vote_restart_game, param1=, team=[-1], initiator=[1].
-	
-	DebugPrintToAll("[DEBUG] Vote started, issue=%s, param1=%s, team=[%d], initiator=[%d].", issue, param1, team, initiator);
-}
-
-public Action:eventVoteEnded(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	DebugPrintToAll("[DEBUG] Vote ended");
-}
-
-public Action:SendVoteRestartPassed(client, args)
-{
-	new Handle:event = CreateEvent("vote_passed");	
-	if(event == INVALID_HANDLE) 
-	{
-		return;
-	}
-	
-	SetEventString(event, "details", "#L4D_vote_passed_restart_game");
-	SetEventString(event, "param1", "");
-	SetEventInt(event, "team", -1);
-	
-	FireEvent(event);
-	
-	DebugPrintToAll("[DEBUG] Sent fake vote passed to restart game");
-}
-
-public Action:SendVoteRestartStarted(client, args)
-{
-	new Handle:event = CreateEvent("vote_started");	
-	if(event == INVALID_HANDLE) 
-	{
-		return;
-	}
-	
-	SetEventString(event, "issue", "#L4D_vote_restart_game");
-	SetEventString(event, "param1", "");
-	SetEventInt(event, "team", -1);
-	SetEventInt(event, "initiator", client);
-	
-	FireEvent(event);
-	
-	DebugPrintToAll("[DEBUG] Sent fake vote started to restart game");
-}
-
-public Action:FakeRestartVoteCampaign(client, args)
-{
-	if (IsTargetL4D2())
-	{
-		ReplyToCommand(client, "Just use the restart Chapter Vote");
-		return Plugin_Handled;
-	}
-	//re-enable ready mode after the restart
-	pauseBetweenHalves = 1;
-	
-	RestartCampaignAny();
-	PrintToChatAll("[SM] Round manually restarted.");
-	DebugPrintToAll("[SM] Round manually restarted.");
-	return Plugin_Handled;
 }
 
 RestartCampaignAny()
@@ -1088,53 +855,6 @@ public Action:Timer_Respectate(Handle:timer, any:client)
 	ChangePlayerTeam(client, L4D_TEAM_SPECTATE);
 	PrintToChatAll("[SM] %N has become a spectator (again).", client);
 	if(readyMode) checkStatus();
-}
-
-public Action:Command_Unfreezeme1(client, args)
-{
-	SetEntityMoveType(client, MOVETYPE_NOCLIP);	
-	PrintToChatAll("Unfroze %N with noclip");
-	
-	return Plugin_Handled;
-}
-
-public Action:Command_Unfreezeme2(client, args)
-{
-	SetEntityMoveType(client, MOVETYPE_OBSERVER);	
-	PrintToChatAll("Unfroze %N with observer");
-	
-	return Plugin_Handled;
-}
-
-public Action:Command_Unfreezeme3(client, args)
-{
-	SetEntityMoveType(client, MOVETYPE_WALK);	
-	PrintToChatAll("Unfroze %N with WALK");
-	
-	return Plugin_Handled;
-}
-
-
-public Action:Command_Unfreezeme4(client, args)
-{
-	SetEntityMoveType(client, MOVETYPE_CUSTOM);	
-	PrintToChatAll("Unfroze %N with customs");
-	
-	return Plugin_Handled;
-}
-
-
-public Action:printClients(client, args)
-{
-	for (new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
-	{
-		if (IsClientInGame(i)) 
-		{
-			decl String:curname[128];
-			GetClientName(i,curname,128);
-			DebugPrintToAll("[DEBUG] Player %s with client id [%d]", curname, i);
-		}
-	}	
 }
 
 public Action:Command_Say(client, args)
@@ -1328,73 +1048,8 @@ public Action:Command_Reready(client, args)
 {
 	if (readyMode) return Plugin_Handled;
 	
-	/*if(IsTargetL4D2() && !IsScavengeMode())
-	{
-		PrintToChatAll("[SM] Reready is only supported for scavenge mode.");
-	
-		return Plugin_Handled;
-	}*/
-	
 	pauseBetweenHalves = 1;
 	PrintToChatAll("[SM] Match will pause at the end of this half and require readying up again.");
-	
-	return Plugin_Handled;
-}
-
-
-public Action:readyWho(client, args)
-{
-	if (!readyMode) return Plugin_Handled;
-	
-	decl String:readyPlayers[1024];
-	decl String:unreadyPlayers[1024];
-	
-	readyPlayers[0] = 0;
-	unreadyPlayers[0] = 0;
-	
-	new numPlayersRdy = 0;
-	new numPlayersNotRdy = 0;
-	
-	new i;
-	for(i = 1; i < L4D_MAXCLIENTS_PLUS1; i++) 
-	{
-		if(IsClientInGameHuman(i)) 
-		{
-			decl String:name[MAX_NAME_LENGTH];
-			GetClientName(i, name, sizeof(name));
-			
-			if(readyStatus[i]) 
-			{
-				if(numPlayersRdy > 0 )
-					StrCat(readyPlayers, 1024, ", ");
-				
-				StrCat(readyPlayers, 1024, name);
-				
-				numPlayersRdy++;
-			}
-			else
-			{
-				if(numPlayersNotRdy > 0 )
-					StrCat(unreadyPlayers, 1024, ", ");
-				
-				StrCat(unreadyPlayers, 1024, name);
-				
-				numPlayersNotRdy++;
-			}
-		}
-	}
-	
-	if(!numPlayersRdy) 
-	{
-		StrCat(readyPlayers, 1024, "NONE");
-	}
-	if(!numPlayersNotRdy) 
-	{
-		StrCat(unreadyPlayers, 1024, "NONE");
-	}
-	
-	DebugPrintToAll("[SM] Players ready: %s", readyPlayers);
-	DebugPrintToAll("[SM] Players NOT ready: %s", unreadyPlayers);
 	
 	return Plugin_Handled;
 }
@@ -1537,36 +1192,6 @@ DrawReadyPanelList()
 		if(IsClientInGameHuman(i)) 
 		{
 			SendPanelToClient(panel, i, Menu_ReadyPanel, READY_LIST_PANEL_LIFETIME);
-			
-			/*
-			//some other menu was open during this time?
-			if(menuInterrupted[i])
-			{
-				//if the menu is still up, dont refresh
-				if(GetClientMenu(i))
-				{
-					DebugPrintToAll("MENU: Will not draw to %N, has menu open (and its not ours)", i);
-					continue;
-				}
-				else
-				{
-					menuInterrupted[i] = false;
-				}
-			}
-			//send to client if he doesnt have menu already
-			//this menu will be refreshed automatically from timeout callback
-			if(!GetClientMenu(i))
-				SendPanelToClient(panel, i, Menu_ReadyPanel, READY_LIST_PANEL_LIFETIME);
-			else
-				DebugPrintToAll("MENU: Will not draw to %N, has menu open (and it could be ours)", i);
-			*/
-			
-			/*
-			#if READY_DEBUG
-			PrintToChat(i, "[DEBUG] You have been sent the Panel.");
-			#endif
-			*/
-			
 		}
 	}
 	
@@ -1578,37 +1203,8 @@ DrawReadyPanelList()
 }
 
 
-public Action:readyDraw(client, args)
-{
-	DrawReadyPanelList();
-}
-
 public Menu_ReadyPanel(Handle:menu, MenuAction:action, param1, param2) 
-{ 
-	/*
-	if(!readyMode)
-	{
-		return;
-	}
-	
-	if (action == MenuAction_Cancel) {
-		new reason = param2;
-		new client = param1;
-
-		//some other menu was opened, dont refresh
-		if(reason == MenuCancel_Interrupted)
-		{
-			DebugPrintToAll("MENU: Ready menu was interrupted");
-			menuInterrupted[client] = true;
-		}
-		//usual timeout, refresh the menu
-		else if(reason == MenuCancel_Timeout)
-		{
-			DebugPrintToAll("MENU: Ready menu timed out, refreshing");
-			SendPanelToClient(menuPanel, client, Menu_ReadyPanel, READY_LIST_PANEL_LIFETIME);
-		}
-	}*/
-	
+{
 }
 
 //freeze everyone until they ready up
@@ -2024,188 +1620,6 @@ public Action:Timer_SearchKeyDisabled(Handle:timer)
 			return;
 		}
 	}
-}
-
-public Action:Command_DumpEntities(client, args)
-{
-	decl String:netClass[128];
-	decl String:className[128];
-	new i;
-	
-	DebugPrintToAll("Dumping entities...");
-	
-	for(i = 1; i < GetMaxEntities(); i++)
-	{
-		if(IsValidEntity(i))
-		{
-			if(IsValidEdict(i)) 
-			{
-				GetEdictClassname(i, className, 128);
-				GetEntityNetClass(i, netClass, 128);
-				DebugPrintToAll("Edict = %d, class name = %s, net class = %s", i, className, netClass);
-			}
-			else
-			{
-				GetEntityNetClass(i, netClass, 128);
-				DebugPrintToAll("Entity = %d, net class = %s", i, netClass);
-			}
-		}
-	}
-	
-	return Plugin_Handled;
-}
-
-public Action:Command_DumpGameRules(client,args) 
-{
-	new getTeamScore = GetTeamScore(2);
-	DebugPrintToAll("Get team Score for team 2 = %d", getTeamScore);
-	
-	new gamerules = FindEntityByClassname(-1, "terror_gamerules");
-	
-	if(gamerules == -1)
-	{
-		DebugPrintToAll("Failed to find terror_gamerules edict");
-		return Plugin_Handled;
-	}
-	
-	new offset = FindSendPropInfo("CTerrorGameRulesProxy","m_iSurvivorScore");
-	if(offset == -1)
-	{
-		DebugPrintToAll("Failed to find the property when searching for offset");
-		return Plugin_Handled;
-	}
-	
-	new entValue = GetEntData(gamerules, offset, 4);
-	new entValue2 = GetEntData(gamerules, offset+4, 4);
-	//	new distance = GetEntProp(gamerules, Prop_Send, "m_iSurvivorScore");
-	
-	DebugPrintToAll("Survivor score = %d, %d [offset = %d]", entValue, entValue2, offset);
-	
-	new c_offset = FindSendPropInfo("CTerrorGameRulesProxy","m_iCampaignScore");
-	if(c_offset == -1)
-	{
-		DebugPrintToAll("Failed to find the property when searching for c_offset");
-		return Plugin_Handled;
-	}
-	
-	new centValue = GetEntData(gamerules, c_offset, 2);
-	new centValue2 = GetEntData(gamerules, c_offset+4, 2);
-	//	new distance = GetEntProp(gamerules, Prop_Send, "m_iSurvivorScore");
-	
-	DebugPrintToAll("Campaign score = %d, %d [offset = %d]", centValue, centValue2, c_offset);
-	
-	/*
-	* try the 4 cs_team_manager aka CCSTeam edicts
-	* 
-	*/
-	
-	new teamNumber, score;
-	decl String:teamName[128];
-	decl String:curClassName[128];
-	
-	new i, teams;
-	for(i = 0; i < GetMaxEntities() && teams < 4; i++)
-	{
-		if(IsValidEdict(i)) 
-		{
-			GetEdictClassname(i, curClassName, 128);
-			if(strcmp(curClassName, "cs_team_manager") == 0) 
-			{
-				teams++;
-				
-				teamNumber = GetEntData(i, FindSendPropInfo("CCSTeam", "m_iTeamNum"), 1);
-				score = GetEntData(i, FindSendPropInfo("CCSTeam", "m_iScore"), 4);
-				
-				GetEntPropString(i, Prop_Send, "m_szTeamname", teamName, 128);
-				
-				DebugPrintToAll("Team #%d, score = %d, name = %s", teamNumber, score, teamName);
-			}
-		}
-	}
-	return Plugin_Handled;
-}
-
-public Action:Command_ScanProperties(client, args)
-{
-	if(GetCmdArgs() != 3)
-	{
-		PrintToChat(client, "Usage: sm_scanproperties <step> <size> <needle>");
-		return Plugin_Handled;
-	}
-	
-	decl String:cmd1[128], String:cmd2[128], String:cmd3[128];
-	decl String:curClassName[128];
-	
-	GetCmdArg(1, cmd1, 128);
-	GetCmdArg(2, cmd2, 128);	
-	GetCmdArg(3, cmd3, 128);
-	
-	new step = StringToInt(cmd1);
-	new size = StringToInt(cmd2);
-	new needle = StringToInt(cmd3);
-	new i;
-	
-	new gamerules = FindEntityByClassname(-1, "terror_gamerules");
-	
-	if(gamerules == -1)
-	{
-		DebugPrintToAll("Failed to find terror_gamerules edict");
-		return Plugin_Handled;
-	}
-	
-	new value = -1;
-	for(i = 100; i < 1000; i += step)
-	{
-		value = GetEntData(gamerules, i, size);
-		
-		if(value == needle)
-		{
-			break;
-		}
-	}
-	if(value == needle)
-	{
-		DebugPrintToAll("Found value at offset = %d in terror_gamesrules", i);
-	}
-	else
-	{
-		DebugPrintToAll("Failed to find value in terror_gamesrules");
-	}
-	
-	new teams;
-	for(new j = 0; j < GetMaxEntities() && teams < 4; j++)
-	{
-		if(IsValidEdict(j)) 
-		{
-			GetEdictClassname(j, curClassName, 128);
-			if(strcmp(curClassName, "cs_team_manager") == 0)
-			{
-				teams++;
-				value = -1;
-				
-				for(i = 100; i < 1000; i += step)
-				{
-					value = GetEntData(j, i, size);
-					
-					if(value == needle)
-					{
-						break;
-					}
-				}
-				if(value == needle)
-				{
-					DebugPrintToAll("Found value at offset = %d in cs_team_manager", i);
-					break;
-				}
-				else
-				{
-					DebugPrintToAll("Failed to find value in cs_team_manager");
-				}
-			}
-		}
-		
-	}
-	return Plugin_Handled;
 }
 
 public Action:Command_SwapTeams(client, args)
@@ -2690,126 +2104,6 @@ DebugPrintToAll(const String:format[], any:...)
 #endif
 }
 
-CheckDependencyVersions(bool:throw = false)
-{
-#if !READY_DEBUG
-	if(!IsSourcemodVersionValid())
-	{
-		decl String:version[64];
-		GetConVarString(FindConVar("sourcemod_version"), version, sizeof(version));
-		
-//Fix warnings about evaluating constant expressions
-#if READY_VERSION_REQUIRED_SOURCEMOD_NONDEV
-#define ADD_STABLE_STRING " stable"
-#else
-#define ADD_STABLE_STRING ""
-#endif		
-		PrintToChatAll("[L4D RUP] Your SourceMod version (%s) is out of date, please upgrade to %s%s", version, READY_VERSION_REQUIRED_SOURCEMOD, ADD_STABLE_STRING);
-		
-		if(throw)
-			ThrowError("Your SourceMod version (%s) is out of date, please upgrade to %s%s", version, READY_VERSION_REQUIRED_SOURCEMOD, ADD_STABLE_STRING);
-	
-#undef ADD_STABLE_STRING
-	}
-	if(!IsLeft4DowntownVersionValid())
-	{
-		decl String:version[64];
-		new Handle:versionCvar = FindConVar("left4downtown_version");
-		if(versionCvar == INVALID_HANDLE)
-		{
-			strcopy(version, sizeof(version), "0.1.0"); //0.1.0 didn't have a version cvar
-		}
-		else
-		{
-			GetConVarString(versionCvar, version, sizeof(version));
-		}
-		
-		PrintToChatAll("[L4D RUP] Your Left4Downtown Extension (%s) is out of date, please upgrade to %s or later", version, READY_VERSION_REQUIRED_LEFT4DOWNTOWN);
-		if(throw)
-			ThrowError("Your Left4Downtown Extension (%s) is out of date, please upgrade to %s or later", version, READY_VERSION_REQUIRED_LEFT4DOWNTOWN);
-		return;
-	}
-#else
-//suppress warnings
-	if(throw && !throw)
-	{
-		IsSourcemodVersionValid();
-		IsLeft4DowntownVersionValid();
-	}
-#endif
-}
-
-bool:IsSourcemodVersionValid()
-{
-	decl String:version[64];
-	GetConVarString(FindConVar("sourcemod_version"), version, sizeof(version));
-	
-	new minVersion = ParseVersionNumber(READY_VERSION_REQUIRED_SOURCEMOD);
-	new versionNumber = ParseVersionNumber(version);
-
-	DebugPrintToAll("SourceMod Minimum version=%x, current=%s (%x)", minVersion, version, versionNumber);
-	
-	if(versionNumber == minVersion)
-	{
-#if READY_VERSION_REQUIRED_SOURCEMOD_NONDEV //snapshot-dev might not have latest bugfixes
-		if(StrContains(version, "-dev", false) != -1)
-		{
-			//1.2.1-dev is no good
-			return false;
-		}
-#endif
-		return true;
-	}
-	//newer version or 1.3, assume they know what they're doing
-	else if(versionNumber > minVersion)
-	{
-		return true;
-	}
-	else
-	{
-		return false;
-	}
-}
-
-bool:IsLeft4DowntownVersionValid()
-{
-	new Handle:versionCvar = FindConVar("left4downtown_version");
-	if(versionCvar == INVALID_HANDLE)
-	{
-		DebugPrintToAll("Could not find left4downtown_version, maybe using 0.1.0");
-		return false;
-	}
-	
-	decl String:version[64];
-	GetConVarString(versionCvar, version, sizeof(version));
-	
-	new minVersion = ParseVersionNumber(READY_VERSION_REQUIRED_LEFT4DOWNTOWN);
-	new versionNumber = ParseVersionNumber(version);
-
-	DebugPrintToAll("Left4Downtown min version=%x, current=%s (%x)", minVersion, version, versionNumber);
-
-	return versionNumber >= minVersion;
-}
-
-/* parse a version string such as "1.2.3.4", up to 4 subversions allowed */
-ParseVersionNumber(const String:versionText[])
-{
-	decl String:versionNumbers[4][4];
-	ExplodeString(versionText, ".", versionNumbers, 4, 4);
-	
-	new version = 0;
-	new shift = 24;
-	for(new i = 0; i < 4; i++)
-	{
-		version = version | (StringToInt(versionNumbers[i]) << shift);
-		
-		shift -= 8;
-	}
-	
-	//DebugPrintToAll("Parsed version '%s' as %x", versionText, version);
-	return version;
-}
-
 bool:IsTargetL4D2()
 {
 	decl String:gameFolder[32];
@@ -2823,21 +2117,6 @@ bool:IsTargetL4D2()
 		return false;
 	}	
 }
-
-bool:IsTargetL4D1()
-{
-	decl String:gameFolder[32];
-	GetGameFolderName(gameFolder, sizeof(gameFolder));
-	if (StrContains(gameFolder, "left4dead2") == -1 && StrContains(gameFolder, "left4dead") > -1)
-	{
-		return true;
-	}
-	else
-	{
-		return false;
-	}		
-}
-
 
 bool:IsScavengeMode()
 {
@@ -2867,165 +2146,6 @@ bool:IsVersusMode()
 	}	
 }
 
-#if HEALTH_BONUS_FIX
-public Action:Command_UpdateHealth(client, args)
-{
-	DelayedUpdateHealthBonus();
-	
-	return Plugin_Handled;
-}
-
-public Action:Event_ItemPickup(Handle:event, const String:name[], bool:dontBroadcast)
-{	
-	new player = GetClientOfUserId(GetEventInt(event, "userid"));
-	
-	decl String:item[128];
-	GetEventString(event, "item", item, sizeof(item));
-	
-	#if EBLOCK_DEBUG
-	decl String:curname[128];
-	GetClientName(player,curname,128);
-	
-	if(strcmp(item, "pain_pills") == 0)		
-		DebugPrintToAll("EVENT - Item %s picked up by %s [%d]", item, curname, player);
-	#endif
-	
-	if(strcmp(item, "pain_pills") == 0)
-	{
-		painPillHolders[player] = true;
-		DelayedPillUpdate();
-	}
-	
-	return Plugin_Handled;
-}
-
-public Action:Event_PillsUsed(Handle:event, const String:name[], bool:dontBroadcast)
-{	
-	new player = GetClientOfUserId(GetEventInt(event, "userid"));
-	
-	#if EBLOCK_DEBUG
-	new subject = GetClientOfUserId(GetEventInt(event, "subject"));
-	
-	decl String:curname[128];
-	GetClientName(player,curname,128);
-	
-	decl String:curname_subject[128];
-	GetClientName(subject,curname_subject,128);
-	
-	DebugPrintToAll("EVENT - %s [%d] used pills on subject %s [%d]", curname, player, curname_subject, subject);
-	#endif
-	
-	painPillHolders[player] = false;
-	
-	return Plugin_Handled;
-}
-
-public Action:Event_HealSuccess(Handle:event, const String:name[], bool:dontBroadcast)
-{	
-	#if EBLOCK_DEBUG
-	new player = GetClientOfUserId(GetEventInt(event, "userid"));
-	new subject = GetClientOfUserId(GetEventInt(event, "subject"));
-	
-	decl String:curname[128];
-	GetClientName(player,curname,128);
-	
-	decl String:curname_subject[128];
-	GetClientName(subject,curname_subject,128);
-	
-	DebugPrintToAll("EVENT - %s [%d] healed %s [%d] successfully", curname, player, curname_subject, subject);
-	#endif
-
-	DelayedUpdateHealthBonus();
-	
-	return Plugin_Handled;
-}
-
-DelayedUpdateHealthBonus()
-{
-	#if EBLOCK_USE_DELAYED_UPDATES
-	CreateTimer(EBLOCK_BONUS_UPDATE_DELAY, Timer_DoUpdateHealthBonus, _, _);
-	#else
-	UpdateHealthBonus();
-	#endif
-	
-	DebugPrintToAll("Delayed health bonus update");
-}
-
-public Action:Timer_DoUpdateHealthBonus(Handle:timer)
-{
-	UpdateHealthBonus();
-}
-
-UpdateHealthBonus()
-{
-	for (new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
-	{
-		if (IsClientInGame(i) && GetClientTeam(i) == 2) 
-		{
-			UpdateHealthBonusForClient(i);
-		}
-	}
-}
-
-DelayedPillUpdate()
-{
-	#if EBLOCK_USE_DELAYED_UPDATES
-	CreateTimer(EBLOCK_BONUS_UPDATE_DELAY, Timer_PillUpdate, _, _);
-	#else
-	UpdateHealthBonusForPillHolders();
-	#endif
-	
-	DebugPrintToAll("Delayed pill bonus update");
-}
-
-public Action:Timer_PillUpdate(Handle:timer)
-{
-	UpdateHealthBonusForPillHolders();
-}
-
-UpdateHealthBonusForPillHolders()
-{
-	for (new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++)
-	{
-		if (IsClientInGame(i) && GetClientTeam(i) == 2 && painPillHolders[i]) 
-		{
-			UpdateHealthBonusForClient(i);
-		}
-	}
-}
-
-UpdateHealthBonusForClient(client)
-{
-	SendHurtMe(client);
-}
-
-SendHurtMe(i)
-{	/*
-	* when a person uses pills the m_healthBuffer gets set to 
-	* minimum(50, 100-currentHealth)
-	* 
-	* it stays at that value until the person heals (or uses pills?)
-	* or the round is over
-	* 
-	* once the m_healthBuffer property is non-0 the health bonus for that player
-	* seems to keep updating
-	* 
-	* The first time we set it ourselves that player gets that much temp hp,
-	* setting it afterwards crashes the server, and setting it after we set it
-	* for the first time doesn't do anything.
-	*/
-	new Float:healthBuffer = GetEntPropFloat(i, Prop_Send, "m_healthBuffer");
-	
-	DebugPrintToAll("Health buffer for player [%d] is %f", i, healthBuffer);	
-	if(healthBuffer == 0.0)
-	{
-		SetEntPropFloat(i, Prop_Send, "m_healthBuffer", EBLOCK_BONUS_HEALTH_BUFFER);
-		DebugPrintToAll("Health buffer for player [%d] set to %f", i, EBLOCK_BONUS_HEALTH_BUFFER);
-	}
-	
-	DebugPrintToAll("Sent hurtme to [%d]", i);
-}
-#endif
 public PersistentTeam:GetClientPersistentTeam(client)
 {
 	return GetL4D2TeamPersistentTeam(L4D2Team:GetClientTeam(client));
