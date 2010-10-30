@@ -1,4 +1,4 @@
-#define PLUGIN_VERSION    "1.0.5"
+#define PLUGIN_VERSION    "1.0.6"
 #define PLUGIN_NAME       "L4D Laser Sights Pure"
 
 #include <sourcemod>
@@ -29,22 +29,31 @@ public OnPluginStart()
 
 	LoadTranslations("common.phrases");
 
-	StartPrepSDKCall(SDKCall_Player);
-	if (!PrepSDKCall_SetSignature(SDKLibrary_Server, "\xA1****\x83***\x57\x8B\xF9\x0F*****\x8B***\x56\x51\xE8****\x8B\xF0\x83\xC4\x04", 34))
+	StartPrepSDKCall(SDKCall_Player); // A1 3C ? ? ? 83 ? ? ? 57 8B F9 0F ? ? ? ? ? 8B 4C ? ? 56 51 E8
+	if (!PrepSDKCall_SetSignature(SDKLibrary_Server, "\xA1\x3C\x2A\x2A\x2A\x83\x2A\x2A\x2A\x57\x8B\xF9\x0F\x2A\x2A\x2A\x2A\x2A\x8B\x4C\x2A\x2A\x56\x51\xE8", 25))
 	{
 		PrepSDKCall_SetSignature(SDKLibrary_Server, "@_ZN13CTerrorPlayer10AddUpgradeE19SurvivorUpgradeType", 0);
 	}
 	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_ByValue);
 	AddUpgrade = EndPrepSDKCall();
+	
+	if (AddUpgrade == INVALID_HANDLE)
+	{
+		LogError("AddUpgrade Signature broken, go annoy AtomicStryer");
+	}
 
-	StartPrepSDKCall(SDKCall_Player);
-	if (!PrepSDKCall_SetSignature(SDKLibrary_Server, "\x51\x53\x55\x8B***\x8B\xD9\x56\x8B\xCD\x83\xE1\x1F\xBE\x01\x00\x00\x00\x57\xD3\xE6\x8B\xFD\xC1\xFF\x05\x89***", 32))
+	StartPrepSDKCall(SDKCall_Player); // 51 53 55 8B 6C ? ? 8B D9 56 8B CD 83 E1 ? BE 01
+	if (!PrepSDKCall_SetSignature(SDKLibrary_Server, "\x51\x53\x55\x8B\x6C\x2A\x2A\x8B\xD9\x56\x8B\xCD\x83\xE1\x2A\xBE\x01", 17))
 	{
 		PrepSDKCall_SetSignature(SDKLibrary_Server, "@_ZN13CTerrorPlayer13RemoveUpgradeE19SurvivorUpgradeType", 0);
 	}
 	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_ByValue);
 	RemoveUpgrade = EndPrepSDKCall();
-
+	
+	if (RemoveUpgrade == INVALID_HANDLE)
+	{
+		LogError("RemoveUpgrade Signature broken, go annoy AtomicStryer");
+	}
 	
 	CreateConVar("l4d_lasersight_version", PLUGIN_VERSION, "Lasersight plugin version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_DONTRECORD);
 
