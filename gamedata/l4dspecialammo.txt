@@ -1,0 +1,30 @@
+"Games"
+{
+	"left4dead"
+	{
+		"Signatures"
+		{
+			"AddUpgrade"
+			/*	CTerrorPlayer::AddUpgrade(SurvivorUpgradeType)
+			*	A1 ? ? ? ? 83 ? ? ? 57 8B F9 0f ? ? ? ? ? 8B ? ? ? 56 51 E8 ? ? ? ? 8B F0 83 C4 ?
+			*/
+
+			{
+				"library"	"server"
+				"windows"	"\xA1\x2A\x2A\x2A\x2A\x83\x2A\x2A\x2A\x57\x8B\xF9\x0f\x2A\x2A\x2A\x2A\x2A\x8B\x2A\x2A\x2A\x56\x51\xE8\x2A\x2A\x2A\x2A\x8B\xF0\x83\xC4"
+				"linux"		"@_ZN13CTerrorPlayer10AddUpgradeE19SurvivorUpgradeType"
+			}
+			
+			"RemoveUpgrade"
+			/*	CTerrorPlayer::RemoveUpgrade(SurvivorUpgradeType)
+			*	51 53 55 8B ? ? ? 8B D9 56 8B CD 83 ? ? BE ? ? ? ? 57
+			*/
+
+			{
+				"library"	"server"
+				"windows"	"\x51\x53\x55\x8B\x2A\x2A\x2A\x8B\xD9\x56\x8B\xCD\x83\x2A\x2A\xBE\x2A\x2A\x2A\x2A\x57"
+				"linux"		"@_ZN13CTerrorPlayer13RemoveUpgradeE19SurvivorUpgradeType"
+			}
+		}
+	}
+}

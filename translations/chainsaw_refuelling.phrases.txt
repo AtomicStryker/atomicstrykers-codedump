@@ -1,0 +1,27 @@
+﻿"Phrases"
+{
+	"Information"
+	{
+		"en"	"Hint"
+		"ru"	"Информация"
+		"de"	"Tipp"
+	}
+	"Refuelling"
+	{
+		"en"	"You can refuel dropped or teammates chainsaws, aim for it and press m1 while carrying a gastank"
+		"ru"	"Вы можете заправить бензопилу с помощью канистры"
+		"de"	"Man kann die Kettensäge mit Benzin nachtanken, mit Tank in der Hand auf Säge zielen und 'Schiessen' drücken"
+	}
+	"Full"
+	{
+		"en"	"Chainsaw tank is already full"
+		"ru"	"Бензопила уже полностью заправлена"
+		"de"	"Kettensäge ist vollgetankt"
+	}
+	"Drop"
+	{
+		"en"	"You can drop a chainsaw by pressing the reload button"
+		"ru"	"Вы можете выбросить бензопилу, нажав клавишу перезарядки"
+		"de"	"Man kann die Kettensäge fallenlassen - drück NACHLADEN"
+	}
+}
