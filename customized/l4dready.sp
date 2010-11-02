@@ -95,6 +95,7 @@ new Handle:cvarPausesAllowed 			= INVALID_HANDLE;
 new Handle:cvarPauseDuration 			= INVALID_HANDLE;
 new Handle:cvarConnectEnabled 			= INVALID_HANDLE;
 new Handle:cvarBlockSpecGlobalChat 		= INVALID_HANDLE;
+new Handle:cvarDisableReadySpawns		= INVALID_HANDLE;
 
 new Handle:fwdOnReadyRoundRestarted 	= INVALID_HANDLE;
 new Handle:fwdOnRoundIsLive			= INVALID_HANDLE;
@@ -198,6 +199,7 @@ public OnPluginStart()
 	cvarPauseDuration = CreateConVar("l4d_ready_pause_duration", "90.0", "Minimum duration of pause in seconds before either team can unpause", CONVAR_FLAGS_PLUGIN);
 	cvarConnectEnabled = CreateConVar("l4d_ready_connect_enabled", "1", "Show Announcements When Players Join", CONVAR_FLAGS_PLUGIN);
 	cvarBlockSpecGlobalChat = CreateConVar("l4d_block_spectator_globalchat", "0", "Prevent non-caster Spectators from global chatting, it gets redirected to teamchat", CONVAR_FLAGS_PLUGIN);
+	cvarDisableReadySpawns = CreateConVar("l4d_ready_disable_spawns", "0", "Prevent SI from having ghost-mode spawns during readyup.", CONVAR_FLAGS_PLUGIN);
 	
 	cvarSearchKey = FindConVar("sv_search_key");
 	cvarGameMode = FindConVar("mp_gamemode");
@@ -465,21 +467,27 @@ bool:ShouldResetRoundTwiceToGoLive()
 
 public Action:eventRoundEndCallback(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	#if READY_DEBUG
 	DebugPrintToAll("[DEBUG] Event round has ended");
-	#endif
 	
+	if(isSecondRound)
+	{
+		SaveSpectators();
+	}
 	if(!isCampaignBeingRestarted)
 	{
-		#if READY_DEBUG
+		
 		if(!isSecondRound)
+		{
 			DebugPrintToAll("[DEBUG] Second round detected.");
+			if(!isSecondRound && GetConVarBool(cvarDisableReadySpawns) && (GetConVarInt(cvarReadyHalves) || pauseBetweenHalves))
+			{
+				SetConVarInt(FindConVar("director_no_specials"), 1);
+			}
+		}
 		else
 			DebugPrintToAll("[DEBUG] End of second round detected.");
-		#endif
-		isSecondRound = true;
 		
-		SaveSpectators();
+		isSecondRound = true;
 	}
 	
 	//we just ended the last restart, match will be live soon
@@ -1245,6 +1253,10 @@ readyOn()
 		}
 		else //versus
 		{
+			if(!isSecondRound && GetConVarBool(cvarDisableReadySpawns))
+			{
+				SetConVarInt(FindConVar("director_no_specials"), 1);
+			}
 			L4D2_CTimerStart(L4D2CT_VersusStartTimer, 99999.9);
 		}
 		
@@ -1311,7 +1323,11 @@ readyOff()
 		hookedPlayerHurt = 0;
 	}
 	if (!inWarmUp)
-	{		
+	{	
+		if(GetConVarBool(cvarDisableReadySpawns))
+		{
+			ResetConVar(FindConVar("director_no_specials"));
+		}
 		if(insidePluginEnd)
 		{
 			UnfreezeAllPlayers();
@@ -2039,6 +2055,10 @@ RoundIsLive()
 {
 	UnfreezeAllPlayers();
 	
+	if(GetConVarBool(cvarDisableReadySpawns))
+	{
+		ResetConVar(FindConVar("director_no_specials"));
+	}
 	L4D2_CTimerStart(L4D2CT_VersusStartTimer, GetConVarFloat(FindConVar("versus_force_start_time")));
 	
 	Call_StartForward(fwdOnRoundIsLive);
