@@ -160,6 +160,7 @@ public OnPluginStart()
 	RegConsoleCmd("sm_ready", readyUp);
 	RegConsoleCmd("sm_unready", readyDown);
 	RegConsoleCmd("sm_notready", readyDown); //alias for people who are bad at reading instructions
+	RegConsoleCmd("sm_reready", Command_Reready);
 	RegConsoleCmd("sm_cast", regCaster);
 	
 	RegConsoleCmd("sm_pause", readyPause);
@@ -235,12 +236,6 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 public OnAllPluginsLoaded()
 {	
 	new bool:l4dscores = FindConVar("l4d_team_manager_ver") != INVALID_HANDLE;
-	
-	if(l4dscores)
-	{
-		// allow reready because it will fix scores when rounds are restarted?
-		RegConsoleCmd("sm_reready", Command_Reready);
-	}
 	
 	if(!l4dscores)
 	{
