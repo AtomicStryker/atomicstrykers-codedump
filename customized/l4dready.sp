@@ -1888,8 +1888,8 @@ TryTeamPlacement()
 */
 SaveSpectators()
 {
+	ClearTrie(teamPlacementTrie);
 	decl String:authid[96];
-
 	for(new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++) 
 	{
 		if(IsClientInGameHuman(i)) 
