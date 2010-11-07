@@ -1,15 +1,13 @@
-#define PLUGIN_VERSION    "1.0.5"
+#define PLUGIN_VERSION    "1.0.7"
 #define PLUGIN_NAME       "L4D Laser Sights Pure"
 
 #include <sourcemod>
 #include <sdktools>
 
-
 new Handle:AddUpgrade = INVALID_HANDLE;
 new Handle:RemoveUpgrade = INVALID_HANDLE;
 new bool:bHasLaser[MAXPLAYERS+1];
 new UserMsg:sayTextMsgId;
-
 
 public Plugin:myinfo =
 {
@@ -19,8 +17,6 @@ public Plugin:myinfo =
 	version = PLUGIN_VERSION,
 	url = "http://forums.alliedmods.net/showthread.php?p=877908"
 };
-
-
 
 public OnPluginStart()
 {
@@ -32,7 +28,8 @@ public OnPluginStart()
 	StartPrepSDKCall(SDKCall_Player);
 	if (!PrepSDKCall_SetSignature(SDKLibrary_Server, "\xA1****\x83***\x57\x8B\xF9\x0F*****\x8B***\x56\x51\xE8****\x8B\xF0\x83\xC4\x04", 34))
 	{
-		PrepSDKCall_SetSignature(SDKLibrary_Server, "@_ZN13CTerrorPlayer10AddUpgradeE19SurvivorUpgradeType", 0);
+		//PrepSDKCall_SetSignature(SDKLibrary_Server, "@_ZN13CTerrorPlayer10AddUpgradeE19SurvivorUpgradeType", 0);
+		PrepSDKCall_SetSignature(SDKLibrary_Server, "\x55\x89\xE5\x57\x56\x53\x83\xEC\x2A\xE8\x2A\x2A\x2A\x2A\x81\xC3\x2A\x2A\x2A\x2A\x8B\x7D\x2A\x8B\x83\x2A\x2A\x2A\x2A\x8B\x40\x2A\x8B\x48\x2A\x85\xC9\x75\x2A\x83\xC4\x2A\x5B\x5E\x5F\x5D\xC3\x8B\x45\x2A\x89\x2A\x2A\xE8", 54);
 	}
 	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_ByValue);
 	AddUpgrade = EndPrepSDKCall();
@@ -40,7 +37,8 @@ public OnPluginStart()
 	StartPrepSDKCall(SDKCall_Player);
 	if (!PrepSDKCall_SetSignature(SDKLibrary_Server, "\x51\x53\x55\x8B***\x8B\xD9\x56\x8B\xCD\x83\xE1\x1F\xBE\x01\x00\x00\x00\x57\xD3\xE6\x8B\xFD\xC1\xFF\x05\x89***", 32))
 	{
-		PrepSDKCall_SetSignature(SDKLibrary_Server, "@_ZN13CTerrorPlayer13RemoveUpgradeE19SurvivorUpgradeType", 0);
+		//PrepSDKCall_SetSignature(SDKLibrary_Server, "@_ZN13CTerrorPlayer13RemoveUpgradeE19SurvivorUpgradeType", 0);
+		PrepSDKCall_SetSignature(SDKLibrary_Server, "\x55\x89\xE5\x57\x56\x53\x83\xEC\x2A\xE8\x2A\x2A\x2A\x2A\x81\xC3\x2A\x2A\x2A\x2A\x8B\x75\x2A\x8B\x55\x2A\xC1\xFA\x2A\x81", 30);
 	}
 	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_ByValue);
 	RemoveUpgrade = EndPrepSDKCall();
