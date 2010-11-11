@@ -1419,7 +1419,7 @@ UnfreezeAllPlayers()
 {
 	for (new i = 1; i < L4D_MAXCLIENTS_PLUS1; i++) 
 	{
-		if (IsClientInGame(i)) 
+		if (IsClientInGame(i) && L4D2Team:GetClientTeam(i) != L4D2Team_Spectators) 
 		{
 			#if READY_DEBUG
 			decl String:curname[128];
