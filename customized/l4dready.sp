@@ -19,7 +19,7 @@
 #define READY_DEBUG 0
 #define READY_DEBUG_LOG 0
 
-#define READY_VERSION "0.17.9"
+#define READY_VERSION "0.17.10"
 #define READY_SCAVENGE_WARMUP 1
 #define READY_LIVE_COUNTDOWN 5
 #define READY_UNREADY_HINT_PERIOD 10.0
@@ -474,7 +474,7 @@ public Action:eventRoundEndCallback(Handle:event, const String:name[], bool:dont
 		if(!isSecondRound)
 		{
 			DebugPrintToAll("[DEBUG] Second round detected.");
-			if(!isSecondRound && GetConVarBool(cvarDisableReadySpawns) && (GetConVarInt(cvarReadyHalves) || pauseBetweenHalves))
+			if(GetConVarBool(cvarEnforceReady) && !isSecondRound && GetConVarBool(cvarDisableReadySpawns) && (GetConVarInt(cvarReadyHalves) || pauseBetweenHalves))
 			{
 				SetConVarInt(FindConVar("director_no_specials"), 1);
 			}
