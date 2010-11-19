@@ -2,7 +2,7 @@
 
 #include <sourcemod>
 #include <sdktools>
-#include "left4downtown.inc"
+#include <left4downtown>
 
 /*
 * PROGRAMMING CREDITS:
