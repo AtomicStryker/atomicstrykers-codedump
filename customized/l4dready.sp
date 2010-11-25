@@ -895,7 +895,9 @@ public Action:Command_Say(client, args)
 	{
 		decl String:sText[256];
 		GetCmdArg(1, sText, sizeof(sText));
-		if (!client || (IsChatTrigger() && sText[0] == '/')) //Ignore if it is a server message or a silent chat trigger
+		if (!client
+		|| (IsChatTrigger() && sText[0] == '/') //Ignore if it is a server message or a silent chat trigger
+		|| sText[0] == '@') //Or admin talk
 		{
 			return Plugin_Continue;
 		}
@@ -931,7 +933,9 @@ public Action:Command_Teamsay(client, args)
 	{
 		decl String:sText[256];
 		GetCmdArg(1, sText, sizeof(sText));
-		if (!client || (IsChatTrigger() && sText[0] == '/')) //Ignore if it is a server message or a silent chat trigger
+		if (!client
+		|| (IsChatTrigger() && sText[0] == '/') //Ignore if it is a server message or a silent chat trigger
+		|| sText[0] == '@') //Or admin talk
 		{
 			return Plugin_Continue;
 		}
