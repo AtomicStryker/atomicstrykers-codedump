@@ -3,12 +3,13 @@
 #undef REQUIRE_PLUGIN
 
 #include <sdktools>
+#include <left4downtown>
 #include <adminmenu>
 
 #define DEBUG_LOG 0
 #define DEBUG_CHAT 0
 
-#define PLUGIN_VERSION "1.0.3"
+#define PLUGIN_VERSION "1.0.4"
 #define DEBUG_SCRIM 0
 #define DEBUG_DOOR 0
 #define DEBUG_CHMAP 0
@@ -1510,14 +1511,15 @@ DumpCPDEntity(const String:prop[], const String:type[], ent = -1, size = 4)
 	}
 }
 
-new cLimit, mSize;
+//new cLimit, mSize;
 DirectorStop()
 {
-	/* Remove spawning */
+	/*
+	// Remove spawning
 	SetConVarInt(FindConVar("director_no_bosses"), 1);
 	SetConVarInt(FindConVar("director_no_specials"), 1);
 
-	/* Remove mobs */
+	// Remove mobs
 	SetConVarInt(FindConVar("director_no_mobs"), 1);
 	if (GetConVarInt(FindConVar("z_common_limit")) != 0) {
 		cLimit = GetConVarInt(FindConVar("z_common_limit"));
@@ -1531,20 +1533,24 @@ DirectorStop()
 	#if DEBUG_DIRECTOR
 	PrintDebugMessage("[DEBUG] DirectorStop(): [ common limit = %i | mob size = %i ]", cLimit, mSize);
 	#endif
+	*/
+	
+	L4D2_CTimerStart(L4D2CT_VersusStartTimer, 99999.9);
 }
 
 DirectorStart()
 {
+	/*
 	new cLimitDef, mSizeDef;
 
 	if (cLimit == 0) cLimit = GetConVarInt(FindConVar("z_common_limit"));
 	if (mSize == 0) mSize = GetConVarInt(FindConVar("z_mega_mob_size"));
 
-	/* Restore spawning */
+	// Restore spawning
 	ResetConVar(FindConVar("director_no_bosses"));
 	ResetConVar(FindConVar("director_no_specials"));
 
-	/* Restore mobs */
+	// Restore mobs
 	ResetConVar(FindConVar("director_no_mobs"));
 	cLimitDef = GetConVarInt(FindConVar("z_common_limit"));
 	mSizeDef = GetConVarInt(FindConVar("z_mega_mob_size"));
@@ -1555,7 +1561,7 @@ DirectorStart()
 	PrintDebugMessage("[DEBUG] DirectorStart(): [ common limit = %s | mob size = %s ]", cLimit != cLimitDef && cLimitDef != 0 ? "cLimitDef" : "cLimit", mSize != mSizeDef && mSizeDef != 1 ? "mSizeDef" : "mSize");
 	#endif
 
-	/* Restart director (repopulate world) */
+	// Restart director (repopulate world)
 	decl String:cmd[] = "director_start";
 	new flags = GetCommandFlags(cmd);
 	SetCommandFlags(cmd, flags & ~FCVAR_CHEAT);
@@ -1565,6 +1571,9 @@ DirectorStart()
 	#if DEBUG_DIRECTOR
 	PrintDebugMessage("[DEBUG] DirectorStart(): [ common limit = %i (def. %i) | mob size = %i (def. %i) ]", cLimit, cLimitDef, mSize, mSizeDef);
 	#endif
+	*/
+	
+	L4D2_CTimerStart(L4D2CT_VersusStartTimer, GetConVarFloat(FindConVar("versus_force_start_time")));
 }
 
 ResetReadyState(client, String:cbipt[])
