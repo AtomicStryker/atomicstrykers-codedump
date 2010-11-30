@@ -863,9 +863,13 @@ public Action:Timer_Respectate(Handle:timer, any:client)
 	if(readyMode) checkStatus();
 }
 
+native bool:BaseComm_IsGagged(client);
+
 public Action:Command_Say(client, args)
 {
-	if (args < 1 || (!readyMode && !isPaused))
+	if (args < 1
+	|| (!readyMode && !isPaused)
+	|| BaseComm_IsGagged(client))
 	{
 		return Plugin_Continue;
 	}
@@ -913,7 +917,9 @@ public Action:Command_Say(client, args)
 
 public Action:Command_Teamsay(client, args)
 {
-	if (args < 1 || (!readyMode && !isPaused))
+	if (args < 1
+	|| (!readyMode && !isPaused)
+	|| BaseComm_IsGagged(client))
 	{
 		return Plugin_Continue;
 	}
