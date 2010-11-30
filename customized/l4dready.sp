@@ -383,7 +383,10 @@ checkStatus()
 	if(!humans || humans < GetConVarInt(cvarReadyMinimum))
 		return;
 	
-	if (goingLive && (humans == ready)) return;
+	if ((goingLive && (humans == ready))
+	|| forcedStart)
+		return;
+	
 	else if (goingLive && (humans != ready))
 	{
 		goingLive = 0;
@@ -2155,7 +2158,8 @@ bool:IsVersusMode()
 {
 	decl String:sGameMode[32];
 	GetConVarString(cvarGameMode, sGameMode, sizeof(sGameMode));
-	if (StrContains(sGameMode, "versus") > -1)
+	if (StrContains(sGameMode, "versus") > -1
+	|| StrEqual(sGameMode, "mutation12")) // realism versus
 	{
 		return true;
 	}
