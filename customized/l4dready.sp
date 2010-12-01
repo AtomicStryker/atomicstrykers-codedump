@@ -224,11 +224,14 @@ public OnPluginStart()
 	StartPrepSDKCall(SDKCall_Player);
 	PrepSDKCall_SetFromConf(gConf, SDKConf_Signature, "TakeOverBot");
 	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
-	fTOB = EndPrepSDKCall();	
+	fTOB = EndPrepSDKCall();
 }
+
+native bool:BaseComm_IsGagged(client);
 
 public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 {
+	MarkNativeAsOptional("BaseComm_IsGagged");
 	CreateNative("L4DReady_IsGamePaused", nativeIsGamePaused);
 	return APLRes_Success;
 }
@@ -863,13 +866,21 @@ public Action:Timer_Respectate(Handle:timer, any:client)
 	if(readyMode) checkStatus();
 }
 
-native bool:BaseComm_IsGagged(client);
+static bool:OptIsGagged(client)
+{
+	if (GetFeatureStatus(FeatureType_Native, "BaseComm_IsGagged") == FeatureStatus_Available)
+	{
+		return BaseComm_IsGagged(client);
+	}
+	
+	return false;
+}
 
 public Action:Command_Say(client, args)
 {
 	if (args < 1
 	|| (!readyMode && !isPaused)
-	|| BaseComm_IsGagged(client))
+	|| OptIsGagged(client))
 	{
 		return Plugin_Continue;
 	}
@@ -919,7 +930,7 @@ public Action:Command_Teamsay(client, args)
 {
 	if (args < 1
 	|| (!readyMode && !isPaused)
-	|| BaseComm_IsGagged(client))
+	|| OptIsGagged(client))
 	{
 		return Plugin_Continue;
 	}
