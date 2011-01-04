@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.1.2"
+#define PLUGIN_VERSION "1.1.3"
 
 #define TEST_DEBUG			0
 #define TEST_DEBUG_LOG		1
@@ -203,9 +203,10 @@ ReplaceGrenadeLauncherWithM60(chance)
 				if (!IsValidEdict(replacement)) return;
 				
 				TeleportEntity(replacement, origin, angles, NULL_VECTOR);
+				SetEntProp(replacement, Prop_Data, "m_iClip1", GetConVarInt(M60AmmoCVAR), 1);
 				DebugPrintToAll("Teleported weapon_rifle_m60 %i into position, removing weapon_grenade_launcher_spawn now", replacement);
 				
-				RemoveEdict(prev);
+				if (IsValidEdict(prev)) RemoveEdict(prev);
 			}
 		}
 		prev = ent;
@@ -223,9 +224,10 @@ ReplaceGrenadeLauncherWithM60(chance)
 			if (!IsValidEdict(replacement)) return;
 			
 			TeleportEntity(replacement, origin, angles, NULL_VECTOR);
+			SetEntProp(replacement, Prop_Data, "m_iClip1", GetConVarInt(M60AmmoCVAR), 1);
 			DebugPrintToAll("Teleported weapon_rifle_m60 %i into position, removing weapon_grenade_launcher_spawn now", replacement);
 			
-			RemoveEdict(prev);
+			if (IsValidEdict(prev)) RemoveEdict(prev);
 		}
 	}
 }

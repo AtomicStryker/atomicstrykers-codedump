@@ -68,6 +68,60 @@ public Action:Cmd13(client, args)
 	SDKCall(fSwapTeams, g_pDirector);
 }
 
+static CreateLightEntity(client)
+{
+	if (!client || !IsClientInGame(client) || !IsPlayerAlive(client)) return -1;
+	
+	new lightentity = CreateEntityByName("light_dynamic");
+    if (!IsValidEntity(lightentity)) return -1;
+	
+	DispatchKeyValue(lightentity, "inner_cone", "60");
+	DispatchKeyValue(lightentity, "cone", "100");
+	DispatchKeyValue(lightentity, "brightness", "7");
+	DispatchKeyValueFloat(lightentity, "spotlight_radius", 120.0);
+	DispatchKeyValueFloat(lightentity, "distance", 300.0);
+	DispatchKeyValue(lightentity, "_light", "195 225 255 50");
+	DispatchKeyValue(lightentity, "pitch", "-90");
+	DispatchKeyValue(lightentity, "style", "1");
+	DispatchSpawn(lightentity);
+        
+	decl Float:fPos[3];
+	decl Float:fAngle[3];
+	decl Float:fAngle2[3];
+	decl Float:fForward[3];
+	decl Float:fOrigin[3];
+	GetClientEyePosition(client, fPos);
+	GetClientEyeAngles(client, fAngle);
+	GetClientEyeAngles(client, fAngle2);
+
+	fAngle2[0] = 0.0;
+	fAngle2[2] = 0.0;
+	GetAngleVectors(fAngle2, fForward, NULL_VECTOR, NULL_VECTOR);
+	ScaleVector(fForward, 100.0);
+	fForward[2] = 0.0;
+	AddVectors(fPos, fForward, fOrigin);
+
+	fAngle[0] += 90.0;
+	fOrigin[2] -= 100.0;
+	TeleportEntity(lightentity, fOrigin, fAngle, NULL_VECTOR);
+	
+	decl String:strName[32];
+	Format(strName, sizeof(strName), "target%i", client);
+	
+	DispatchKeyValue(client, "targetname", strName);
+	DispatchKeyValue(lightentity, "parentname", strName);
+	
+	SetVariantString("!activator");
+	AcceptEntityInput(lightentity, "SetParent", client, lightentity, 0);
+	
+	SetVariantString("head");
+	AcceptEntityInput(lightentity, "SetParentAttachmentMaintainOffset", client, lightentity, 0);
+	
+	AcceptEntityInput(lightentity, "TurnOn");
+
+	return lightentity;
+}
+
 public Action:Cmd12(client, args)
 {
 	if (!client)
@@ -76,6 +130,14 @@ public Action:Cmd12(client, args)
 		return Plugin_Handled;
 	}
 	
+	CreateLightEntity(client);
+	
+	ReplyToCommand(client, "Dynamic Light spawned at your position!!");
+	
+	return Plugin_Handled;
+}
+
+	/*
 	new lightEntity = CreateEntityByName("point_spotlight");
 	
 	if (lightEntity == -1)
@@ -139,9 +201,7 @@ public Action:Cmd12(client, args)
 	AcceptEntityInput(lightEntity, "TurnOn");
 	
 	ReplyToCommand(client, "Dynamic Light spawned at your position!!");
-	
-	return Plugin_Handled;
-}
+	*/
 
 stock bool:L4D2_OnFinaleMap()
 {
