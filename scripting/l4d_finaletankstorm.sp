@@ -1,8 +1,9 @@
 #include <sourcemod>
 #include <sdktools>
+#include <left4downtown>
 #define DEBUG 0
 
-#define PLUGIN_VERSION "1.0.2"
+#define PLUGIN_VERSION "1.0.3"
 #define PLUGIN_NAME "L4D Finale Tankstorm"
 
 new Handle:SetTankAmount = INVALID_HANDLE;
@@ -148,6 +149,12 @@ public Action:CheckSpawn(Handle:timer)
 
 public Action:FinaleBegins(Handle:event, const String:name[], bool:dontBroadcast)
 {
+	if (IsGameL4D2()
+	&& !L4D_IsMissionFinalMap())
+	{
+		return;
+	}
+
 	bIsFinale = true;
 	DefaultMaxZombies = GetConVarInt(hMaxZombies);
 	
@@ -157,6 +164,13 @@ public Action:FinaleBegins(Handle:event, const String:name[], bool:dontBroadcast
 	}
 	
 	ResetBool();
+}
+
+static bool:IsGameL4D2()
+{
+	decl String:gamename[32];
+	GetGameFolderName(gamename, sizeof(gamename));
+	return StrEqual(gamename, "left4dead2");
 }
 
 public Action:Event_PlayerDeath (Handle:event, const String:name[], bool:dontBroadcast)
