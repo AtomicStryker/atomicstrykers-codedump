@@ -49,10 +49,20 @@ static const		t2weaponIDs[] = {
 static const String:GENERIC_WEAPON[] 		= "weapon_spawn";
 static const String:WEAPON_ID_ENTPROP[]		= "m_weaponID";
 
+static		Handle:DROPPED_GUNS_ARRAY		= INVALID_HANDLE;
+
 
 public OnPluginStart()
 {
 	HookEvent("player_use", Event_PlayerUse);
+	HookEvent("weapon_drop", Event_WeaponDrop);
+	
+	DROPPED_GUNS_ARRAY = CreateArray();
+}
+
+public OnMapStart()
+{
+	ClearArray(DROPPED_GUNS_ARRAY);
 }
 
 public Action:Event_PlayerUse(Handle:event, const String:name[], bool:dontBroadcast)
@@ -60,10 +70,31 @@ public Action:Event_PlayerUse(Handle:event, const String:name[], bool:dontBroadc
 	new item = GetEventInt(event, "targetid");
 	
 	if (IsValidEdict(item)
+	&& !HasBeenDropped(item)
 	&& IsT2Gun(item))
 	{
 		RemoveEdict(item);
 	}
+}
+
+public Action:Event_WeaponDrop(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	new droppedgun = GetEventInt(event, "propid");
+
+	PushArrayCell(DROPPED_GUNS_ARRAY, droppedgun);
+}
+
+static bool:HasBeenDropped(item)
+{
+	new index = FindValueInArray(DROPPED_GUNS_ARRAY, item);
+
+	if (index != -1)
+	{
+		RemoveFromArray(DROPPED_GUNS_ARRAY, index);
+		return true;
+	}
+	
+	return false;
 }
 
 static bool:IsT2Gun(item)
