@@ -1,9 +1,8 @@
 #pragma semicolon 1
 #include <sourcemod>
 #include <sdktools>
-#include <left4downtown>
 
-#define PLUGIN_VERSION					"1.0.0"
+#define PLUGIN_VERSION					"1.0.1"
 
 
 static const 		TEAM_INFECTED		= 3;
@@ -30,10 +29,12 @@ public Plugin:myinfo =
 public OnPluginStart()
 {
 	CreateConVar("l4d2_bacteria_version", PLUGIN_VERSION, " Version of L4D2 Bacteria Sounds on this server ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY|FCVAR_DONTRECORD);
-	cvarGameModeActive = CreateConVar("l4d2_bacteria_gamemodesactive", "versus,teamversus,realism,teamrealism", " Set the gamemodes for which the plugin should be activated (same usage as sv_gametypes, i.e. add all game modes where you want it active separated by comma) ");
+	cvarGameModeActive = CreateConVar("l4d2_bacteria_gamemodesactive", "versus,teamversus,scavenge,realism,mutation12", " Set the gamemodes for which the plugin should be activated (same usage as sv_gametypes, i.e. add all game modes where you want it active separated by comma) ");
 
 	HookConVarChange(cvarGameModeActive, GameModeChanged);
 	CheckGamemode();
+	
+	HookEvent("item_pickup", Event_ItemPickup);
 }
 
 public GameModeChanged(Handle:convar, const String:oldValue[], const String:newValue[])
@@ -51,9 +52,13 @@ static CheckGamemode()
 	isAllowedGameMode = (StrContains(convarsetting, gamemode, false) != -1);
 }
 
-public L4D_OnEnterGhostState(client)
+public Action:Event_ItemPickup(Handle:event, const String:name[], bool:dontBroadcast)
 {
+	new client = GetClientOfUserId(GetEventInt(event, "userid"));
+
 	if (!isAllowedGameMode
+	|| !client
+	|| !IsClientInGame(client)
 	|| GetClientTeam(client) != TEAM_INFECTED)
 	{
 		return;

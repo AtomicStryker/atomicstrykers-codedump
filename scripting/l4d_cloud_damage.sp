@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "2.18"
+#define PLUGIN_VERSION "2.19"
 #define CVAR_FLAGS          FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY
 
 #define DEBUG 0
@@ -19,6 +19,9 @@ new Handle:CloudBlocksRevive = INVALID_HANDLE;
 new Handle:SoundPath = INVALID_HANDLE;
 new Handle:CloudMeleeSlowEnabled = INVALID_HANDLE;
 new Handle:DisplayDamageMessage = INVALID_HANDLE;
+
+static Handle:cvarGameModeActive	= INVALID_HANDLE;
+static bool:isAllowedGameMode		= false;
 
 new meleeentinfo;
 new bool:isincloud[MAXPLAYERS+1];
@@ -51,6 +54,14 @@ public OnPluginStart()
 	CloudShake = CreateConVar("l4d_cloud_shake_enabled", "1", " Enable/Disable the Cloud Damage Shake ", CVAR_FLAGS);
 	CloudBlocksRevive = CreateConVar("l4d_cloud_blocks_revive", "0", " Enable/Disable the Cloud Damage Stopping Reviving ", CVAR_FLAGS);
 	
+	cvarGameModeActive =	CreateConVar("l4d2_cloud_gamemodesactive",
+							"versus,teamversus,realism",
+							" Set the gamemodes for which the plugin should be activated (same usage as sv_gametypes, i.e. add all game modes where you want it active separated by comma) ",
+							CVAR_FLAGS);
+	
+	HookConVarChange(cvarGameModeActive, GameModeChanged);
+	CheckGamemode();
+	
 	CreateConVar("l4d_cloud_damage_version", PLUGIN_VERSION, " Version of L4D Cloud Damage on this server ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_DONTRECORD);
 
 	// Autoexec config
@@ -67,6 +78,21 @@ public OnPluginStart()
 	}
 }
 
+public GameModeChanged(Handle:convar, const String:oldValue[], const String:newValue[])
+{
+	CheckGamemode();
+}
+
+static CheckGamemode()
+{
+	decl String:gamemode[PLATFORM_MAX_PATH];
+	GetConVarString(FindConVar("mp_gamemode"), gamemode, sizeof(gamemode));
+	decl String:convarsetting[PLATFORM_MAX_PATH];
+	GetConVarString(cvarGameModeActive, gamemode, sizeof(gamemode));
+	
+	isAllowedGameMode = (StrContains(convarsetting, gamemode, false) != -1);
+}
+
 public Action:PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	// We get the client id
@@ -74,6 +100,7 @@ public Action:PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 	
 	// If client is valid
 	if (!client
+	|| !isAllowedGameMode
 	|| !IsClientInGame(client)
 	|| GetClientTeam(client) !=3
 	|| IsPlayerSpawnGhost(client))
