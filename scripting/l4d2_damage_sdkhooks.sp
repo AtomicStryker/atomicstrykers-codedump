@@ -26,10 +26,11 @@ The header Strings, in this case "MP5" and "AWP Sniper" are arbitrary and for yo
 Damage gets multiplied with the Modifiers, 0 would STOP any damage from that source, 1.0 would be default, 2.0 is twice the damage
 
 
-Target Strings:
+Possible Target Strings:
 
 normal guns - by their entity class, e.g. "weapon_smg_silenced"
 melee weapons - by their string, e.g. "katana"
+throwables - as usual ("weapon_pipe_bomb"), except for molotovs. it's "entityflame"
 
 common infected - "infected"
 witch - "witch"
@@ -44,32 +45,34 @@ The car Mr. Tank just put into Ellis:    "prop_physics"
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#define PLUGIN_VERSION						"1.0.2"
+#define PLUGIN_VERSION							"1.0.3"
 
-#define TEST_DEBUG							 1
-#define TEST_DEBUG_LOG						 1
+#define TEST_DEBUG								1
+#define TEST_DEBUG_LOG						 	1
 
-#define				MAX_MODDED_WEAPONS		32
-#define				CLASS_STRINGLENGHT		32
+#define				MAX_MODDED_WEAPONS			32
+#define				CLASS_STRINGLENGHT			32
 
-#define 		ZOMBIECLASS_SMOKER			1
-#define 		ZOMBIECLASS_BOOMER			2
-#define 		ZOMBIECLASS_HUNTER			3
-#define 		ZOMBIECLASS_SPITTER			4
-#define 		ZOMBIECLASS_JOCKEY			5
-#define 		ZOMBIECLASS_CHARGER 		6
-#define 		ZOMBIECLASS_TANK 			8
+#define 		ZOMBIECLASS_SMOKER				1
+#define 		ZOMBIECLASS_BOOMER				2
+#define 		ZOMBIECLASS_HUNTER				3
+#define 		ZOMBIECLASS_SPITTER				4
+#define 		ZOMBIECLASS_JOCKEY				5
+#define 		ZOMBIECLASS_CHARGER 			6
+#define 		ZOMBIECLASS_TANK 				8
 
-static const	L4D2_TEAM_INFECTED		  =  3;
-static const	L4D2_MAX_HUMAN_PLAYERS	  = 32;
-static const	L4D2_INFLICTOR_INFECTED	  = 4095;
+static const	L4D2_TEAM_INFECTED			=  3;
 
-static const String:ENTPROP_OWNER_ENT[]	  = "m_hOwnerEntity";
-static const String:ENTPROP_MELEE_STRING[]= "m_strMapSetScriptName";
+static const Float:DAMAGE_MOD_NONE			= 1.0;
+
+static const String:ENTPROP_MELEE_STRING[]	= "m_strMapSetScriptName";
+static const String:CLASSNAME_INFECTED[]  	= "infected";
+static const String:CLASSNAME_MELEE_WPN[] 	= "melee_weapon";
+static const String:CLASSNAME_WITCH[]	 	= "witch";
+
+/*
+static const String:ENTPROP_OWNER_ENT[]	  	= "m_hOwnerEntity";
 static const String:ENTPROP_ZOMBIE_CLASS[]= "m_zombieClass";
-static const String:CLASSNAME_INFECTED[]  = "infected";
-static const String:CLASSNAME_WITCH[]	  = "witch";
-static const String:CLASSNAME_MELEE_WPN[] = "melee_weapon";
 static const String:CLASSNAME_PLAYER[]	  = "player";
 static const String:CLASSNAME_SMOKER[]	  = "smoker";
 static const String:CLASSNAME_BOOMER[]	  = "boomer";
@@ -78,6 +81,7 @@ static const String:CLASSNAME_SPITTER[]	  = "spitter";
 static const String:CLASSNAME_JOCKEY[]	  = "jockey";
 static const String:CLASSNAME_CHARGER[]	  = "charger";
 static const String:CLASSNAME_TANK[]	  = "tank";
+*/
 
 
 static String:damageModConfigFile[PLATFORM_MAX_PATH]	= "";
@@ -195,23 +199,36 @@ static ReloadKeyValues()
 
 public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype)
 {
-	if (!IsValidEdict(victim) || !IsValidEdict(attacker)) return Plugin_Continue;
+	if (!IsValidEdict(victim)
+	|| !IsValidEdict(inflictor))
+	{
+		return Plugin_Continue;
+	}
 	
-	decl String:classname[CLASS_STRINGLENGHT], i;
-	if (inflictor != L4D2_INFLICTOR_INFECTED) // case Survivor attack
+	decl String:classname[CLASS_STRINGLENGHT];
+	new bool:bHumanAttacker = false;
+	
+	if (attacker <= MaxClients
+	&& IsClientInGame(attacker))
+	{
+		bHumanAttacker = true;	// case: player entity attacks
+		
+		if (attacker == inflictor) // case: attack with an equipped weapon (guns, claws)
+		{
+			GetClientWeapon(inflictor, classname, sizeof(classname));
+		}
+	}
+	
+	else // case: other entity inflicts damage (eg melee weapon, throwable, ability)
 	{
 		GetEdictClassname(inflictor, classname, sizeof(classname));
 		
-		if (StrEqual(classname, CLASSNAME_MELEE_WPN)) // subcase melee weapon
+		if (StrEqual(classname, CLASSNAME_MELEE_WPN)) // subcase melee weapons
 		{
-			new humanattacker = GetEntPropEnt(inflictor, Prop_Send, ENTPROP_OWNER_ENT);
-			GetEntPropString(GetPlayerWeaponSlot(humanattacker, 1), Prop_Data, ENTPROP_MELEE_STRING, classname, sizeof(classname));
+			GetEntPropString(GetPlayerWeaponSlot(attacker, 1), Prop_Data, ENTPROP_MELEE_STRING, classname, sizeof(classname));
 		}
-	}
-	else // case infected attack
-	{
-		GetEdictClassname(attacker, classname, sizeof(classname));
 		
+		/*
 		if (StrEqual(classname, CLASSNAME_PLAYER)) // subcase Special Infected attack
 		{
 			switch (GetEntProp(attacker, Prop_Send, ENTPROP_ZOMBIE_CLASS))
@@ -225,19 +242,24 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 				case ZOMBIECLASS_TANK: 		Format(classname, sizeof(classname), CLASSNAME_TANK);
 			}
 		}
+		*/
 	}
 	
-	DebugPrintToAll("attacker %i, inflictor %i dealt [%f] damage to victim %i, class %s", attacker, inflictor, damage, victim, classname);
+	DebugPrintToAll("attacker %i, inflictor %i dealt [%f] damage to victim %i, class %s", attacker, inflictor, damage, victim);
+	DebugPrintToAll("configurable class name: %s", classname);
 	
+	new i;
 	if (!GetTrieValue(weaponIndexTrie, classname, i)) return Plugin_Continue;
 	
-	decl teamattacker, teamvictim, Float:damagemod;
+	new teamattacker, teamvictim, Float:damagemod;
 	
-	if (attacker < L4D2_MAX_HUMAN_PLAYERS && IsClientInGame(attacker)) // case: attacker human player
+	new bool:bHumanVictim = (victim <= MaxClients && IsClientInGame(victim));
+	
+	if (bHumanAttacker) // case: attacker human player
 	{
 		teamattacker = GetClientTeam(attacker);
 		
-		if (victim < L4D2_MAX_HUMAN_PLAYERS) // case: victim also human player
+		if (bHumanVictim) // case: victim also human player
 		{
 			teamvictim = GetClientTeam(victim);
 			if (teamattacker == teamvictim)
@@ -249,7 +271,7 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 				damagemod = damageModArray[i][damageModifierEnemy];
 			}
 		}
-		else // case: victim is witch or common
+		else // case: victim is witch or common or some other entity, we'll assume an adversary
 		{
 			if (teamattacker == L4D2_TEAM_INFECTED)
 			{
@@ -261,7 +283,7 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 			}
 		}
 	}
-	else if (victim < L4D2_MAX_HUMAN_PLAYERS && IsClientInGame(victim)) // case: attacker witch or common, victim human player
+	else if (bHumanVictim) // case: attacker witch or common, victim human player
 	{
 
 		teamvictim = GetClientTeam(victim);
@@ -274,10 +296,13 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 			damagemod = damageModArray[i][damageModifierEnemy];
 		}
 	}
-	else return Plugin_Continue; //unhandled
+	else return Plugin_Continue; // entity-to-entity damage is unhandled
 	
-	damage = damage * damagemod;
-	DebugPrintToAll("Damage modded by [%f] to [%f]", damagemod, damage);
+	if (FloatCompare(damagemod, DAMAGE_MOD_NONE) != 0)
+	{
+		damage = damage * damagemod;
+		DebugPrintToAll("Damage modded by [%f] to [%f]", damagemod, damage);
+	}
 	
 	return Plugin_Changed;
 }
