@@ -45,7 +45,7 @@ The car Mr. Tank just put into Ellis:    "prop_physics"
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#define PLUGIN_VERSION							"1.0.3"
+#define PLUGIN_VERSION							"1.0.4"
 
 #define TEST_DEBUG								1
 #define TEST_DEBUG_LOG						 	1
@@ -199,7 +199,10 @@ static ReloadKeyValues()
 
 public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype)
 {
-	if (!IsValidEdict(victim)
+	if (!inflictor
+	|| !attacker
+	|| !victim
+	|| !IsValidEdict(victim)
 	|| !IsValidEdict(inflictor))
 	{
 		return Plugin_Continue;
