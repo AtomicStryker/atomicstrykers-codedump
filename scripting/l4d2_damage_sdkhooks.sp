@@ -45,10 +45,10 @@ The car Mr. Tank just put into Ellis:    "prop_physics"
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#define PLUGIN_VERSION							"1.0.4"
+#define PLUGIN_VERSION							"1.0.5"
 
-#define TEST_DEBUG								1
-#define TEST_DEBUG_LOG						 	1
+#define TEST_DEBUG								0
+#define TEST_DEBUG_LOG						 	0
 
 #define				MAX_MODDED_WEAPONS			32
 #define				CLASS_STRINGLENGHT			32
@@ -248,7 +248,7 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 		*/
 	}
 	
-	DebugPrintToAll("attacker %i, inflictor %i dealt [%f] damage to victim %i, class %s", attacker, inflictor, damage, victim);
+	DebugPrintToAll("attacker %i, inflictor %i dealt [%f] damage to victim %i", attacker, inflictor, damage, victim);
 	DebugPrintToAll("configurable class name: %s", classname);
 	
 	new i;
