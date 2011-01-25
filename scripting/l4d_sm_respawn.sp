@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.9.2"
+#define PLUGIN_VERSION "1.9.3"
 
 
 public Plugin:myinfo =
@@ -109,15 +109,17 @@ static RespawnPlayer(client, player_id)
 	{
 		case 2:
 		{
+			new bool:canTeleport = SetTeleportEndPoint(client);
+		
 			SDKCall(hRoundRespawn, player_id);
 			
 			CheatCommand(player_id, "give", "first_aid_kit");
 			CheatCommand(player_id, "give", "smg");
-			if(!SetTeleportEndPoint(client) || client == player_id)
+			
+			if(canTeleport)
 			{
-				return;
+				PerformTeleport(client,player_id,g_pos);
 			}
-			PerformTeleport(client,player_id,g_pos);
 		}
 		
 		case 3:
@@ -139,7 +141,7 @@ public bool:TraceEntityFilterPlayer(entity, contentsMask)
 	return entity > MaxClients || !entity;
 } 
 
-SetTeleportEndPoint(client)
+static bool:SetTeleportEndPoint(client)
 {
 	decl Float:vAngles[3], Float:vOrigin[3];
 	
@@ -173,8 +175,8 @@ SetTeleportEndPoint(client)
 
 PerformTeleport(client, target, Float:pos[3])
 {
-	TeleportEntity(target, pos, NULL_VECTOR, NULL_VECTOR);
 	pos[2]+=40.0;
+	TeleportEntity(target, pos, NULL_VECTOR, NULL_VECTOR);
 	
 	LogAction(client,target, "\"%L\" teleported \"%L\" after respawning him" , client, target);
 }
