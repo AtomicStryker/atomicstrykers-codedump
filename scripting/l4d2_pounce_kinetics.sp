@@ -44,9 +44,9 @@ public OnPluginStart()
 	HookEvent("ability_use", event_AbilityUsed);
 	HookEvent("pounce_end", event_PounceEnded);
 	
-	CreateConVar("l4d2_pounce_kinetics_version", 						PLUGIN_VERSION, " L4D2 Pounce Kinetics Plugin Version ", 			FCVAR_PLUGIN|FCVAR_REPLICATED|FCVAR_DONTRECORD);
-	triggeringDistance = 	CreateConVar("l4d2_pounce_kinetics_range",	"450.0", 		" What Pounce Range is considered unstoppable ",	FCVAR_PLUGIN|FCVAR_REPLICATED);
-	cvarisEnabled = 		CreateConVar("l4d2_pounce_kinetics_enabled", "1", 			" Turn Pounce Kinetics on and off ", 				FCVAR_PLUGIN|FCVAR_REPLICATED);
+	CreateConVar("l4d2_pounce_kinetics_version", 						PLUGIN_VERSION, " L4D2 Pounce Kinetics Plugin Version ", 			FCVAR_PLUGIN|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	triggeringDistance = 	CreateConVar("l4d2_pounce_kinetics_range",	"450.0", 		" What Pounce Range is considered unstoppable ",	FCVAR_PLUGIN);
+	cvarisEnabled = 		CreateConVar("l4d2_pounce_kinetics_enabled", "1", 			" Turn Pounce Kinetics on and off ", 				FCVAR_PLUGIN);
 	
 	HookConVarChange(cvarisEnabled, 		_cvarChange);
 	HookConVarChange(triggeringDistance, 	_cvarChange);
