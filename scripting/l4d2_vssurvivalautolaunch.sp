@@ -22,8 +22,8 @@ static Handle:countDownCvar = INVALID_HANDLE;
 
 public OnPluginStart()
 {
-	CreateConVar("l4d2_vs_sv_autolaunch_version", PLUGIN_VERSION, "L4D2 VS Survival Autolaunch Version", FCVAR_PLUGIN|FCVAR_REPLICATED|FCVAR_DONTRECORD);
-	countDownCvar = CreateConVar("l4d2_vs_sv_autolaunch_time", "45", " Time after which an Auto Launch is done ", FCVAR_PLUGIN|FCVAR_REPLICATED);
+	CreateConVar("l4d2_vs_sv_autolaunch_version", PLUGIN_VERSION, "L4D2 VS Survival Autolaunch Version", FCVAR_PLUGIN|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	countDownCvar = CreateConVar("l4d2_vs_sv_autolaunch_time", "45", " Time after which an Auto Launch is done ", FCVAR_PLUGIN);
 	
 	HookEvent("player_first_spawn", _PlayerFirstSpawn_Event, EventHookMode_PostNoCopy);
 	HookEvent("round_start", _RoundStart_Event, EventHookMode_PostNoCopy);
