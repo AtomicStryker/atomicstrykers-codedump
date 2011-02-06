@@ -50,7 +50,7 @@ public OnPluginStart()
 	
 	PrepSDKCalls();
 
-	CreateConVar("l4d2_tankswap_version", PLUGIN_VERSION, " Version of L4D2 Tank Swap on this server ", FCVAR_PLUGIN|FCVAR_NOTIFY|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_DONTRECORD);
+	CreateConVar("l4d2_tankswap_version", PLUGIN_VERSION, " Version of L4D2 Tank Swap on this server ", FCVAR_PLUGIN|FCVAR_NOTIFY|FCVAR_SPONLY|FCVAR_DONTRECORD);
 	cvar_SurrenderTimeLimit = CreateConVar("l4d2_tankswap_timelimit", "10", " How many seconds can a primary Tank Player surrender control ", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	cvar_SurrenderChoiceType = CreateConVar("l4d2_tankswap_choicetype", "1", " 0 - Disabled; 1 - press Button to call Menu; 2 - Menu appears for every Tank ", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	
@@ -106,7 +106,7 @@ public Action:TS_CMD_TakeTank(client, args)
 		surrenderMenu = INVALID_HANDLE;
 	}
 	
-	if (IsPlayerAlive(client) && !IsPlayerGhost(client))
+	if (GetClientHealth(client) > 1 && !IsPlayerGhost(client))
 	{
 		L4D2_ReplaceWithBot(client, true);
 	}
@@ -233,6 +233,8 @@ static CallSurrenderMenu()
 
 public TS_MenuCallBack(Handle:menu, MenuAction:action, param1, param2)
 {
+	if (action == MenuAction_End) CloseHandle(menu);
+
 	if (action != MenuAction_Select) return; // only allow a valid choice to pass
 	
 	decl String:number[4];
@@ -243,7 +245,7 @@ public TS_MenuCallBack(Handle:menu, MenuAction:action, param1, param2)
 	if (!choice)
 	{
 		choice = GetRandomEligibleTank();
-		if (IsPlayerAlive(choice) && !IsPlayerGhost(choice))
+		if (GetClientHealth(choice) > 1 && !IsPlayerGhost(choice))
 		{
 			L4D2_ReplaceWithBot(choice, true);
 		}
@@ -254,7 +256,7 @@ public TS_MenuCallBack(Handle:menu, MenuAction:action, param1, param2)
 	}
 	else
 	{
-		if (IsPlayerAlive(choice) && !IsPlayerGhost(choice))
+		if (GetClientHealth(choice) > 1 && !IsPlayerGhost(choice))
 		{
 			L4D2_ReplaceWithBot(choice, true);
 		}
@@ -315,6 +317,8 @@ public Action:TS_Display_Auto_MenuToTank(Handle:timer)
 
 public TS_Auto_MenuCallBack(Handle:menu, MenuAction:action, param1, param2)
 {
+	if (action == MenuAction_End) CloseHandle(menu);
+	
 	if (action != MenuAction_Select) return; // only allow a valid choice to pass
 	
 	decl String:number[4];
@@ -326,7 +330,7 @@ public TS_Auto_MenuCallBack(Handle:menu, MenuAction:action, param1, param2)
 	else if (choice == 99)	// "Anyone but me"
 	{
 		choice = GetRandomEligibleTank();
-		if (IsPlayerAlive(choice) && !IsPlayerGhost(choice))
+		if (GetClientHealth(choice) > 1 && !IsPlayerGhost(choice))
 		{
 			L4D2_ReplaceWithBot(choice, true);
 		}
@@ -337,7 +341,7 @@ public TS_Auto_MenuCallBack(Handle:menu, MenuAction:action, param1, param2)
 	}
 	else	// choice is a specific player id
 	{
-		if (IsPlayerAlive(choice) && !IsPlayerGhost(choice))
+		if (GetClientHealth(choice) > 1 && !IsPlayerGhost(choice))
 		{
 			L4D2_ReplaceWithBot(choice, true);
 		}
@@ -472,6 +476,12 @@ stock L4D2_ReplaceTank(client, target)
 {
 	DebugPrintToAll("ReplaceTank being called, client %N target %N", client, target);
 	DebugPrintToAll("ZombieManager pointer: 0x%x", g_pZombieManager);
+
+	if (GetClientHealth(client) < 1)
+	{
+		DebugPrintToAll("ReplaceTank invalid, origin tank %N health is below 1", client);
+	}
+	
 	SDKCall(sdkReplaceTank, g_pZombieManager, client, target);
 }
 
