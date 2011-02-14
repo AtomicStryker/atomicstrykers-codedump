@@ -1,51 +1,8 @@
-/*
-
-Example excerpt l4d2damagemod.cfg
-
-
-"L4D2 Damage Mods"
-{
-	"MP5"
-	{
-		"weapon_class"			"weapon_smg_mp5"
-		"modifier_friendly"		"1.0"
-		"modifier_enemy"		"1.2"
-	}
-	
-	"AWP Sniper"
-	{
-		"weapon_class"			"weapon_sniper_awp"
-		"modifier_friendly"		"1.75"
-		"modifier_enemy"		"1.75"
-	}
-}
-
-You require a target String behind "weapon_class", and then you can set your modifiers behind "modifier_friendly" and "modifier_enemy"
-The header Strings, in this case "MP5" and "AWP Sniper" are arbitrary and for your information only
-
-Damage gets multiplied with the Modifiers, 0 would STOP any damage from that source, 1.0 would be default, 2.0 is twice the damage
-
-
-Possible Target Strings:
-
-normal guns - by their entity class, e.g. "weapon_smg_silenced"
-melee weapons - by their string, e.g. "katana"
-throwables - as usual ("weapon_pipe_bomb"), except for molotovs. it's "entityflame"
-
-common infected - "infected"
-witch - "witch"
-
-Special Infected: by their string, e.g. "hunter", "charger" and so on
-
-The car Mr. Tank just put into Ellis:    "prop_physics"
-
-*/
-
 #pragma semicolon 1
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#define PLUGIN_VERSION							"1.0.5"
+#define PLUGIN_VERSION							"1.0.6"
 
 #define TEST_DEBUG								0
 #define TEST_DEBUG_LOG						 	0
@@ -199,6 +156,8 @@ static ReloadKeyValues()
 
 public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype)
 {
+	DebugPrintToAll("attacker %i, inflictor %i dealt [%f] damage to victim %i", attacker, inflictor, damage, victim);
+
 	if (!inflictor
 	|| !attacker
 	|| !victim
@@ -219,6 +178,13 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 		if (attacker == inflictor) // case: attack with an equipped weapon (guns, claws)
 		{
 			GetClientWeapon(inflictor, classname, sizeof(classname));
+			
+			//new weapon = GetEntPropEnt(attacker, Prop_Data, "m_hActiveWeapon");
+			//GetEdictClassname(weapon, "classname", sizeof(classname));
+		}
+		else
+		{
+			GetEdictClassname(inflictor, classname, sizeof(classname)); // tank special case?
 		}
 	}
 	
@@ -248,7 +214,6 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 		*/
 	}
 	
-	DebugPrintToAll("attacker %i, inflictor %i dealt [%f] damage to victim %i", attacker, inflictor, damage, victim);
 	DebugPrintToAll("configurable class name: %s", classname);
 	
 	new i;
