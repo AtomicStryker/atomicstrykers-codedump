@@ -3,7 +3,7 @@
 #include <sdktools>
 #include <left4downtown>
 
-#define PLUGIN_VERSION "1.0.4"
+#define PLUGIN_VERSION "1.0.5"
 
 #define TEST_DEBUG 0
 #define TEST_DEBUG_LOG 1
@@ -392,7 +392,7 @@ PrepSDKCalls()
 		SetFailState("Cant initialize TakeOverZombieBot SDKCall");
 	}
 	
-	CloneHandle(MySDKCall, sdkTakeOverZombieBot);
+	sdkTakeOverZombieBot = CloneHandle(MySDKCall, sdkTakeOverZombieBot);
 	
 	StartPrepSDKCall(SDKCall_Player);
 	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "ReplaceWithBot");
@@ -404,7 +404,7 @@ PrepSDKCalls()
 		SetFailState("Cant initialize ReplaceWithBot SDKCall");
 	}
 	
-	CloneHandle(MySDKCall, sdkReplaceWithBot);
+	sdkReplaceWithBot = CloneHandle(MySDKCall, sdkReplaceWithBot);
 	
 	StartPrepSDKCall(SDKCall_Player);
 	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "CullZombie");
@@ -415,7 +415,7 @@ PrepSDKCalls()
 		SetFailState("Cant initialize CullZombie SDKCall");
 	}
 	
-	CloneHandle(MySDKCall, sdkCullZombie);
+	sdkCullZombie = CloneHandle(MySDKCall, sdkCullZombie);
 	
 	g_pZombieManager = GameConfGetAddress(ConfigFile, "CZombieManager");
 	if(g_pZombieManager == Address_Null)
@@ -434,7 +434,7 @@ PrepSDKCalls()
 		SetFailState("Cant initialize ReplaceTank SDKCall");
 	}
 	
-	CloneHandle(MySDKCall, sdkReplaceTank);
+	sdkReplaceTank = CloneHandle(MySDKCall, sdkReplaceTank);
 	
 	CloseHandle(ConfigFile);
 	CloseHandle(MySDKCall);
