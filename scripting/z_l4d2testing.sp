@@ -40,6 +40,44 @@ public OnPluginStart()
 	RegAdminCmd("sm_light", Cmd12, ADMFLAG_CHEATS, "sm_light spawn dynamic light");
 	
 	RegAdminCmd("sm_swteam", Cmd13, ADMFLAG_CHEATS, "sm_swteam calls l4d_directorswap");
+	
+	RegAdminCmd("sm_anim", Cmd14, ADMFLAG_CHEATS, "sm_anim i calls CBasePlayer::SetAnimation(i)");
+}
+
+public Action:Cmd14(client, args)
+{
+	if (!client)
+	{
+		ReplyToCommand(client, "Must be ingame to use this command");
+		return Plugin_Handled;
+	}
+	
+	if (!args)
+	{
+		ReplyToCommand(client, "sm_anim i calls CBasePlayer::SetAnimation(i)");
+		return Plugin_Handled;
+	}
+	
+	decl String:buffer[24];
+	GetCmdArg(1, buffer, sizeof(buffer));
+	new i = StringToInt(buffer);
+	
+	new Handle:MySDKCall = INVALID_HANDLE;
+	new Handle:ConfigFile = LoadGameConfigFile("l4d2addresses");
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "CBasePlayer_SetAnimation");
+	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
+	MySDKCall = EndPrepSDKCall();
+	CloseHandle(ConfigFile);
+	
+	if (MySDKCall == INVALID_HANDLE)
+	{
+		LogError("Cant initialize SetAnimation SDKCall");
+		return Plugin_Handled;
+	}
+	
+	SDKCall(MySDKCall, client, i);
+	return Plugin_Handled;
 }
 
 public Action:Cmd13(client, args)
@@ -73,7 +111,7 @@ static CreateLightEntity(client)
 	if (!client || !IsClientInGame(client) || !IsPlayerAlive(client)) return -1;
 	
 	new lightentity = CreateEntityByName("light_dynamic");
-    if (!IsValidEntity(lightentity)) return -1;
+	if (!IsValidEntity(lightentity)) return -1;
 	
 	DispatchKeyValue(lightentity, "inner_cone", "60");
 	DispatchKeyValue(lightentity, "cone", "100");
