@@ -32,6 +32,7 @@ public OnPluginStart()
 public OnMapStart()
 {
 	ClearArray(DROPPED_STUFF_ARRAY);
+	WC_iLimitCount = GetConVarInt(WC_hLimitCount);
 }
 
 public WC_ConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
@@ -46,6 +47,8 @@ public Action:WC_WeaponDrop_Event(Handle:event, const String:name[], bool:dontBr
 	WC_iLastWeapon = GetEventInt(event, "propid");
 	WC_iLastClient = GetClientOfUserId(GetEventInt(event, "userid"));
 	GetEventString(event, "item", WC_sLastWeapon, sizeof(WC_sLastWeapon));
+	
+	if (!WC_iLastClient || !IsClientInGame(WC_iLastClient)) return;
 	
 	PushArrayCell(DROPPED_STUFF_ARRAY, WC_iLastWeapon);
 	
@@ -62,6 +65,7 @@ public Action:WC_PlayerUse_Event(Handle:event, const String:name[], bool:dontBro
 	}
 
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
+	if (!client || !IsClientInGame(client)) return;
 	
 	new secondary = GetPlayerWeaponSlot(client, MELEE_WEAPON_SLOT);
 	
