@@ -1,7 +1,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.3"
+#define PLUGIN_VERSION "1.0.4"
 #define PLUGIN_NAME "L4D Survivor AI Pounced Fix"
 
 
@@ -32,6 +32,7 @@ public Action:Event_PlayerHurt(Handle:event, const String:name[], bool:dontBroad
 
 	if (!victim
 	|| !attacker
+	|| !IsClientInGame(attacker)
 	|| GetClientTeam(attacker) == 2)
 	{
 		return;
