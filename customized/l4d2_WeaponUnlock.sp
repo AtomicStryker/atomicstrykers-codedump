@@ -3,7 +3,7 @@
 #pragma semicolon				1
 
 
-#define PLUGIN_VERSION 			"0.8.8"
+#define PLUGIN_VERSION 			"0.8.9"
 #define TEST_DEBUG				0
 #define TEST_DEBUG_LOG			1
 
@@ -542,7 +542,7 @@ static WipeStoredWeapons()
 	
 	for (new i = 32; i <= entcount; i++)
 	{
-		if (IsValidEdict(i))
+		if (IsValidEdict(i) && IsValidEntity(i)) // because people still got me logs of "Is invalid edict" after IsValidEdict ... WTFFFF
 		{
 			GetEdictClassname(i, EdictClassName, sizeof(EdictClassName));
 			if (StrEqual(EdictClassName, "weapon_spawn") || (wipestaticspawns && IsWantedGunEntity(EdictClassName)))
