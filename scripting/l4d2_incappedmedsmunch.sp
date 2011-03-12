@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION		"1.1.8"
+#define PLUGIN_VERSION		"1.1.9"
 
 
 #define STRING_LENGTH		32
@@ -302,6 +302,7 @@ public Action:MunchFinished(Handle:timer, any:client)
 	IsMunchingMed[client] = false;
 	MunchTimer[client] = INVALID_HANDLE;
 	
+	if (!IsClientInGame(client)) return;
 	ReviveClient(client);
 	KillProgressBar(client);
 }

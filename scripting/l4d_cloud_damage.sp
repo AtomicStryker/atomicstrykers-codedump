@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "2.19"
+#define PLUGIN_VERSION "2.20"
 #define CVAR_FLAGS          FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY
 
 #define DEBUG 0
@@ -88,9 +88,26 @@ static CheckGamemode()
 	decl String:gamemode[PLATFORM_MAX_PATH];
 	GetConVarString(FindConVar("mp_gamemode"), gamemode, sizeof(gamemode));
 	decl String:convarsetting[PLATFORM_MAX_PATH];
-	GetConVarString(cvarGameModeActive, gamemode, sizeof(gamemode));
+	GetConVarString(cvarGameModeActive, convarsetting, sizeof(convarsetting));
 	
-	isAllowedGameMode = (StrContains(convarsetting, gamemode, false) != -1);
+	isAllowedGameMode = ListContainsString(convarsetting, ",", gamemode);
+}
+
+stock bool:ListContainsString(const String:list[], const String:separator[], const String:string[])
+{
+	new curPos = 0;
+	new nextPos = 0;
+	decl String:buffer[64];
+	while((nextPos = SplitString(list[curPos], separator, buffer, 64)) != -1)
+	{
+		curPos += nextPos;
+		if (StrEqual(string, buffer, false))
+		{
+			return true;
+		}
+	}
+	
+	return false;
 }
 
 public Action:PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
