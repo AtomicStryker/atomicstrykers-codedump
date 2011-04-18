@@ -3,7 +3,7 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define PLUGIN_VERSION "1.0.3"
+#define PLUGIN_VERSION "1.0.4"
 
 #define STRINGLENGTH_CLASSES				  64
 
@@ -66,6 +66,8 @@ public Action:event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
 
 public OnEntityDestroyed(entity)
 {
+	if (!IsValidEdict(entity)) return;
+
 	decl String:class[STRINGLENGTH_CLASSES];
 	GetEdictClassname(entity, class, sizeof(class));
 	
