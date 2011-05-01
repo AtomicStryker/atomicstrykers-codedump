@@ -1492,12 +1492,6 @@ public Action:compAbort(client, args)
 //begin the ready mode (everyone now needs to ready up before they can move)
 public Action:compReady(client, args)
 {
-	if(!IsVersusMode() && !IsScavengeMode())
-	{
-		DebugPrintToAll("Skipping compReady since we're not in versus or scavenge");
-		return Plugin_Handled;
-	}
-	
 	if (goingLive)
 	{
 		ReplyToCommand(0, "[L4D RUP] Already going live, ignoring.");
@@ -2157,7 +2151,7 @@ bool:IsTargetL4D2()
 	}	
 }
 
-bool:IsScavengeMode()
+stock bool:IsScavengeMode()
 {
 	decl String:sGameMode[32];
 	GetConVarString(cvarGameMode, sGameMode, sizeof(sGameMode));
@@ -2171,7 +2165,7 @@ bool:IsScavengeMode()
 	}	
 }
 
-bool:IsVersusMode()
+stock bool:IsVersusMode()
 {
 	decl String:sGameMode[32];
 	GetConVarString(cvarGameMode, sGameMode, sizeof(sGameMode));
