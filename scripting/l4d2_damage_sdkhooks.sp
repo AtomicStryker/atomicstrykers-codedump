@@ -2,12 +2,12 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#define PLUGIN_VERSION							"1.0.6"
+#define PLUGIN_VERSION							"1.0.7"
 
 #define TEST_DEBUG								0
 #define TEST_DEBUG_LOG						 	0
 
-#define				MAX_MODDED_WEAPONS			32
+#define				MAX_MODDED_WEAPONS			64
 #define				CLASS_STRINGLENGHT			32
 
 #define 		ZOMBIECLASS_SMOKER				1
