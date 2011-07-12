@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#define PLUGIN_VERSION							"1.0.7"
+#define PLUGIN_VERSION							"1.0.8"
 
 #define TEST_DEBUG								0
 #define TEST_DEBUG_LOG						 	0
@@ -24,7 +24,7 @@ static const Float:DAMAGE_MOD_NONE			= 1.0;
 
 static const String:ENTPROP_MELEE_STRING[]	= "m_strMapSetScriptName";
 static const String:CLASSNAME_INFECTED[]  	= "infected";
-static const String:CLASSNAME_MELEE_WPN[] 	= "melee_weapon";
+static const String:CLASSNAME_MELEE_WPN[] 	= "weapon_melee";
 static const String:CLASSNAME_WITCH[]	 	= "witch";
 
 /*
@@ -188,14 +188,9 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 		}
 	}
 	
-	else // case: other entity inflicts damage (eg melee weapon, throwable, ability)
+	else // case: other entity inflicts damage (eg throwable, ability)
 	{
 		GetEdictClassname(inflictor, classname, sizeof(classname));
-		
-		if (StrEqual(classname, CLASSNAME_MELEE_WPN)) // subcase melee weapons
-		{
-			GetEntPropString(GetPlayerWeaponSlot(attacker, 1), Prop_Data, ENTPROP_MELEE_STRING, classname, sizeof(classname));
-		}
 		
 		/*
 		if (StrEqual(classname, CLASSNAME_PLAYER)) // subcase Special Infected attack
@@ -212,6 +207,11 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 			}
 		}
 		*/
+	}
+	
+	if (StrEqual(classname, CLASSNAME_MELEE_WPN)) // subcase melee weapons
+	{
+		GetEntPropString(GetPlayerWeaponSlot(attacker, 1), Prop_Data, ENTPROP_MELEE_STRING, classname, sizeof(classname));
 	}
 	
 	DebugPrintToAll("configurable class name: %s", classname);
