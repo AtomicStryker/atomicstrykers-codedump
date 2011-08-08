@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION					"1.0.2"
+#define PLUGIN_VERSION					"1.0.3"
 
 #define TEST_DEBUG								0
 #define TEST_DEBUG_LOG						 	0
@@ -14,6 +14,9 @@ static const String:MODEL_SUFFIX[]		= ".mdl";
 static const String:SOUND_PREFIX[]		= "music/bacteria/";
 static const String:SOUND_SUFFIX_A[]	= "bacteria.wav";
 static const String:SOUND_SUFFIX_B[]	= "bacterias.wav";
+static const String:BOOMERFEM[]			= "boomette";
+static const String:BOOMERMALE[]		= "boomer";
+
 
 static Handle:cvarGameModeActive		= INVALID_HANDLE;
 static bool:isAllowedGameMode			= false;
@@ -81,6 +84,9 @@ public Action:Event_ItemPickup(Handle:event, const String:name[], bool:dontBroad
 	GetClientModel(client, buffer, sizeof(buffer)); // example output: models/infected/boomer.mdl
 	
 	DebugPrintToAll("client model: [%s]", buffer);
+	
+	// sex changes for fat people!
+	ReplaceString(buffer, sizeof(buffer), BOOMERFEM, BOOMERMALE, false);
 	
 	// replace the model directory with the bacteria directory (emitsound works relative to sound folder)
 	ReplaceString(buffer, sizeof(buffer), MODEL_PREFIX, SOUND_PREFIX);
