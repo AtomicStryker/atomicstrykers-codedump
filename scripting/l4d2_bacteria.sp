@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION					"1.0.4"
+#define PLUGIN_VERSION					"1.0.5"
 
 #define TEST_DEBUG								0
 #define TEST_DEBUG_LOG						 	0
@@ -45,7 +45,7 @@ public OnPluginStart()
 	HookEvent("item_pickup", Event_ItemPickup);
 	HookEvent("round_start", Event_RoundStart);
 	
-	SoundArrayStack = CreateArray();
+	SoundArrayStack = CreateArray(20, 0);
 	LastPlayedStack = CreateTrie();
 	
 	CreateTimer(INTER_SOUND_DELAY, Timer_SoundCaller, _, TIMER_REPEAT);
@@ -82,6 +82,7 @@ public Action:Event_ItemPickup(Handle:event, const String:name[], bool:dontBroad
 	if (!isAllowedGameMode
 	|| !client
 	|| !IsClientInGame(client)
+	|| IsFakeClient(client)
 	|| GetClientTeam(client) != TEAM_INFECTED)
 	{
 		return;
@@ -89,6 +90,11 @@ public Action:Event_ItemPickup(Handle:event, const String:name[], bool:dontBroad
 
 	decl String:buffer[PLATFORM_MAX_PATH];
 	GetClientModel(client, buffer, sizeof(buffer)); // example output: models/infected/boomer.mdl
+	
+	if (StrContains(buffer, "hulk", false)) // keep tanks out of the queue
+	{
+		return;
+	}
 	
 	DebugPrintToAll("client model: [%s]", buffer);
 	
@@ -111,21 +117,21 @@ public Action:Event_ItemPickup(Handle:event, const String:name[], bool:dontBroad
 	DebugPrintToAll("resulting sound name: [%s]", buffer);
 	
 	new foo;
-	if (!GetTrieValue(LastPlayedStack, buffer, foo))
+	if (GetTrieValue(LastPlayedStack, buffer, foo))
+	{
+		DebugPrintToAll("Sound already in queue!");
+	}
+	else
 	{
 		DebugPrintToAll("Sound pushed to queue!");
 		SetTrieValue(LastPlayedStack, buffer, 0);
 		PushArrayString(SoundArrayStack, buffer);
 	}
-	else
-	{
-		DebugPrintToAll("Sound already in queue!");
-	}
 }
 
 public Action:Timer_SoundCaller(Handle:timer, Handle:foo)
 {
-	if (GetArraySize(SoundArrayStack))
+	if (GetArraySize(SoundArrayStack) != 0)
 	{
 		decl String:buffer[PLATFORM_MAX_PATH];
 		GetArrayString(SoundArrayStack, 0, buffer, sizeof(buffer));
