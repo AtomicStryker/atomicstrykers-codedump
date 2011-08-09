@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION					"1.0.3"
+#define PLUGIN_VERSION					"1.0.4"
 
 #define TEST_DEBUG								0
 #define TEST_DEBUG_LOG						 	0
@@ -16,8 +16,10 @@ static const String:SOUND_SUFFIX_A[]	= "bacteria.wav";
 static const String:SOUND_SUFFIX_B[]	= "bacterias.wav";
 static const String:BOOMERFEM[]			= "boomette";
 static const String:BOOMERMALE[]		= "boomer";
+static const Float:INTER_SOUND_DELAY	= 3.0;
 
-
+static Handle:SoundArrayStack			= INVALID_HANDLE;
+static Handle:LastPlayedStack			= INVALID_HANDLE;
 static Handle:cvarGameModeActive		= INVALID_HANDLE;
 static bool:isAllowedGameMode			= false;
 
@@ -42,6 +44,11 @@ public OnPluginStart()
 	
 	HookEvent("item_pickup", Event_ItemPickup);
 	HookEvent("round_start", Event_RoundStart);
+	
+	SoundArrayStack = CreateArray();
+	LastPlayedStack = CreateTrie();
+	
+	CreateTimer(INTER_SOUND_DELAY, Timer_SoundCaller, _, TIMER_REPEAT);
 }
 
 public Action:Event_RoundStart(Handle:event, const String:name[], bool:dontBroadcast)
@@ -103,8 +110,33 @@ public Action:Event_ItemPickup(Handle:event, const String:name[], bool:dontBroad
 	
 	DebugPrintToAll("resulting sound name: [%s]", buffer);
 	
-	// playback!
-	EmitSoundToAll(buffer);
+	new foo;
+	if (!GetTrieValue(LastPlayedStack, buffer, foo))
+	{
+		DebugPrintToAll("Sound pushed to queue!");
+		SetTrieValue(LastPlayedStack, buffer, 0);
+		PushArrayString(SoundArrayStack, buffer);
+	}
+	else
+	{
+		DebugPrintToAll("Sound already in queue!");
+	}
+}
+
+public Action:Timer_SoundCaller(Handle:timer, Handle:foo)
+{
+	if (GetArraySize(SoundArrayStack))
+	{
+		decl String:buffer[PLATFORM_MAX_PATH];
+		GetArrayString(SoundArrayStack, 0, buffer, sizeof(buffer));
+		RemoveFromArray(SoundArrayStack, 0);
+		
+		RemoveFromTrie(LastPlayedStack, buffer);
+		
+		// playback!
+		EmitSoundToAll(buffer);
+		DebugPrintToAll("Queue now playing: [%s]", buffer);
+	}
 }
 
 stock DebugPrintToAll(const String:format[], any:...)
@@ -115,8 +147,8 @@ stock DebugPrintToAll(const String:format[], any:...)
 	VFormat(buffer, sizeof(buffer), format, 2);
 	
 	#if TEST_DEBUG
-	PrintToChatAll("[DAMAGE] %s", buffer);
-	PrintToConsole(0, "[DAMAGE] %s", buffer);
+	PrintToChatAll("[BACTERIA] %s", buffer);
+	PrintToConsole(0, "[BACTERIA] %s", buffer);
 	#endif
 	
 	LogMessage("%s", buffer);
