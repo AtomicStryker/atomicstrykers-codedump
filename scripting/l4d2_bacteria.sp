@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION					"1.0.5"
+#define PLUGIN_VERSION					"1.0.6"
 
 #define TEST_DEBUG								0
 #define TEST_DEBUG_LOG						 	0
@@ -91,7 +91,7 @@ public Action:Event_ItemPickup(Handle:event, const String:name[], bool:dontBroad
 	decl String:buffer[PLATFORM_MAX_PATH];
 	GetClientModel(client, buffer, sizeof(buffer)); // example output: models/infected/boomer.mdl
 	
-	if (StrContains(buffer, "hulk", false)) // keep tanks out of the queue
+	if (StrContains(buffer, "hulk", false) != -1) // keep tanks out of the queue
 	{
 		return;
 	}
