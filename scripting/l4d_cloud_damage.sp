@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "2.20"
+#define PLUGIN_VERSION "2.21"
 #define CVAR_FLAGS          FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY
 
 #define DEBUG 0
@@ -43,6 +43,7 @@ public OnPluginStart()
 	HookEvent("player_death", PlayerDeath, EventHookMode_Pre);
 	AddNormalSoundHook(NormalSHook:HookSound_Callback); //my melee hook since they didnt include an event for it
 	HookEvent("player_team", PlayerTeam);
+	HookEvent("round_start", RoundStart);
 	
 	CloudEnabled = CreateConVar("l4d_cloud_damage_enabled", "1", " Enable/Disable the Cloud Damage plugin ", CVAR_FLAGS);
 	CloudDamage = CreateConVar("l4d_cloud_damage_damage", "2.0", " Amount of damage the cloud deals every 2 seconds ", CVAR_FLAGS);
@@ -59,7 +60,7 @@ public OnPluginStart()
 							" Set the gamemodes for which the plugin should be activated (same usage as sv_gametypes, i.e. add all game modes where you want it active separated by comma) ",
 							CVAR_FLAGS);
 	
-	HookConVarChange(cvarGameModeActive, GameModeChanged);
+	HookConVarChange(FindConVar("mp_gamemode"), GameModeChanged);
 	CheckGamemode();
 	
 	CreateConVar("l4d_cloud_damage_version", PLUGIN_VERSION, " Version of L4D Cloud Damage on this server ", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_DONTRECORD);
@@ -79,6 +80,11 @@ public OnPluginStart()
 }
 
 public GameModeChanged(Handle:convar, const String:oldValue[], const String:newValue[])
+{
+	CheckGamemode();
+}
+
+public Action:RoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	CheckGamemode();
 }
