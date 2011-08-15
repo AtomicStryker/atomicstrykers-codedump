@@ -3,7 +3,7 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define PLUGIN_VERSION "1.0.8"
+#define PLUGIN_VERSION "1.0.9"
 
 #define DEBUG 0
 
@@ -46,10 +46,12 @@ static Handle:HordeAmountCVAR 		= INVALID_HANDLE;
 static Handle:RandomizeUCI			= INVALID_HANDLE;
 static Handle:RandomizeUCIChance	= INVALID_HANDLE;
 static Handle:AllowedUCIFlags		= INVALID_HANDLE;
+static Handle:UCIHealthOverride		= INVALID_HANDLE;
 static bool:AutoShuffleEnabled		= false;
 static bool:AreModelsCached			= false;
 static		UncommonInfectedChance	= 0;
 static		AllowedUCIFlag			= 0;
+static		UCIHealthOverrideValue	= -1;
 
 static UncommonData[Uncommons][UncommonInfo];
 
@@ -62,6 +64,7 @@ public OnPluginStart()
 	RandomizeUCI = 			CreateConVar("l4d2_spawn_uncommons_autoshuffle", "1", "Do you want all Uncommons randomly spawning on all maps", FCVAR_PLUGIN | FCVAR_NOTIFY);
 	RandomizeUCIChance =	CreateConVar("l4d2_spawn_uncommons_autochance", "15", "Every 'THIS' zombie spawning will be statistically turned uncommon if autoshuffle is active", FCVAR_PLUGIN | FCVAR_NOTIFY);
 	AllowedUCIFlags =		CreateConVar("l4d2_spawn_uncommons_autotypes", "19", "binary flag of allowed autoshuffle zombies. 1 = riot, 2 = ceda, 4 = clown, 8 = mudman, 16 = roadcrew, 32 = jimmy, 64 = fallen", FCVAR_PLUGIN | FCVAR_NOTIFY);
+	UCIHealthOverride =		CreateConVar("l4d2_spawn_uncommons_healthoverride", "-1", "Health value the uncommons get set to. '-1' is default values", FCVAR_PLUGIN | FCVAR_NOTIFY);
 	
 	RegAdminCmd("sm_spawnuncommon", Command_Uncommon, ADMFLAG_CHEATS, "Spawn uncommon infected, ANYTIME");
 	RegAdminCmd("sm_spawnuncommonhorde", Command_UncommonHorde, ADMFLAG_CHEATS, "Spawn an uncommon infected horde, ANYTIME");
@@ -72,12 +75,14 @@ public OnPluginStart()
 	AutoShuffleEnabled = GetConVarBool(RandomizeUCI);
 	UncommonInfectedChance = GetConVarInt(RandomizeUCIChance);
 	AllowedUCIFlag = GetConVarInt(AllowedUCIFlags);
-	HookConVarChange(RandomizeUCI, ShuffleConvarChanged);
-	HookConVarChange(RandomizeUCIChance, ShuffleConvarChanged);
-	HookConVarChange(AllowedUCIFlags, ShuffleConvarChanged);
+	UCIHealthOverrideValue = GetConVarInt(UCIHealthOverride);
+	HookConVarChange(RandomizeUCI, ConvarsChanged);
+	HookConVarChange(RandomizeUCIChance, ConvarsChanged);
+	HookConVarChange(AllowedUCIFlags, ConvarsChanged);
+	HookConVarChange(UCIHealthOverride, ConvarsChanged);
 }
 
-public ShuffleConvarChanged(Handle:convar, const String:oldValue[], const String:newValue[])
+public ConvarsChanged(Handle:convar, const String:oldValue[], const String:newValue[])
 {
 	AutoShuffleEnabled = GetConVarBool(RandomizeUCI);
 	UncommonInfectedChance = GetConVarInt(RandomizeUCIChance);
@@ -257,6 +262,7 @@ public OnEntityCreated(entity, const String:classname[])
 	if (number > -1)
 	{
 		SetEntityModel(entity, UncommonData[number][model]);
+		HandleHealthOverride(entity);
 		#if DEBUG
 		PrintToChatAll("Changing Zombie %i into a Uncommon of type %s", entity, UncommonData[number][name]);	
 		#endif
@@ -290,6 +296,7 @@ public Action:SpawnUncommonInf(number, Float:location[3])
 	}
 	
 	SetEntityModel(zombie, UncommonData[number][model]);
+	HandleHealthOverride(zombie);
 	new ticktime = RoundToNearest( FloatDiv( GetGameTime() , GetTickInterval() ) ) + 5;
 	SetEntProp(zombie, Prop_Data, "m_nNextThinkTick", ticktime);
 
@@ -302,6 +309,14 @@ public Action:SpawnUncommonInf(number, Float:location[3])
 	#if DEBUG
 	PrintToChatAll("Spawned uncommon inf %i", number);	
 	#endif
+}
+
+static HandleHealthOverride(entity)
+{
+	if (UCIHealthOverrideValue != -1)
+	{
+		SetEntProp(entity, Prop_Data, "m_iHealth", UCIHealthOverrideValue);
+	}
 }
 
 GetAnyClient()
