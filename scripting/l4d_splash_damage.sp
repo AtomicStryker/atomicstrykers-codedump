@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.7"
+#define PLUGIN_VERSION "1.0.8"
 #define CVAR_FLAGS FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY
 
 
@@ -64,7 +64,7 @@ public Action:Splashdamage(Handle:timer, any:client)
 	decl String:class[100];
 	GetClientModel(client, class, sizeof(class));
 	
-	if (StrContains(class, "boomer", false) != -1)
+	if (StrContains(class, "boome", false) != -1)
 	{
 		if (GetConVarInt(SplashEnabled))
 		{
@@ -202,10 +202,4 @@ public Action:EraseGhostExploit(Handle:timer, Handle:client)
 {	
 	IsSwappingTeam[client] = false;
 	return Plugin_Handled;
-}
-
-stock bool:IsPlayerIncapped(client)
-{
-	if (GetEntProp(client, Prop_Send, "m_isIncapacitated", 1)) return true;
-	return false;
 }
