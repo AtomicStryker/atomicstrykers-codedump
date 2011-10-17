@@ -3,7 +3,7 @@
 #include <sdktools>
 #include <left4downtown>
 
-#define PLUGIN_VERSION "1.0.5"
+#define PLUGIN_VERSION "1.0.6"
 
 #define TEST_DEBUG 0
 #define TEST_DEBUG_LOG 1
@@ -272,9 +272,17 @@ public Action:TS_Display_Auto_MenuToTank(Handle:timer)
 	primaryTankPlayer = FindHumanTankPlayer();
 	if (!primaryTankPlayer)
 	{
-		DebugPrintToAll("FindHumanTankPlayer didnt find a human tank, retrying auto menu in 2 seconds");
-		CreateTimer(CONTROL_RETRY_DELAY, TS_Display_Auto_MenuToTank);
-		return Plugin_Stop;
+		if (HasTeamHumanPlayers(3))
+		{
+			DebugPrintToAll("FindHumanTankPlayer didnt find a human tank, retrying auto menu in 2 seconds");
+			CreateTimer(CONTROL_RETRY_DELAY, TS_Display_Auto_MenuToTank);
+			return Plugin_Stop;
+		}
+		else
+		{
+			DebugPrintToAll("No Humans on Infected team, aborting");
+			return Plugin_Stop;
+		}
 	}
 
 	surrenderMenu = CreateMenu(TS_Auto_MenuCallBack, MenuAction:MENU_ACTIONS_ALL);
@@ -313,6 +321,20 @@ public Action:TS_Display_Auto_MenuToTank(Handle:timer)
 	}
 	
 	return Plugin_Stop;
+}
+
+bool:HasTeamHumanPlayers(team)
+{
+	for (new i = 1; i <= MaxClients; i++)
+	{
+		if (IsClientInGame(i)
+		&& GetClientTeam(i) == team
+		&& !IsFakeClient(i))
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 public TS_Auto_MenuCallBack(Handle:menu, MenuAction:action, param1, param2)

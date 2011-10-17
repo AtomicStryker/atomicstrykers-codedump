@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "2.21"
+#define PLUGIN_VERSION "2.22"
 #define CVAR_FLAGS          FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY
 
 #define DEBUG 0
@@ -101,13 +101,12 @@ static CheckGamemode()
 
 stock bool:ListContainsString(const String:list[], const String:separator[], const String:string[])
 {
-	new curPos = 0;
-	new nextPos = 0;
-	decl String:buffer[64];
-	while((nextPos = SplitString(list[curPos], separator, buffer, 64)) != -1)
+	decl String:buffer[64][15];
+	
+	new count = ExplodeString(list, separator, buffer, 14, sizeof(buffer));
+	for (new i = 0; i < count; i++)
 	{
-		curPos += nextPos;
-		if (StrEqual(string, buffer, false))
+		if (StrEqual(string, buffer[i], false))
 		{
 			return true;
 		}
