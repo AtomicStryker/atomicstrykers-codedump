@@ -9,7 +9,7 @@
 #define DEBUG_LOG 0
 #define DEBUG_CHAT 0
 
-#define PLUGIN_VERSION "1.0.4"
+#define PLUGIN_VERSION "1.0.5"
 #define DEBUG_SCRIM 0
 #define DEBUG_DOOR 0
 #define DEBUG_CHMAP 0
@@ -47,9 +47,11 @@ new Handle:gameMode = INVALID_HANDLE;
 new Handle:displayMode = INVALID_HANDLE;
 new Handle:foundCampaigns = INVALID_HANDLE;
 new Handle:g_l4dVoteMenu = INVALID_HANDLE;
+new Handle:cvarDoorRepel = INVALID_HANDLE;
 
 new countDown;
 new checkPointDoorEntityStart;
+new pushEnt;
 new String:checkPointDoorEntityStartAngles[255];
 new checkPointDoorEntityIds[4];
 new bool:isClientLoading[MAXPLAYERS + 1];
@@ -126,7 +128,8 @@ public OnPluginStart()
 	awaitSpawn = CreateConVar("l4d2_infectedSpawn", "1", "Wait for infected to be ready to spawn before starting countdown");
 	gameMode = CreateConVar("l4d2_gameModeActive", "versus,teamversus", "Set the game mode for which the plugin should be activated (same usage as sv_gametypes, i.e. add all game modes where you want it active separated by comma)");
 	displayMode = CreateConVar("l4d2_displayMode", "hint", "Set the display mode how the countdown will be displayed (hint = countdown is displayed in hint messages; center = countdown is displayed in the screen center; chat = countdown is displayed in the chat)");
-
+	cvarDoorRepel = CreateConVar("l4d2_saferoom_door_repels", "1", " Set 0 if you do not want the saferoom door to repel Survivors pre-round ");
+	
 	AutoExecConfig(true, "l4d2_loading");
 }
 
@@ -324,11 +327,14 @@ public Event_ReviveEnd(Handle:event, const String:name[], bool:dontBroadcast)
 
 public Event_PlayerUse(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	#if DEBUG_DOOR
 	new ent = GetEventInt(event, "targetid");
-	new userid = GetEventInt(event, "userid");
-	new client = GetClientOfUserId(userid);
-
+	//new client = GetClientOfUserId(GetEventInt(event, "userid"));
+	if (IsCheckPointDoor(ent))
+	{
+		TurnOffPush();
+	}
+	
+	#if DEBUG_DOOR
 	PrintDebugMessage("Client %N used entity %i", client, ent);
 	if (IsCountDownStoppedOrRunning()) PrintDebugMessage("Countdown running");
 	if (IsCheckPointDoor(ent)) PrintDebugMessage("Found check point door: %i", ent);
@@ -1446,7 +1452,6 @@ bool:IsSoleSurvivor()
 	return count == 1;
 }
 
-#if DEBUG_DOOR
 bool:IsCheckPointDoor(ent)
 {
 	for (new i = 0; i < 4; i++) {
@@ -1456,7 +1461,6 @@ bool:IsCheckPointDoor(ent)
 	}
 	return false;
 }
-#endif
 
 DumpCPDEntity(const String:prop[], const String:type[], ent = -1, size = 4)
 {
@@ -2118,6 +2122,11 @@ public Action:SpawnFakeDoorDelayed(Handle:timer, Handle:datapack)
 		if (IsValidEntity(fakedoor)) LogAction(0, -1, "Created fake door with ent id %i (%s)", fakedoor, cantOpen ? "cannot be opened" : "can be opened");
 		else LogAction(0, -1, "Failed to create fake door");
 		#endif
+		
+		if (GetConVarBool(cvarDoorRepel))
+		{
+			pushEnt = Create_Point_Push(ent, "120.0", "120.0");
+		}
 	}
 }
 
@@ -2345,4 +2354,46 @@ public Handler_VoteCallback(Handle:menu, MenuAction:action, param1, param2)
 			}
 		}
 	}
+}
+
+TurnOffPush()
+{
+	if (pushEnt && IsValidEntity(pushEnt))
+	{
+		AcceptEntityInput(pushEnt, "Kill");
+		pushEnt = -1;
+	}
+}
+
+stock Create_Point_Push(ent, const String:radius[] = "200.0", const String:innerRadius[] = "200.0", const String:magnitude[] = "1000.0", Float:zOffset = 30.0)
+{
+	new point_push = CreateEntityByName("point_push");
+	
+	if (IsValidEdict(point_push))
+	{
+		new Float:pos[3]; 
+		GetEntPropVector(ent, Prop_Send, "m_vecOrigin", pos);
+		pos[2] += zOffset;
+		
+		DispatchKeyValue(point_push, "targetname", "l4dpusher");
+		
+		///VALUES
+		DispatchKeyValue(point_push, "enabled", "1");
+		DispatchKeyValue(point_push, "magnitude", magnitude);
+		DispatchKeyValue(point_push, "radius", radius);
+		DispatchKeyValue(point_push, "inner_radius", innerRadius);
+		DispatchKeyValue(point_push, "spawnflags", "8");
+		
+		DispatchSpawn(point_push);
+		
+		ActivateEntity(point_push);
+		AcceptEntityInput(point_push, "TurnOn");
+		
+		ActivateEntity(point_push);
+		AcceptEntityInput(point_push, "Enable");
+		
+		TeleportEntity(point_push, pos, NULL_VECTOR, NULL_VECTOR);
+	}
+	
+	return point_push;
 }
