@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.0"
+#define PLUGIN_VERSION "1.0.1"
 
 #define CVAR_FLAGS 									FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY
 
@@ -15,6 +15,8 @@
 
 static const String:GAMEDATA_FILENAME[]				= "l4d2addresses";
 static const String:INCAP_ENTPROP[]					= "m_isIncapacitated";
+static const String:HANGING_ENTPROP[]				= "m_isHangingFromLedge";
+static const String:LEDGEFALLING_ENTPROP[]			= "m_isFallingFromLedge";
 static const String:VELOCITY_ENTPROP[]				= "m_vecVelocity";
 //static const String:CHARACTER_ENTPROP[]				= "m_survivorCharacter";
 static const String:BOOMER_WEAPON[]					= "boomer_claw";
@@ -30,9 +32,9 @@ static Handle:cvar_enabled							= INVALID_HANDLE;
 static Handle:cvar_slapPower						= INVALID_HANDLE;
 static Handle:cvar_slapCooldownTime					= INVALID_HANDLE;
 static Handle:cvar_slapAnnounceMode					= INVALID_HANDLE;
+static Handle:cvar_slapOffLedges					= INVALID_HANDLE;
 
 static Float:lastSlapTime[MAXPLAYERS+1]				= 0.0;
-
 
 public Plugin:myinfo = 
 {
@@ -49,10 +51,11 @@ public OnPluginStart()
 
 	CreateConVar("l4d2_boomerbitchslap_version", PLUGIN_VERSION, " L4D2 Boomer Bitch Slap Plugin Version ", CVAR_FLAGS|FCVAR_DONTRECORD);
 	
-	cvar_enabled = CreateConVar("l4d2_boomerbitchslap_enabled","1", " Enable/Disable the Boomer Bitch Slap Plugin ", CVAR_FLAGS);
-	cvar_slapPower = CreateConVar("l4d2_boomerbitchslap_power","150.0", " How much Force is applied to the victim ", CVAR_FLAGS);
-	cvar_slapCooldownTime = CreateConVar("l4d2_boomerbitchslap_cooldown","15.0", " How many seconds before Boomer can Slap again ", CVAR_FLAGS);
-	cvar_slapAnnounceMode = CreateConVar("l4d2_boomerbitchslap_announce","1", " Do Slaps get announced in the Chat Area ", CVAR_FLAGS);
+	cvar_enabled = CreateConVar("l4d2_boomerbitchslap_enabled", "1", " Enable/Disable the Boomer Bitch Slap Plugin ", CVAR_FLAGS);
+	cvar_slapPower = CreateConVar("l4d2_boomerbitchslap_power", "150.0", " How much Force is applied to the victim ", CVAR_FLAGS);
+	cvar_slapCooldownTime = CreateConVar("l4d2_boomerbitchslap_cooldown", "15.0", " How many seconds before Boomer can Slap again ", CVAR_FLAGS);
+	cvar_slapAnnounceMode = CreateConVar("l4d2_boomerbitchslap_announce", "1", " Do Slaps get announced in the Chat Area ", CVAR_FLAGS);
+	cvar_slapOffLedges = CreateConVar("l4d2_boomerbitchslap_ledgeslap", "0", " Enable/Disable Slapping hanging people off ledges ", CVAR_FLAGS);
 	
 	AutoExecConfig(true, "l4d2_boomerbitchslap");
 	
@@ -72,50 +75,62 @@ public Action:PlayerHurt(Handle:event, const String:name[], bool:dontBroadcast)
 	if (GetConVarInt(cvar_enabled)
 		&& GetClientTeam(target) == TEAM_SURVIVOR
 		&& StrEqual(weapon, BOOMER_WEAPON)
-		&& !GetEntProp(target, Prop_Send, INCAP_ENTPROP)
 		&& CanSlapAgain(slapper))
 	{
-	
-		if (!IsFakeClient(target)) // none of this applies for bots.
+		if (!GetEntProp(target, Prop_Send, INCAP_ENTPROP))
 		{
-			PrintCenterText(target, "Got Bitch Slapped by %N!!!", slapper);
-			
-			if (GetConVarInt(cvar_slapAnnounceMode)) PrintToChatAll("\x04%N\x01 was \x02Bitch Slapped\x01 by \x04%N\x01!", target, slapper);
-			
-			//decl String:painSound[STRING_LENGHT];
-			//GetSurvivorPainSound(target, painSound);
-			
-			for (new i=1; i <= MaxClients; i++)
+			if (!IsFakeClient(target)) // none of this applies for bots.
 			{
-				if (IsClientInGame(i) && !IsFakeClient(i))
+				PrintCenterText(target, "Got Bitch Slapped by %N!!!", slapper);
+				
+				if (GetConVarInt(cvar_slapAnnounceMode)) PrintToChatAll("\x04%N\x01 was \x02Bitch Slapped\x01 by \x04%N\x01!", target, slapper);
+				
+				//decl String:painSound[STRING_LENGHT];
+				//GetSurvivorPainSound(target, painSound);
+				
+				for (new i=1; i <= MaxClients; i++)
 				{
-					EmitSoundToClient(i, PUNCH_SOUND, target, SNDCHAN_AUTO, SNDLEVEL_GUNFIRE);
-					//EmitSoundToClient(i, painSound, target, SNDCHAN_AUTO, SNDLEVEL_GUNFIRE);
+					if (IsClientInGame(i) && !IsFakeClient(i))
+					{
+						EmitSoundToClient(i, PUNCH_SOUND, target, SNDCHAN_AUTO, SNDLEVEL_GUNFIRE);
+						//EmitSoundToClient(i, painSound, target, SNDCHAN_AUTO, SNDLEVEL_GUNFIRE);
+					}
 				}
 			}
-		}
-		
-		PrintCenterText(slapper, "YOU BITCHSLAPPED %N", target);
-		
-		decl Float:HeadingVector[3], Float:AimVector[3];
-		new Float:power = GetConVarFloat(cvar_slapPower);
+			
+			PrintCenterText(slapper, "YOU BITCHSLAPPED %N", target);
+			
+			decl Float:HeadingVector[3], Float:AimVector[3];
+			new Float:power = GetConVarFloat(cvar_slapPower);
 
-		GetClientEyeAngles(slapper, HeadingVector);
-	
-		AimVector[0] = FloatMul( Cosine( DegToRad(HeadingVector[1])  ) , power);
-		AimVector[1] = FloatMul( Sine( DegToRad(HeadingVector[1])  ) , power);
+			GetClientEyeAngles(slapper, HeadingVector);
 		
-		decl Float:current[3];
-		GetEntPropVector(target, Prop_Data, VELOCITY_ENTPROP, current);
+			AimVector[0] = FloatMul( Cosine( DegToRad(HeadingVector[1])  ) , power);
+			AimVector[1] = FloatMul( Sine( DegToRad(HeadingVector[1])  ) , power);
+			
+			decl Float:current[3];
+			GetEntPropVector(target, Prop_Data, VELOCITY_ENTPROP, current);
+			
+			decl Float:resulting[3];
+			resulting[0] = FloatAdd(current[0], AimVector[0]);	
+			resulting[1] = FloatAdd(current[1], AimVector[1]);
+			resulting[2] = power * SLAP_VERTICAL_MULTIPLIER;
+			
+			L4D2_Fling(target, resulting, slapper);
+			
+			lastSlapTime[slapper] = GetEngineTime();
+		}
+		else if (GetEntProp(target, Prop_Send, HANGING_ENTPROP) && GetConVarBool(cvar_slapOffLedges))
+		{
+			SetEntProp(target, Prop_Send, INCAP_ENTPROP, 0);
+			SetEntProp(target, Prop_Send, HANGING_ENTPROP, 0);
+			SetEntProp(target, Prop_Send, LEDGEFALLING_ENTPROP, 0);
 		
-		decl Float:resulting[3];
-		resulting[0] = FloatAdd(current[0], AimVector[0]);	
-		resulting[1] = FloatAdd(current[1], AimVector[1]);
-		resulting[2] = power * SLAP_VERTICAL_MULTIPLIER;
-		
-		L4D2_Fling(target, resulting, slapper);
-		
-		lastSlapTime[slapper] = GetEngineTime();
+			StopFallingSounds(target);
+			
+			PrintCenterText(slapper, "YOU BITCHSLAPPED %N", target);
+			PrintCenterText(target, "Got Bitch Slapped by %N!!!", slapper);
+		}
 	}
 }
 
@@ -158,6 +173,15 @@ stock Require_L4D2()
 	{
 		SetFailState("Plugin supports Left 4 Dead 2 only.");
 	}
+}
+
+stock StopFallingSounds(client)
+{
+	ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangTwoHands");
+	ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangOneHand");
+	ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangFingers");
+	ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangAboutToFall");
+	ClientCommand(client, "music_dynamic_stop_playing Event.LedgeHangFalling");
 }
 
 /*
