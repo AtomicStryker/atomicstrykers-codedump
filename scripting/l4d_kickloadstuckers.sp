@@ -1,5 +1,7 @@
+#pragma semicolon 1
+
 #include <sourcemod>
-#define PLUGIN_VERSION "1.0.7"
+#define PLUGIN_VERSION "1.0.8"
 
 public Plugin:myinfo = 
 {
@@ -54,6 +56,8 @@ public OnClientDisconnect(client)
 
 public Action:CheckClientIngame(Handle:timer, any:client)
 {
+	LoadingTimer[client] = INVALID_HANDLE;
+
 	if (!IsClientConnected(client)) return; //onclientdisconnect should handle this, but you never know
 	
 	if (!IsClientInGame(client))
@@ -75,8 +79,6 @@ public Action:CheckClientIngame(Handle:timer, any:client)
 		
 		LogToFileEx(file, "%s - %N", steamid, client); // this logs their steamids and names. to be banned.
 	}
-	
-	LoadingTimer[client] = INVALID_HANDLE
 }
 
 stock bool:AreHumansConnected()
