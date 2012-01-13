@@ -1,7 +1,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION		"1.0.9"
+#define PLUGIN_VERSION		"1.1.0"
 #pragma semicolon			1
 #define TEST_DEBUG			0
 #define TEST_DEBUG_LOG		0
@@ -141,7 +141,7 @@ public Action:BC_Reincap(Handle:timer, any:client)
 
 public Action:BC_SetHealthDelayed(Handle:timer, any:client)
 {
-	if (IncappedHealth[client] > 1 && IsPlayerIncapped(client))
+	if (IsValidEntity(client) && IncappedHealth[client] > 1 && IsPlayerIncapped(client))
 	{
 		SetEntityHealth(client, IncappedHealth[client]);
 	}
