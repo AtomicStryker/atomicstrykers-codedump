@@ -1,7 +1,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION		"1.1.0"
+#define PLUGIN_VERSION		"1.1.1"
 #pragma semicolon			1
 #define TEST_DEBUG			0
 #define TEST_DEBUG_LOG		0
@@ -19,7 +19,7 @@ static const L4D2_TEAM_SURVIVOR						= 2;
 
 
 static Handle:ReinCapTimerArray[MAXPLAYERS+1]		= INVALID_HANDLE;
-static Handle:ChargerTimer							= INVALID_HANDLE;
+static bool:KillChargerTimer						= false;
 static IncappedHealth[MAXPLAYERS+1]					= 0;
 
 
@@ -49,34 +49,21 @@ public Action:BC_Event_Charge(Handle:event, String:event_name[], bool:dontBroadc
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	if (!client || !IsClientInGame(client)) return;
 	
-	if (ChargerTimer != INVALID_HANDLE)
-	{
-		CloseHandle(ChargerTimer);
-		ChargerTimer = INVALID_HANDLE;
-	}
-	
-	ChargerTimer = CreateTimer(CHARGE_CHECKING_INTERVAL, BC_CheckForIncapped, client, TIMER_REPEAT);
-	TriggerTimer(ChargerTimer, true);
+	KillChargerTimer = false;
+	TriggerTimer(CreateTimer(CHARGE_CHECKING_INTERVAL, BC_CheckForIncapped, client, TIMER_REPEAT), true);
 	
 	DebugPrintToAll("Charge caught, starting ChargerTimer");
 }
 
 public Action:BC_Event_ChargeEnd(Handle:event, String:event_name[], bool:dontBroadcast)
 {
-	if (ChargerTimer != INVALID_HANDLE)
-	{
-		CloseHandle(ChargerTimer);
-		ChargerTimer = INVALID_HANDLE;
-	}
-	
+	KillChargerTimer = true;
 	DebugPrintToAll("Charge(r) end caught, killing ChargerTimer");
 	CreateTimer(UNINCAP_TIME_ON_IMPACT, BC_WipeHealthArray);
 }
 
 public OnMapEnd()
 {
-	ChargerTimer = INVALID_HANDLE;
-	
 	for (new i = 1; i <= MaxClients; i++)
 	{
 		ReinCapTimerArray[i] = INVALID_HANDLE;
@@ -88,7 +75,7 @@ public Action:BC_Event_Impact(Handle:event, String:event_name[], bool:dontBroadc
 	new target = GetClientOfUserId(GetEventInt(event, "victim"));	
 	if (ReinCapTimerArray[target] != INVALID_HANDLE)
 	{
-		KillTimer(ReinCapTimerArray[target]);
+		CloseHandle(ReinCapTimerArray[target]);
 		ReinCapTimerArray[target] = INVALID_HANDLE;
 		ReinCapTimerArray[target] = CreateTimer(UNINCAP_TIME_ON_IMPACT*2, BC_Reincap, target);
 		
@@ -98,7 +85,13 @@ public Action:BC_Event_Impact(Handle:event, String:event_name[], bool:dontBroadc
 
 public Action:BC_CheckForIncapped(Handle:timer, any:client)
 {
-	if (!client || !IsClientInGame(client)) return Plugin_Stop;
+	if (!client
+	|| !IsClientInGame(client)
+	|| KillChargerTimer)
+	{
+		KillChargerTimer = false;
+		return Plugin_Stop;
+	}
 	decl Float:targetpos[3], Float:chargerpos[3];
 	
 	for (new target = 1; target <= MaxClients; target++)
@@ -129,6 +122,8 @@ public Action:BC_CheckForIncapped(Handle:timer, any:client)
 
 public Action:BC_Reincap(Handle:timer, any:client)
 {
+	ReinCapTimerArray[client] = INVALID_HANDLE;
+	
 	if (!IsValidEntity(client)) return;
 	
 	SetPlayerIncapState(client, true);
@@ -136,7 +131,6 @@ public Action:BC_Reincap(Handle:timer, any:client)
 	CreateTimer(HEALTH_SET_DELAY, BC_SetHealthDelayed, client);
 	
 	DebugPrintToAll("Re-Incapped %N", client);
-	ReinCapTimerArray[client] = INVALID_HANDLE;
 }
 
 public Action:BC_SetHealthDelayed(Handle:timer, any:client)
