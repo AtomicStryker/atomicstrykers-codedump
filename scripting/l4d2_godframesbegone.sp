@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#define PLUGIN_VERSION										"1.0.5"
+#define PLUGIN_VERSION										"1.0.6"
 
 #define			STRINGLENGTH									32
 #define			STRINGLENGTH_DEBUG							   192
@@ -11,7 +11,6 @@ static const 		OUT_SERVER								= 	 1;
 static const 		OUT_LOG									= 	 2;
 static const 		OUT_CHAT								= 	 4;
 static const		L4D2_TEAM_INFECTED					    =    3;
-static const		L4D2_INFLICTOR_INFECTED	 			    = 4095;
 static const		TEMP_HEALTH_ERROR_MARGIN				=    1;
 static const		ZOMBIECLASS_SPITTER						=	 4;
 
@@ -170,7 +169,6 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 			if (!GetConVarBool(cvarEnabled)
 			|| !IsValidEdict(victim)
 			|| !IsValidEdict(attacker)
-			|| inflictor != L4D2_INFLICTOR_INFECTED
 			|| victim > MaxPlayerClients
 			|| !IsClientInGame(victim)
 			|| GetClientTeam(victim) == L4D2_TEAM_INFECTED)
@@ -180,7 +178,10 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 		}
 	}
 	
-	new bool:playerattacker = (attacker	&& attacker < MaxPlayerClients && IsClientInGame(attacker));
+	new bool:playerattacker = (attacker
+							&& attacker < MaxPlayerClients
+							&& IsClientInGame(attacker)
+							&& GetClientTeam(attacker) == L4D2_TEAM_INFECTED);
 
 	if (!playerattacker && !GetConVarBool(cvarCommonsEnabled)							// case common override disabled and attacker common
 	|| lastSavedGodFrameBegin[victim] == 0.0											// case no god frames on record
