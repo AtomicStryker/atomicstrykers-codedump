@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "2.22"
+#define PLUGIN_VERSION "2.23"
 #define CVAR_FLAGS          FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY
 
 #define DEBUG 0
@@ -25,7 +25,6 @@ static bool:isAllowedGameMode		= false;
 
 new meleeentinfo;
 new bool:isincloud[MAXPLAYERS+1];
-new bool:swappedTeams[MAXPLAYERS+1];
 new bool:MeleeDelay[MAXPLAYERS+1];
 new propinfoghost;
 
@@ -42,7 +41,6 @@ public OnPluginStart()
 {
 	HookEvent("player_death", PlayerDeath, EventHookMode_Pre);
 	AddNormalSoundHook(NormalSHook:HookSound_Callback); //my melee hook since they didnt include an event for it
-	HookEvent("player_team", PlayerTeam);
 	HookEvent("round_start", RoundStart);
 	
 	CloudEnabled = CreateConVar("l4d_cloud_damage_enabled", "1", " Enable/Disable the Cloud Damage plugin ", CVAR_FLAGS);
@@ -166,18 +164,6 @@ static CreateGasCloud(client, Float:g_pos[3])
 	WritePackFloat(data, targettime);
 	
 	CreateTimer(2.0, Point_Hurt, data, TIMER_REPEAT);
-}
-
-public Action:PlayerTeam(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	swappedTeams[client] = true;
-	CreateTimer(2.0, EraseGhostExploit, client);
-}
-
-public Action:EraseGhostExploit(Handle:timer, any:client)
-{	
-	swappedTeams[client] = false;
 }
 
 public Action:Point_Hurt(Handle:timer, Handle:hurt)
