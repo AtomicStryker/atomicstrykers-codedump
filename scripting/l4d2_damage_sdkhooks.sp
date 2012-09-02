@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#define PLUGIN_VERSION							"1.0.8"
+#define PLUGIN_VERSION							"1.0.9"
 
 #define TEST_DEBUG								0
 #define TEST_DEBUG_LOG						 	0
@@ -170,7 +170,8 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 	decl String:classname[CLASS_STRINGLENGHT];
 	new bool:bHumanAttacker = false;
 	
-	if (attacker <= MaxClients
+	if (attacker > 0
+	&& attacker <= MaxClients
 	&& IsClientInGame(attacker))
 	{
 		bHumanAttacker = true;	// case: player entity attacks
