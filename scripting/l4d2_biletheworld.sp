@@ -3,7 +3,7 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define PLUGIN_VERSION "1.0.5"
+#define PLUGIN_VERSION "1.0.6"
 
 #define STRINGLENGTH_CLASSES				  64
 
@@ -240,7 +240,10 @@ public bool:_TraceFilter(entity, contentsMask)
 //http://forums.alliedmods.net/showpost.php?s=e5dce96f11b8e938274902a8ad8e75e9&p=885168&postcount=3
 stock GetEntityAbsOrigin(entity, Float:origin[3])
 {
-	if (entity && IsValidEntity(entity) && (GetEntSendPropOffs(entity, "m_vecOrigin") != -1))
+	if (entity && IsValidEntity(entity)
+	&& (GetEntSendPropOffs(entity, "m_vecOrigin") != -1)
+	&& (GetEntSendPropOffs(entity, "m_vecMins") != -1)
+	&& (GetEntSendPropOffs(entity, "m_vecMaxs") != -1))
 	{
 		decl Float:mins[3], Float:maxs[3];
 		GetEntPropVector(entity, Prop_Send, "m_vecOrigin", origin);
