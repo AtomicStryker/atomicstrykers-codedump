@@ -68,13 +68,17 @@
 			
 			/*
 			 * CDirector::AreTeamsFlipped(void)const
+			 *
+			 * got via CTerrorPlayer::UpdateTeamDesired and its String "CTerrorPlayer::UpdateTeamDesired error "
+			 * Windows and Linux now differ quite a lot in this function
+			 *
 			 */
 			"AreTeamsFlipped"
 			{
 				"library"	"server"
 				"linux"	"@_ZNK9CDirector15AreTeamsFlippedEv"
-				"windows" "\x56\x8B\xF1\xE8****\x84\xC0\x74\x0B\x8B\x86****\x8A\x40*\x5E\xC3"
-				/* 56 8B F1 E8 ? ? ? ? 84 C0 74 0B 8B 86 ? ? ? ? 8A 40 ? 5E C3 */
+				"windows" "\x57\x8B\xF9\xE8\x2A\x2A\x2A\x2A\x84\xC0\x75\x2A\xF7"
+				/* 57 8B F9 E8 ? ? ? ? 84 C0 75 ? F7 */
 			}
 
 			/*
