@@ -3,7 +3,7 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define PLUGIN_VERSION "1.0.6"
+#define PLUGIN_VERSION "1.0.7"
 
 #define STRINGLENGTH_CLASSES				  64
 
@@ -19,13 +19,18 @@ static const String:CLASS_BILEJAR[]			= "vomitjar_projectile";
 static const String:CLASS_ZOMBIE[]			= "infected";
 static const String:CLASS_WITCH[]			= "witch";
 
+static const String:VELOCITY_ENTPROP[]		= "m_vecVelocity";
+static const Float:SLAP_VERTICAL_MULTIPLIER	= 1.5;
 
 static Handle:isEnabled = 				INVALID_HANDLE;
 static Handle:splashRadius = 			INVALID_HANDLE;
 static Handle:sdkCallVomitOnPlayer = 	INVALID_HANDLE;
 static Handle:sdkCallBileJarPlayer = 	INVALID_HANDLE;
 static Handle:sdkCallBileJarInfected = 	INVALID_HANDLE;
+static Handle:sdkCallFling			 = 	INVALID_HANDLE;
 
+static Handle:cvar_slapPower		 = INVALID_HANDLE;
+static Handle:cvar_bFling			 = INVALID_HANDLE;
 
 public Plugin:myinfo = 
 {
@@ -45,6 +50,9 @@ public OnPluginStart()
 	CreateConVar("l4d2_bile_the_world_version", PLUGIN_VERSION, " L4D2 Bile the World Plugin Version ", 					FCVAR_PLUGIN|FCVAR_REPLICATED|FCVAR_DONTRECORD|FCVAR_NOTIFY);
 	splashRadius = 	CreateConVar("l4d2_bile_the_world_radius", 	"200", 			" Radius of Bile Splash on Boomer Death and Vomit Jar ", 	FCVAR_PLUGIN|FCVAR_REPLICATED);
 	isEnabled = 	CreateConVar("l4d2_bile_the_world_enabled", "1", 			" Turn Bile the World on and off ", 						FCVAR_PLUGIN|FCVAR_REPLICATED);
+	
+	cvar_slapPower = CreateConVar("l4d2_bile_the_world_expl_pwr", "150.0", " How much Force is applied to the victims ", FCVAR_PLUGIN|FCVAR_REPLICATED);
+	cvar_bFling  = 	CreateConVar("l4d2_bile_the_world_flingenabled", "0", " Turn Flinging by Boomer Explosion on and off ", FCVAR_PLUGIN|FCVAR_REPLICATED);
 }
 
 public Action:event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
@@ -61,7 +69,7 @@ public Action:event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
 	decl Float:pos[3];
 	GetClientEyePosition(client, pos);
 
-	VomitSplash(true, pos);
+	VomitSplash(true, pos, client);
 }
 
 public OnEntityDestroyed(entity)
@@ -77,17 +85,17 @@ public OnEntityDestroyed(entity)
 	GetEntityAbsOrigin(entity, pos);
 	pos[2] += BILE_POS_HEIGHT_FIX;
 	
-	VomitSplash(false, pos);
+	VomitSplash(false, pos, 0);
 }
 
-static VomitSplash(bool:BoomerDeath, Float:pos[3])
+static VomitSplash(bool:BoomerDeath, Float:pos[3], boomer)
 {		
 	if (!GetConVarBool(isEnabled)) return;
 	
 	decl Float:targetpos[3];
 	new Float:distancesetting = GetConVarFloat(splashRadius);
 	
-	if (BoomerDeath) // unfortunately were forced to loop all entities here
+	if (BoomerDeath) // unfortunately we're forced to loop all entities here
 	{
 		for (new i = 1; i <= MaxClients; i++)
 		{
@@ -106,7 +114,33 @@ static VomitSplash(bool:BoomerDeath, Float:pos[3])
 				continue;
 			}
 			
-			SDKCall(sdkCallBileJarPlayer, i, GetAnyValidSurvivor());
+			if (GetConVarBool(cvar_bFling))
+			{
+				decl Float:HeadingVector[3], Float:AimVector[3];
+				new Float:power = GetConVarFloat(cvar_slapPower);
+				
+				// compute target vector
+				HeadingVector[0] = targetpos[0] - pos[0];
+				HeadingVector[1] = targetpos[1] - pos[1];
+				HeadingVector[2] = targetpos[2] - pos[2];
+			
+				AimVector[0] = FloatMul( Cosine( DegToRad(HeadingVector[1])  ) , power);
+				AimVector[1] = FloatMul( Sine( DegToRad(HeadingVector[1])  ) , power);
+				
+				decl Float:current[3];
+				GetEntPropVector(i, Prop_Data, VELOCITY_ENTPROP, current);
+				
+				decl Float:resulting[3];
+				resulting[0] = FloatAdd(current[0], AimVector[0]);	
+				resulting[1] = FloatAdd(current[1], AimVector[1]);
+				resulting[2] = power * SLAP_VERTICAL_MULTIPLIER;
+				
+				L4D2_Fling(i, resulting, boomer);
+			}
+			else
+			{
+				SDKCall(sdkCallBileJarPlayer, i, GetAnyValidSurvivor());
+			}
 		}
 	
 		decl String:class[STRINGLENGTH_CLASSES];
@@ -192,6 +226,20 @@ static PrepSDKCalls()
 		return;
 	}
 	
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(ConfigFile, SDKConf_Signature, "CTerrorPlayer_Fling");
+	PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_ByRef);
+	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
+	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+	PrepSDKCall_AddParameter(SDKType_Float, SDKPass_Plain);
+	sdkCallFling = EndPrepSDKCall();
+	
+	if (sdkCallFling == INVALID_HANDLE)
+	{
+		SetFailState("Cant initialize Fling SDKCall");
+		return;
+	}
+	
 	CloseHandle(ConfigFile);
 }
 
@@ -267,4 +315,10 @@ stock GetAnyValidSurvivor()
 		}
 	}
 	return 1;
+}
+
+// CTerrorPlayer::Fling(Vector  const&, PlayerAnimEvent_t, CBaseCombatCharacter *, float)
+stock L4D2_Fling(target, Float:vector[3], attacker, Float:incaptime = 3.0)
+{	
+	SDKCall(sdkCallFling, target, vector, 76, attacker, incaptime); //76 is the 'got bounced' animation in L4D2
 }
