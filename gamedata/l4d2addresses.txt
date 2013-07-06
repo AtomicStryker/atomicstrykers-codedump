@@ -18,7 +18,7 @@
 				"windows"
 				{
 					"signature" "DirectorMusicBanks_OnRoundStart"				
-					"read" "8"
+					"read" "13"
 				}
 				"linux"
 				{
@@ -95,6 +95,9 @@
 			
 			/*
 			 * CDirector::AreTeamsFlipped(void)const
+			 *
+			 * got via CTerrorPlayer::UpdateTeamDesired and its String "CTerrorPlayer::UpdateTeamDesired error "
+			 *
 			 */
 			"AreTeamsFlipped"
 			{
@@ -182,12 +185,12 @@
 				/* 83 EC 0C 56 8B F1 8B 8E ? ? ? ? 8D ? ? ? 50 E8 ? ? ? ? 84 C0 */
 			}
 			
-			/* Used solely to get the offset for TheDirector */
+			/* CDirectorMusicBanks::OnRoundStart, used solely to get the offset for TheDirector */
 			"DirectorMusicBanks_OnRoundStart"
 			{
 				"library"	"server"
-				"windows"       "\x83\xEC\x14\x57\x8B\xF9\x8B\x0D\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x84\xC0\x0F\x2A\x2A\x2A\x2A\x2A\x53\x55\x6A\x24\xE8"
-				/* 83 EC 14 57 8B F9 8B 0D ? ? ? ? E8 ? ? ? ? 84 C0 0F ? ? ? ? ? 53 55 6A 24 E8 */
+				"windows"       "\x55\x8B\xEC\x83\xEC\x2A\x56\x57\x8B\xF9\x8B\x0D\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x84\xC0\x0F"
+				/* 55 8B EC 83 EC ? 56 57 8B F9 8B 0D ? ? ? ? E8 ? ? ? ? 84 C0 0F */
 			}
 
 			/* Find the Director singleton class in linux */
@@ -216,13 +219,15 @@
 
 			/*
 			 * CDirector::RestartScenarioFromVote(const char*)
+			 *
+			 * string "RestartScenarioFromVote - changing to m"
 			 */
 			"RestartScenarioFromVote"
 			{
 				"library"	"server"
 				"linux"	"@_ZN9CDirector23RestartScenarioFromVoteEPKc"
-				"windows" "\x56\x8B\xF1\x8B\x0D\x2A\x2A\x2A\x2A\x85\xC9\x57\x74\x2A\x6A\x01\xE8\x2A\x2A\x2A\x2A\x8B\x0D\x2A\x2A\x2A\x2A\x85\xC9"
-					/* 56 8B F1 8B 0D ? ? ? ? 85 C9 57 74 ? 6A 01 E8 ? ? ? ? 8B 0D ? ? ? ? 85 C9 */
+				"windows" "\x55\x8B\xEC\x56\x8B\xF1\x8B\x0D\x2A\x2A\x2A\x2A\x57\x85\xC9\x74"
+				/* 55 8B EC 56 8B F1 8B 0D ? ? ? ? 57 85 C9 74 */
 			}
 			
 			/*
@@ -383,8 +388,8 @@
 			{
 				"library"	"server"
 				"linux"	"@_ZN13CTerrorPlayer17TakeOverZombieBotEPS_"
-				"windows" "\x81\xEC\x2A\x2A\x2A\x2A\x53\x55\x8B\xAC\x2A\x2A\x2A\x2A\x2A\x56\x33\xDB\x38"
-				/* 81 EC ? ? ? ? 53 55 8B AC ? ? ? ? ? 56 33 DB 38 */
+				"windows" "\x55\x8B\xEC\x81\xEC\x2A\x2A\x2A\x2A\xA1\x58\x2A\x2A\x2A\x33\xC5\x89\x45\x2A\x53\x8B\x5D\x2A\x80"
+				/* 55 8B EC 81 EC ? ? ? ? A1 58 ? ? ? 33 C5 89 45 ? 53 8B 5D ? 80 */
 			}
 			
 			/*
@@ -397,33 +402,33 @@
 			{
 				"library"	"server"
 				"linux"	"@_ZN13CTerrorPlayer14ReplaceWithBotEb"
-				"windows" "\x81\xEC\x2A\x2A\x2A\x2A\x56\x8B\xF1\x8B\x06\x8B\x90\x2A\x2A\x2A\x2A\xFF\xD2\x84\xC0\x74\x2A\x80"
-				/* 81 EC ? ? ? ? 56 8B F1 8B 06 8B 90 ? ? ? ? FF D2 84 C0 74 ? 80 */
-			}
-			
-			/*
-			 * CTerrorPlayer::CullZombie(void)
-			 */
-			"CullZombie"
-			{
-				"library"	"server"
-				"linux"	"@_ZN13CTerrorPlayer10CullZombieEv"
-				"windows" "\x83\xEC\x2A\x56\x8B\xF1\x8B\x0D\x2A\x2A\x2A\x2A\x57\x56\xE8\x2A\x2A\x2A\x2A\xB0\x2A\x8D\xBE"
-				/* 83 EC ? 56 8B F1 8B 0D ? ? ? ? 57 56 E8 ? ? ? ? B0 ? 8D BE */
+				"windows" "\x55\x8B\xEC\x81\xEC\x2A\x2A\x2A\x2A\xA1\x58\x2A\x2A\x2A\x33\xC5\x89\x45\x2A\x56\x8B\xF1\x8B\x06\x8B\x90\x2A\x2A\x2A\x2A\xFF\xD2\x84\xC0\x74"
+				/* 55 8B EC 81 EC ? ? ? ? A1 58 ? ? ? 33 C5 89 45 ? 56 8B F1 8B 06 8B 90 ? ? ? ? FF D2 84 C0 74 */
 			}
 			
 			/*
 			 * ZombieManager::ReplaceTank(CTerrorPlayer *, CTerrorPlayer *)
 			 *
-			 * for finding: in CDirector::UpdateTankSpawns, easily findable in graph view
-			 * "TANK OFFER: No tickets, choosing random"
+			 * for finding: in CDirector::UpdateTankSpawns, easily findable in graph view from ReplaceWithBot
 			 */
 			"ReplaceTank"
 			{
 				"library"	"server"
 				"linux"	"@_ZN13ZombieManager11ReplaceTankEP13CTerrorPlayerS1_"
-				"windows" "\x83\xEC\x2A\x55\x56\x8B\x74\x2A\x2A\x8B\x06\x8B\x90\x2A\x2A\x2A\x2A\x57\x8B\xF9\x8B\xCE"
-				/* 83 EC ? 55 56 8B 74 ? ? 8B 06 8B 90 ? ? ? ? 57 8B F9 8B CE */
+				"windows" "\x55\x8B\xEC\x83\xEC\x2A\x53\x56\x57\x8B\x7D\x2A\x8B\x07\x8B\x90\x2A\x2A\x2A\x2A\x8B\xF1\x8B\xCF\xFF\xD2\x84"
+				/* 55 8B EC 83 EC ? 53 56 57 8B 7D ? 8B 07 8B 90 ? ? ? ? 8B F1 8B CF FF D2 84 */
+			}
+			
+			/*
+			 * CTerrorPlayer::CullZombie(void)
+			 * Called in ReplaceTank, followed by a call to CCSPlayer::State_Transition
+			 */
+			"CullZombie"
+			{
+				"library"	"server"
+				"linux"	"@_ZN13CTerrorPlayer10CullZombieEv"
+				"windows" "\x55\x8B\xEC\x83\xEC\x2A\x56\x8B\xF1\x8B\x0D\x2A\x2A\x2A\x2A\x57\x56\xE8"
+				/* 55 8B EC 83 EC ? 56 8B F1 8B 0D ? ? ? ? 57 56 E8 */
 			}
 			
 			/*
@@ -456,22 +461,22 @@
 				"linux" "@_ZN12CBaseAbility15CreateForPlayerEP13CTerrorPlayer"
 			}
 			
+			/* CTerrorPlayer::BecomeGhost(bool) */
 			"BecomeGhost"
 			{
 				"library"	"server"
 				"linux"		"@_ZN13CTerrorPlayer11BecomeGhostEb"
-				"windows"	"\x8B\x44\x24\x04\x56\x50\x8B\xF1\xE8\x2A\x2A\x2A\x2A\x84\xC0\x75\x2A\x83\xBE\x2A\x2A\x00\x00\x06\x0F\x84\x2A\x2A\x00\x00\x6A\x06\x8B\xCE\xE8"
-				/*	8B 44 24 04 56 50 8B F1 E8 ? ? ? ? 84 C0 75 ? 83 BE ? ? 00 00 06 0F 84 ? ? 00 00 6A 06 8B CE E8	*/
+				"windows"	"\x55\x8B\xEC\x53\x8B\x5D\x2A\x56\x53\x8B\xF1\xE8\x2A\x2A\x2A\x2A\x84"
+				/* 55 8B EC 53 8B 5D ? 56 53 8B F1 E8 ? ? ? ? 84 */
 			}
 			
-			/* CCSPlayer::State_Transition(CSPlayerState) - Sig is not unique in Windows but Functions appear similar */
-			
+			/* CCSPlayer::State_Transition(CSPlayerState) */
 			"State_Transition"
 			{
 				"library"	"server"
 				"linux"		"@_ZN9CCSPlayer16State_TransitionE13CSPlayerState"
-				"windows"	"\x53\x8B\x5C\x24\x08\x56\x8B\xF1\x39\x9E\x2A\x2A\x00\x00\x74\x2A\x80\x7E\x2A\x00\x74\x2A\x80\x4E\x2A\x01\xEB"
-				/*	53 8B 5C 24 08 56 8B F1 39 9E ? ? 00 00 74 ? 80 7E ? 00 74 ? 80 4E ? 01 EB	*/
+				"windows"	"\x55\x8B\xEC\x56\x8B\xF1\x8B\x86\x2A\x2A\x2A\x2A\x57\x8B\x7D\x2A\x85\xC0\x74\x2A\x83"
+				/*	55 8B EC 56 8B F1 8B 86 ? ? ? ? 57 8B 7D ? 85 C0 74 ? 83	*/
 			}
 			
 			/*
