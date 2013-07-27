@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#define PLUGIN_VERSION										"1.0.6"
+#define PLUGIN_VERSION										"1.0.7"
 
 #define			STRINGLENGTH									32
 #define			STRINGLENGTH_DEBUG							   192
@@ -178,7 +178,7 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 		}
 	}
 	
-	new bool:playerattacker = (attacker
+	new bool:playerattacker = (attacker > 0
 							&& attacker < MaxPlayerClients
 							&& IsClientInGame(attacker)
 							&& GetClientTeam(attacker) == L4D2_TEAM_INFECTED);
