@@ -9,7 +9,7 @@
 				"windows"
 				{
 					"signature" "DirectorMusicBanks_OnRoundStart"				
-					"read" "8"					
+					"read" "13"					
 				}
 				"linux"
 				{
@@ -46,13 +46,15 @@
 
 			/*
 			 * CDirector::RestartScenarioFromVote(const char*)
+			 *
+			 * string "RestartScenarioFromVote - changing to m"
 			 */
 			"RestartScenarioFromVote"
 			{
 				"library"	"server"
 				"linux"	"@_ZN9CDirector23RestartScenarioFromVoteEPKc"
-				"windows" "\x56\x8B\xF1\x8B\x0D\x2A\x2A\x2A\x2A\x85\xC9\x57\x74\x2A\x6A\x01\xE8\x2A\x2A\x2A\x2A\x8B\x0D\x2A\x2A\x2A\x2A\x85\xC9"
-					/* 56 8B F1 8B 0D ? ? ? ? 85 C9 57 74 ? 6A 01 E8 ? ? ? ? 8B 0D ? ? ? ? 85 C9 */
+				"windows" "\x55\x8B\xEC\x56\x8B\xF1\x8B\x0D\x2A\x2A\x2A\x2A\x57\x85\xC9\x74"
+				/* 55 8B EC 56 8B F1 8B 0D ? ? ? ? 57 85 C9 74 */
 			}
 			
 			/*
@@ -62,15 +64,14 @@
 			{
 				"library"	"server"
 				"linux"	"@_ZN9CDirector9SwapTeamsEv"
-				"windows" "\x81*****\x53\x55\x56\x8B\xF1\x8B*****\x57\x89***\xC6********\x8B"
-				/* 81 ? ? ? ? ? 53 55 56 8B F1 8B ? ? ? ? ? 57 89 ? ? ? C6 ? ? ? ? ? ? ? ? 8B */
+				"windows" "\x55\x8B\xEC\x81\xEC\x2A\x2A\x2A\x2A\x53\x56\x8B\xF1\x8B\x8E\x2A\x2A\x2A\x2A\x57\x89\x75\x2A\xC6\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x8B"
+				/* 55 8B EC 81 EC ? ? ? ? 53 56 8B F1 8B 8E ? ? ? ? 57 89 75 ? C6 ? ? ? E8 ? ? ? ? 8B */
 			}
 			
 			/*
 			 * CDirector::AreTeamsFlipped(void)const
 			 *
 			 * got via CTerrorPlayer::UpdateTeamDesired and its String "CTerrorPlayer::UpdateTeamDesired error "
-			 * Windows and Linux now differ quite a lot in this function
 			 *
 			 */
 			"AreTeamsFlipped"
@@ -125,12 +126,12 @@
 				/* 83 EC 0C 56 8B F1 8B 8E ? ? ? ? 8D ? ? ? 50 E8 ? ? ? ? 84 C0 */
 			}
 			
-			/* Used solely to get the offset for TheDirector */
+			/* CDirectorMusicBanks::OnRoundStart, used solely to get the offset for TheDirector */
 			"DirectorMusicBanks_OnRoundStart"
 			{
 				"library"	"server"
-				"windows"       "\x83\xEC\x14\x57\x8B\xF9\x8B\x0D\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x84\xC0\x0F\x2A\x2A\x2A\x2A\x2A\x53\x55\x6A\x24\xE8"
-				/* 83 EC 14 57 8B F9 8B 0D ? ? ? ? E8 ? ? ? ? 84 C0 0F ? ? ? ? ? 53 55 6A 24 E8 */
+				"windows"       "\x55\x8B\xEC\x83\xEC\x2A\x56\x57\x8B\xF9\x8B\x0D\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x84\xC0\x0F"
+				/* 55 8B EC 83 EC ? 56 57 8B F9 8B 0D ? ? ? ? E8 ? ? ? ? 84 C0 0F */
 			}
 
 			/* Find the Director/ZombieManager singleton classes */

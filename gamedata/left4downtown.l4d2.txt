@@ -2,6 +2,22 @@
 {
 	"left4dead2"
 	{
+		"Addresses"
+		{
+			"ZombieManager"
+			{
+				"windows"
+				{
+					"signature"	"StartChangeLevel"
+					"read"	"245"
+				}
+				"linux"
+				{
+					"signature" "TheZombieManager"
+					"read" "0"
+				}
+			}
+		}
 		"Offsets"
 		{
 			/* Offset into CDirectorMusicBanks::OnRoundStart */
@@ -14,7 +30,7 @@
 			"CDirectorScavengeMode"
 			{
 				"windows"	"8"   /* mov ecx, [esi+568h] */
-				"linux"		"31"  /* mov eax, [ebx+578h] */
+				"linux"		"32"  /* mov eax, [ebx+578h] */
 			}
 			
 			/* Offset from ConnectClientLobbyCheck to cmp with max players check
@@ -24,14 +40,35 @@
 			"ValveRejectServerFullFirst"
 			{
 				"windows"	"31"  /* cmp eax, [esi+180h] -> cmp eax, imm32 */ 
-				"linux"		"42"  /* cmp edx, [ebp+180h] -> cmp edx, imm32 */
+				"linux"		"42"  /* cmp edi, [esi+17ch] -> cmp edi, imm32 */
 			}
 			
 			/* Offset into g_pGameRules */
 			"VersusMaxCompletionScore"
 			{
-				"windows"	"1168"
-				"linux"		"1160"
+				"windows"	"1176"
+				"linux"		"1168"
+			}
+			/* Offset into CTerrorPlayer */
+			"SpawnTimer"
+			{
+				"windows"	"11268"
+				"linux"		"11252"
+			}
+			/* Offset into DifficultyChanged() */
+			"HasConfigurableDifficultySetting"
+			{
+				"windows"	"49"
+			}
+			/* Offset into ReadWeaponDataFromFileForSlot_SubCall_01 */
+			"WeaponInfoDatabase"
+			{
+				"windows"	"12"
+			}
+			/* Offset into MeleeWeaponInfoStore_Construction */
+			"CMeleeWeaponInfoStore"
+			{
+				"windows"	"11"
 			}
 		}
 		
@@ -51,23 +88,29 @@
 			
 			/*
 			 * CTerrorGameRules::SetCampaignScores(int,int)
+			 *
+			 * find via xref and "versus_match_finished", the score block is in a subfunc on windows
 			 */
 			"SetCampaignScores" 
 			{
 				"library"	"server"
 				"linux"		"@_ZN16CTerrorGameRules17SetCampaignScoresEii"
-				"windows" "\x56\x8D\x44\x2A\x2A\x8D\xB1\x2A\x2A\x2A\x2A\x50\x6A\x00\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x8D\x4C\x2A\x2A\x51\x6A\x01\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x5E\xC2\x08\x00"
-					/* 56 8D 44 ? ? 8D B1 ? ? ? ? 50 6A 00 8B CE E8 ? ? ? ? 8D 4C ? ? 51 6A 01 8B CE E8 ? ? ? ? 5E C2 08 00 */
+				"windows" "\x55\x8B\xEC\x56\x57\x8B\x7D\x2A\x8B\xF1\x39\xBE\x2A\x2A\x2A\x2A\x74\x2A\xE8\x2A\x2A\x2A\x2A\x89\xBE\x2A\x2A\x2A\x2A\x8B\x7D\x2A\x39"
+				/* 55 8B EC 56 57 8B 7D ? 8B F1 39 BE ? ? ? ? 74 ? E8 ? ? ? ? 89 BE ? ? ? ? 8B 7D ? 39 */
 			}
 			
 			/*
 			 * CTerrorGameRules::ClearTeamScores(bool)
+			 *
+			 * find by xref and "change mission now vote - changing to %"
+			 * heavily inlined on linux
 			 */
 			"ClearTeamScores"
 			{
 				"library"	"server"
 				"linux"		"@_ZN16CTerrorGameRules15ClearTeamScoresEb"
-				"windows" "\x51\x53\x55\x56\x8B\xE9\x57\x33\xDB\x33\xF6**********\x50\x56"
+				"windows" "\x55\x8B\xEC\x56\x8B\x75\x2A\x57\x8B\xF9\x8B\x0D\x2A\x2A\x2A\x2A\x85\xC9\x74\x2A\x56\xE8"
+				/* 55 8B EC 56 8B 75 ? 57 8B F9 8B 0D ? ? ? ? 85 C9 74 ? 56 E8 */
 			}
 			
 			/*
@@ -163,6 +206,43 @@
 				"linux"		"@TheDirector"
 			}
 			
+			"TheZombieManager"
+			{
+				"library"	"server"
+				"linux"		"@TheZombieManager"
+			}
+			
+			/* Find the WeaponInfo Database dictionary */
+			"WeaponInfoDatabase"
+			{
+				"library"	"server"
+				"linux"		"@_ZL20m_WeaponInfoDatabase"
+			}
+			
+			/* We can find the WeaponInfoDatabase location in this sub on windows */
+			"ReadWeaponDataFromFileForSlot"
+			{
+				"library"        "server"
+				"windows"        "\x83\xEC\x08\x85\xF6\x74\x2A\x8D\x04\x24\x50\xB9"
+					/* 83 EC 08 85 F6 74 ? 8D 04 24 50 B9 */
+			}
+			
+			/* Find the Melee Weapon Info dictionary */
+			"CMeleeWeaponInfoStore"
+			{
+				"library"	"server"
+				"linux"		"@g_MeleeWeaponInfoStore"
+			}
+			
+			/* We can find the CMeleeWeaponInfo location in this sub on windows */
+			"MeleeWeaponInfoStore_Construction"
+			{
+				"library"        "server"
+				"windows"        "\x53\x8B\xD9\x8B\x83\x2A\x2A\x2A\x2A\x50\xB9\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x85\xC0\x75\x09\xB8\x2A\x2A\x2A\x2A\x5B\xC2"
+					/* 53 8B D9 8B 83 ? ? ? ? 50 B9 ? ? ? ? E8 ? ? ? ? 85 C0 75 09 B8 ? ? ? ? 5B C2*/
+
+			}
+			
 			/*
 			 * CDirector::RestartScenarioFromVote(const char*)
 			 */
@@ -174,37 +254,50 @@
 					/* 56 8B F1 8B 0D ? ? ? ? 85 C9 57 74 ? 6A 01 E8 ? ? ? ? 8B 0D ? ? ? ? 85 C9 */
 			}
 			
-			/* 
-			 * CDirector::Rematch() 
-			 * - unused by anything
-			 */
-			"Rematch"
-			{
-				"library"	"server"
-				"linux"		"@_ZN9CDirector7RematchEv"
-				"windows"	"\xA1\x2A\x2A\x2A\x2A\x8B\x40\x2A\x85\xC0\x56\x57\x8B\xF1\x75\x2A\xB8\x2A\x2A\x2A\x2A\x8B\x7C\x24\x0C\x85\xFF\x75\x2A\x8B\xF8"
-					/* broken on windows after a patch - but we're not using it anyhow*/
-					/* A1 ? ? ? ? 8B 40 ? 85 C0 56 57 8B F1 75 ? B8 ? ? ? ? 8B 7C 24 0C 85 FF 75 ? 8B F8 */
+			/*
+			* ZombieManager::SpawnSpecial(ZombieClassType, Vector  const&, QAngle  const&)
+			*/
+			"SpawnSpecial"
+			{ 
+				"library" "server"
+				"linux" "@_ZN13ZombieManager12SpawnSpecialE15ZombieClassTypeRK6VectorRK6QAngle"
+				"windows" "\x53\x57\x8B\x2A\x2A\x2A\x8D\x2A\x2A\x83\xF8\x05\x8B\xD9\x0F\x2A\x2A\x2A\x2A\x2A\x8B\x2A\x2A\x2A\x2A\x2A\x2A\x8B"
+					/* 53 57 8B ? ? ? 8D ? ? 83 F8 05 8B D9 0F ? ? ? ? ? 8B ? ? ? ? ? ? 8B */
 			}
-			
+
 			/*
 			* ZombieManager::SpawnTank(Vector  const&, QAngle  const&)
+			*
+			* find by Navarea variant method and "Failed to find a tank spawn position i"
 			*/
 			"SpawnTank"
 			{ 
 				"library" "server"
 				"linux" "@_ZN13ZombieManager9SpawnTankERK6VectorRK6QAngle"
-				"windows" "\x57\x8B\xF9\x8B\x0D\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x85\xC0\x7C\x14\x8B\x0D\x2A\x2A\x2A\x2A\x39\x81\x2A\x2A\x2A\x2A\x7C\x06"
-				/* 57 8B F9 8B 0D ? ? ? ? E8 ? ? ? ? 85 C0 7C 14 8B 0D ? ? ? ? 39 81 ? ? ? ? 7C 06 */
+				"windows" "\x55\x8B\xEC\x57\x8B\xF9\x8B\x0D\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x85\xC0\x78\x2A\x8B\x0D\x2A\x2A\x2A\x2A\x39"
+				/* 55 8B EC 57 8B F9 8B 0D ? ? ? ? E8 ? ? ? ? 85 C0 78 ? 8B 0D ? ? ? ? 39 */
 			}
 			
 			/*
 			* ZombieManager::SpawnWitch(Vector  const&, QAngle  const&)
+			*
+			* find by Navarea variant method and "Failed to find a witch spawn position i"
 			*/
 			"SpawnWitch"
 			{ 
 				"library" "server"
 				"linux" "@_ZN13ZombieManager10SpawnWitchERK6VectorRK6QAngle"
+				"windows" "\x55\x8B\xEC\x8B\x0D\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x85\xC0\x78\x2A\x8B\x0D\x2A\x2A\x2A\x2A\x39\x81"
+				/* 55 8B EC 8B 0D ? ? ? ? E8 ? ? ? ? 85 C0 78 ? 8B 0D ? ? ? ? 39 81 */
+			}
+
+			/*
+			* ZombieManager::SpawnWitchBride(Vector  const&, QAngle  const&)
+			*/
+			"SpawnWitchBride"
+			{ 
+				"library" "server"
+				"linux" "@_ZN13ZombieManager15SpawnWitchBrideERK6VectorRK6QAngle"
 				"windows" "\x8B\x0D\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x85\xC0\x75\x2A\xC2"
 					/* 8B 0D ? ? ? ? E8 ? ? ? ? 85 C0 75 ? C2 */
 			}
@@ -223,13 +316,15 @@
 			
 			/*
 			 * CDirector::OnFirstSurvivorLeftSafeArea(CTerrorPlayer *)
+			 *
+			 * string "Allowing spawning - %s left safe area\n"
 			 */
 			"OnFirstSurvivorLeftSafeArea"
 			{ 
 				"library" "server"
 				"linux" "@_ZN9CDirector27OnFirstSurvivorLeftSafeAreaEP13CTerrorPlayer"
-				"windows" "\x83\xEC\x10\x55\x8B\x6C\x24\x18\x56\x8B\xF1\x8B\x8E\x2A\x2A\x2A\x2A\x55\xE8\x2A\x2A\x2A\x2A\x84\xC0"
-					/* 83 EC 10 55 8B 6C 24 18 56 8B F1 8B 8E ? ? ? ? 55 E8 ? ? ? ? 84 C0 */
+				"windows" "\x55\x8B\xEC\x83\xEC\x2A\x56\x57\x8B\x7D\x2A\x8B\xF1\x8B\x8E\x2A\x2A\x2A\x2A\x57\xE8"
+				/* 55 8B EC 83 EC ? 56 57 8B 7D ? 8B F1 8B 8E ? ? ? ? 57 E8 */
 			}
 			
 			/*
@@ -241,6 +336,28 @@
 				"linux" "@_ZN9CDirector14GetScriptValueEPKci"
 				"windows" "\x8B\x81\x2A\x2A\x2A\x2A\x83\xEC\x08\x83\xF8\xFF\x74\x55\x8B\x0D\x2A\x2A\x2A\x2A\x33\xD2\x3B\xCA\x74\x49\x56\x8D\x74\x24\x04\x56\x8B\x74\x24\x14\x66\x89\x54\x24\x0C\x66\x89\x54\x24\x0E\x89\x54\x24\x08\x8B\x11\x56\x50\x8B\x42\x2A\xFF\xD0\x84\xC0\x5E\x74\x23\x8D\x4C\x24\x10\x51\x8D\x4C\x24\x04\xE8\x2A\x2A\x2A\x2A\x84\xC0\x75\x11\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x11\x8B\x52\x2A\x8D\x04\x24\x50\xFF\xD2\x8B\x44\x24\x10\x83\xC4\x08\xC2\x08\x00"
 					 /* 8B 81 ? ? ? ? 83 EC 08 83 F8 FF 74 55 8B 0D ? ? ? ? 33 D2 3B CA 74 49 56 8D 74 24 04 56 8B 74 24 14 66 89 54 24 0C 66 89 54 24 0E 89 54 24 08 8B 11 56 50 8B 42 ? FF D0 84 C0 5E 74 23 8D 4C 24 10 51 8D 4C 24 04 E8 ? ? ? ? 84 C0 75 11 8B 0D ? ? ? ? 8B 11 8B 52 ? 8D 04 24 50 FF D2 8B 44 24 10 83 C4 08 C2 08 00 */
+			}
+			
+			/*
+			 * CDirector::GetScriptValue(const char*, float)
+			 */
+			"CDirector_GetScriptValueFloat"
+			{
+				"library" "server"
+				"linux" "@_ZN9CDirector14GetScriptValueEPKcf"
+				"windows" "\x8B\x81\x2A\x2A\x2A\x2A\x83\xEC\x2A\x83\x2A\x2A\x74\x2A\x8B\x0D\x2A\x2A\x2A\x2A\x33\xD2\x3B\xCA\x74\x2A\x56\x8D\x74\x2A\x2A\x56\x8B\x74\x2A\x2A\x66\x89\x2A\x2A\x2A\x66\x89\x2A\x2A\x2A\x89\x54\x2A\x2A\x8B\x11\x56\x50\x8B\x42\x2A\xFF\xD0\x84\xC0\x5E\x74\x2A\x8D\x4C\x2A\x2A\x51\x8D\x4C\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x84\xC0\x75\x2A\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x11\x8B\x52\x2A\x8D\x2A\x2A\x50\xFF\xD2\xD9\x2A\x2A\x2A\x83\xC4\x2A\xC2"
+					 /* 8B 81 ? ? ? ? 83 EC ? 83 ? ? 74 ? 8B 0D ? ? ? ? 33 D2 3B CA 74 ? 56 8D 74 ? ? 56 8B 74 ? ? 66 89 ? ? ? 66 89 ? ? ? 89 54 ? ? 8B 11 56 50 8B 42 ? FF D0 84 C0 5E 74 ? 8D 4C ? ? 51 8D 4C ? ? E8 ? ? ? ? 84 C0 75 ? 8B 0D ? ? ? ? 8B 11 8B 52 ? 8D ? ? 50 FF D2 D9 ? ? ? 83 C4 ? C2 */
+			}
+			
+			/*
+			 * CDirector::GetScriptValue(const char*, const char*, char*, int)
+			 */
+			"CDirector_GetScriptValueString"
+			{
+				"library" "server"
+				"linux" "@_ZN9CDirector14GetScriptValueEPKcS1_Pci"
+				"windows" "\x8B\x81\x2A\x2A\x2A\x2A\x83\xEC\x2A\x83\xF8\x2A\x56\x8B\x74\x2A\x2A\x74\x2A\x8B"
+					 /* 8B 81 ? ? ? ? 83 EC ? 83 F8 ? 56 8B 74 ? ? 74 ? 8B */
 			}
 			
 			/*
@@ -350,7 +467,6 @@
 				"linux" "@_ZN13ZombieManager8SpawnMobEi"
 				"windows" "\xA1\x2A\x2A\x2A\x2A\xD9\x40\x2A\x83\xEC\x08\x53\x56\x57"
 				/* A1 ? ? ? ? D9 40 ? 83 EC 08 53 56 57 */
-
 			}
 			
 			/*
@@ -374,7 +490,234 @@
 				"windows" "\x81\xEC\x2A\x2A\x2A\x2A\x56\x8B\xF1\xE8\x2A\x2A\x2A\x2A\x84\xC0\x0F\x2A\x2A\x2A\x2A\x2A\x8B\x8C\x2A\x2A\x2A\x2A\x2A\x55\x33\xED\x3B\xCD\x74"
 				/* 81 EC ? ? ? ? 56 8B F1 E8 ? ? ? ? 84 C0 0F ? ? ? ? ? 8B 8C ? ? ? ? ? 55 33 ED 3B CD 74 */
 			}
+			
+			/*
+			 *   CTerrorPlayer::GetWalkTopSpeed(void)const
+			 */
+			"CTerrorPlayer_GetWalkTopSpeed"
+			{
+				"library"	"server"
+				"linux"	"@_ZNK13CTerrorPlayer15GetWalkTopSpeedEv"
+				"windows" "\x56\x8B\xF1\x80\x2A\x2A\x2A\x2A\x2A\x2A\x74\x2A\x5E\xE9\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x50\xE8"
+				/* 56 8B F1 80 ? ? ? ? ? ? 74 ? 5E E9 ? ? ? ? E8 ? ? ? ? 50 E8 */
+			}
+			
+			/*
+			 *   CTerrorPlayer::GetRunTopSpeed(void)const
+			 */
+			"CTerrorPlayer_GetRunTopSpeed"
+			{
+				"library"	"server"
+				"linux"	"@_ZNK13CTerrorPlayer14GetRunTopSpeedEv"
+				"windows" "\x83\xEC\x2A\x56\x8B\xF1\x8B\x06\x8B\x90\x2A\x2A\x2A\x2A\xFF\xD2\x84\xC0\x74\x2A\xA1"
+				/* 83 EC ? 56 8B F1 8B 06 8B 90 ? ? ? ? FF D2 84 C0 74 ? A1 */
+			}
+			
+			/*
+			 *   CTerrorPlayer::GetCrouchTopSpeed(void)const
+			 */
+			"CTerrorPlayer_GetCrouchTopSpeed"
+			{
+				"library"	"server"
+				"linux"	"@_ZNK13CTerrorPlayer17GetCrouchTopSpeedEv"
+				"windows" "\x56\x8B\xF1\x80\x2A\x2A\x2A\x2A\x2A\x2A\x74\x2A\x5E\xE9\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x83\xF8"
+				/* 56 8B F1 80 ? ? ? ? ? ? 74 ? 5E E9 ? ? ? ? E8 ? ? ? ? 83 F8 */
+			}
 
+			/*
+			 *   CTerrorPlayer::OnRevived(void)const
+			 */
+			"CTerrorPlayer_OnRevived"
+			{
+				"library"   "server"
+				"linux"     "@_ZN13CTerrorPlayer9OnRevivedEv"
+				"windows"   "\x83\xEC\x38\x53\x55\x56\x8B\xF1\x8B\x06\x8B\x90"
+				/* 83 EC 38 53 55 56 8B F1 8B 06 8B 90 */
+			}
+			
+			/*
+			 *   GetDifficulty(void)
+			 */
+			"GetDifficulty"
+			{
+				"library"	"server"
+				"linux"	"@_Z13GetDifficultyv"
+				"windows" "\xA1\x2A\x5C\x68\x10\xC3"
+				/* A1 ? 5C 68 10 C3 */
+			}
+			
+			/*
+			 *	 CTerrorGameRules::HasConfigurableDifficultySetting(void)
+			 */
+			"HasConfigurableDifficulty"
+			{
+				"library"	"server"
+				"linux"		"@_ZN16CTerrorGameRules32HasConfigurableDifficultySettingEv"
+				"windows"	"\xE8\x2A\xFC\xFF\xFF\x84\xC0\x75\x0C\xE8\x2A\x2A\xFF\xFF\x84\xC0\x75\x03\x33\xC0\xC3\xB8\x01\x00\x00\x00\xC3"
+				/* E8 ? FC FF FF 84 C0 75 0C E8 ? ? FF FF 84 C0 75 03 33 C0 C3 B8 01 00 00 00 C3 */
+
+				/* Using offset for windows */
+			}
+			
+			/*
+			 *	 DifficultyChanged(ConVar *)
+			 *		Only used for windows to find HasConfigurableDifficulty
+			 */
+			"DifficultyChanged"
+			{
+				"library"	"server"
+				"linux"		"@_ZL17DifficultyChangedP7IConVarPKcf"
+				"windows"	"\x8B\x44\x24\x04\x83\xEC\x08\x53\x57\x50\x8D\x4C\x24\x0C\xE8\x2A\x2A\x2A\x2A\x8B"
+				/* 8B 44 24 04 83 EC 08 53 57 50 8D 4C 24 0C E8 ? ? ? ? 8B */
+			}
+			/*
+			 *   CTerrorGameRules::GetSurvivorSet(void)
+			 */
+			"GetSurvivorSet"
+			{
+				"library"	"server"
+				"linux"	"@_ZN16CTerrorGameRules14GetSurvivorSetEv"
+				"windows" "\xA1\x2A\x2A\x2A\x2A\x85\xC0\x75\x2A\x56\x8D"
+				/* A1 ? ? ? ? 85 C0 75 ? 56 8D */
+			}
+			
+			/*
+			 *   CTerrorGameRules::FastGetSurvivorSet(void)
+			 */
+			"FastGetSurvivorSet"
+			{
+				"library"	"server"
+				"linux"	"@_ZN16CTerrorGameRules18FastGetSurvivorSetEv"
+				"windows" "\x56\xBE\x02\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x85\xC0\x74"
+				/* 56 BE 02 ? ? ? E8 ? ? ? ? 85 C0 74 */
+			}
+			
+			/*
+			 *	CDirectorVersusMode::GetMissionVersusBossSpawning(float&, float&, float&, float&)
+			 */
+			 
+			"GetMissionVersusBossSpawning"
+			{
+				"library"	"server"
+				"linux"		"@_ZN19CDirectorVersusMode28GetMissionVersusBossSpawningERfS0_S0_S0_"			
+				"windows"	"\x6A\x00\xE8\x2A\x2A\x2A\x2A\x83\xC4\x04\x85\xC0\x75\x05\x32\xC0\xC2\x10\x00"
+				/* 6A 00 E8 ? ? ? ? 83 C4 04 85 C0 75 05 32 C0 C2 10 00 */
+			}
+			
+			/*
+			 *	CTerrorGameRules::GetMissionCurrentMap(KeyValues **)
+			 */
+			"GetMissionCurrentMap"
+			{
+				"library"	"server"
+				"linux" 	"@_ZN16CTerrorGameRules20GetMissionCurrentMapEPP9KeyValues"
+				"windows"	"\x56\x57\x8B\x7C\x2A\x2A\x85\xFF\x74\x2A\xC7\x2A\x2A\x2A\x2A\x2A\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x01\x8B\x50\x2A\xFF\xD2\x8B\x10\x8B\xC8\x8B\x42\x2A\x6A\x00\xFF\xD0\x8B\xF0\x85\xF6\x75\x2A\x5F\x5E\xC3\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x11\x8B\x42\x2A\x57\x56\xFF\xD0\x8B"
+			}
+			
+			/*
+			 *	CThrow::ActivateAbililty()
+			 *		Start a tank rock throw
+			 */
+			"CThrowActivate"
+			{
+				"library"	"server"
+				"linux"		"@_ZN6CThrow15ActivateAbilityEv"
+				"windows"	"\x53\x8B\xD9\x8B\x83\x2A\x2A\x2A\x2A\x83\xF8\xFF\x0F\x84\xEC\x01"
+				/*  53 8B D9 8B 83 ? ? ? ? 83 F8 FF 0F 84 EC 01 */
+			}
+			
+			/*
+			 *	InfectedShoved::OnShoved(Infected *, CBaseEntity *)
+			 *		Common Infected gets staggered
+			 */
+			"OnInfectedShoved"
+			{
+				"library"	"server"
+				"linux"		"@_ZN14InfectedShoved8OnShovedEP8InfectedP11CBaseEntity"
+				"windows"	"\x8B\x44\x2A\x2A\x50\xE8\x2A\x2A\x2A\x2A\x8B\x44\x2A\x2A\x33\xC9\xC7"
+				/* 8B 44 ? ? 50 E8 ? ? ? ? 8B 44 ? ? 33 C9 C7 */
+			}
+			
+			/*
+			 *	CTerrorMeleeWeapon::StartMeleeSwing(CTerrorPlayer *, bool)
+			 *
+			 *  find from TestMeleeSwingCollision (string "MeleeSlashSplatter") xref -> DoMeleeSwing -> xref of that
+			 */
+			"StartMeleeSwing"
+			{
+				"library"	"server"
+				"linux"		"@_ZN18CTerrorMeleeWeapon15StartMeleeSwingEP13CTerrorPlayerb"
+				"windows"	"\x53\x55\x56\x8B\xF1\x8B\x86\x2A\x2A\x2A\x2A\x50\xB9\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x8B\xE8\x33\xDB\x3B\xEB\x0F"
+				/* 53 55 56 8B F1 8B 86 ? ? ? ? 50 B9 ? ? ? ? E8 ? ? ? ? 8B E8 33 DB 3B EB 0F */
+			}
+			
+			/*
+			 *	CDirectorScriptedEventManager::SendInRescueVehicle(void)
+			 *
+			 *  find by String "FinaleEscapeStarted"
+			 */
+			"SendInRescueVehicle"
+			{
+				"library"	"server"
+				"linux"		"@_ZN29CDirectorScriptedEventManager19SendInRescueVehicleEv"
+				"windows"	"\x83\xEC\x18\x56\x68\x2A\x2A\x2A\x2A\x8B\xF1\x6A\x00\xB9\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x85\xC0\x75\x2A\x68"
+                /* 83 EC 18 56 68 ? ? ? ? 8B F1 6A 00 B9 ? ? ? ? E8 ? ? ? ? 85 C0 75 ? 68 */
+			}
+			
+			/*
+			 *	CDirectorScriptedEventManager__ChangeFinaleStage(int, char arg, int)
+			 * or CDirectorScriptedEventManager::ChangeFinaleStage(CDirectorScriptedEventManager::FinaleStageType,char  const*)
+			 *
+			 *  find by String "CHANGEFINALESTAGEOVERRIDE: %s\n"
+			 */
+			"ChangeFinaleStage"
+			{
+				"library"	"server"
+				"linux"		"@_ZN29CDirectorScriptedEventManager17ChangeFinaleStageENS_15FinaleStageTypeEPKc"
+				"windows"	"\x55\x8B\xEC\x81\xEC\x2A\x2A\x2A\x2A\xA1\x58\x2A\x2A\x2A\x33\xC5\x89\x45\x2A\x53\x8B\x5D\x2A\x56\x8B\x75\x2A\x57\x53"
+				/* 55 8B EC 81 EC ? ? ? ? A1 58 ? ? ? 33 C5 89 45 ? 53 8B 5D ? 56 8B 75 ? 57 53 */
+			}
+
+			/*
+			 *	CDirectorVersusMode::EndVersusModeRound(bool)
+			 *  Updates scores using a bunch of CTerrorGameRules calls and triggers the fullscreen_vs_scoreboard viewport panel
+			 *
+			 *  find by String "fullscreen_vs_scoreboard", and look for a func which also creates a "scores" kv and sets values for "t1", "t2", "c1", "c2", and "tiebreak"
+			 */
+			"EndVersusModeRound"
+			{
+				"library"	"server"
+				"linux"		"@_ZN19CDirectorVersusMode18EndVersusModeRoundEb"
+				"windows"	"\x83\xEC\x10\x57\x8B\xF9\xE8"
+				/* 83 EC 10 57 8B F9 E8 */
+			}
+
+			/*
+			 *	int CBaseAnimating::SelectWeightedSequence(int Activity)
+			 *
+			 * - first called func in CMultiPlayerAnimState::AddToGestureSlot (string "CMultiPlayerAnimState::AddToGestureSlot - unknown activity %d")
+			 */
+			"SelectWeightedSequence"
+			{
+				"library"	"server"
+				"linux"		"@_ZN14CBaseAnimating22SelectWeightedSequenceE8Activity"
+				"windows"	"\x56\x8B\xF1\x83\x2A\x2A\x2A\x2A\x2A\x2A\x57\x8B\x2A\x2A\x2A\x2A\x2A\x75\x10\xE8\x2A\x2A\x2A\x2A\x85\xC0\x74\x07\x8B\xCE"
+				/* 56 8B F1 83 ? ? ? ? ? ? 57 8B ? ? ? ? ? 75 10 E8 ? ? ? ? 85 C0 74 07 8B CE */
+			}
+			
+			/*
+			 * InfoChangelevel::StartChangeLevel(Checkpoint  const*)
+			 * 
+			 * Used for finding ZombieManager on Windows
+			 */
+			"StartChangeLevel"
+			{
+				"library"	"server"
+				"linux"		"@_ZN15InfoChangelevel16StartChangeLevelEPK10Checkpoint"
+				"windows"	"\xA1\x2A\x2A\x2A\x2A\x83\x78\x30\x00\x56\x8B\xF1\x74\x12"
+				/* A1 ? ? ? ? 83 78 30 00 56 8B F1 74 12 */
+			}
+			
 /*********************************************************************
 ****************** PLAYER SLOTS PATCHING *****************************
 *********************************************************************/
@@ -443,7 +786,8 @@
 			{
 				/* look for "#Valve_Reject_Server_Full" */
 				"library"	"engine"
-				"linux"		"\x8B\x96\x7C\x01\x00\x00\x85\xD2\x74"
+				"linux"		"\x8B\x2A\x2A\x2A\x00\x00\x85\x2A\x74\x2C"
+                /* 8B ? ? ? 00 00 85 ? 74 2C */
 
 				"windows"	"\x74\x2A\x8B\x54\x2A\x2A\x8B\x06\x8B\x7A\x2A\x8B\x50\x2A\x8B\xCE\xFF\xD2\x2B\xF8\x8B\x06\x8B\x50\x2A\x8B\xCE\xFF\xD2\x03\xC7"
 					/* 74 ?  8B 54 ?  ?  8B 06 8B 7A ?  8B 50 ?  8B CE FF D2 2B F8 8B 06 8B 50 ?  8B CE FF D2 03 C7 */			
@@ -493,8 +837,8 @@
 			{
 				"library"	"server"
 				"linux"		"@_ZN9CDirector13ResetMobTimerEv"
-				"windows"	"\xD9\xEE\x51\x81\xC1\xCC\x01\x00\x00\xD9\x1C\x24\xE8\x2A\x2A\x2A\x2A\xC3"
-							/* D9 EE 51 81 C1 CC 01 00 00 D9 1C 24 E8 ? ? ? ? C3*/
+				"windows"	"\xD9\xEE\x51\x81\xC1\xD4\x01\x00\x00\xD9\x1C\x24\xE8\x2A\x2A\x2A\x2A\xC3"
+							/* D9 EE 51 81 C1 D4 01 00 00 D9 1C 24 E8 ? ? ? ? C3 */
 			}
 			/* CGameRulesProxy::NotifyNetworkStateChanged()
 				This function is called before changing a variety of 
