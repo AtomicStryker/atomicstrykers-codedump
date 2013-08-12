@@ -138,7 +138,7 @@ public Action:BC_Reincap(Handle:timer, any:client)
 {
 	ReinCapTimerArray[client] = INVALID_HANDLE;
 	
-	if (!IsValidEntity(client) || !IsPlayerAlive(client)) return;
+	if (!IsValidEntity(client)) return;
 	
 	decl String:auth[STRINGLENGTH_AUTH_ID];
 	GetClientAuthString(client, auth, sizeof(auth));
