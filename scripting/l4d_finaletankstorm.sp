@@ -3,7 +3,7 @@
 #include <left4downtown>
 #define DEBUG 0
 
-#define PLUGIN_VERSION "1.0.3"
+#define PLUGIN_VERSION "1.0.4"
 #define PLUGIN_NAME "L4D Finale Tankstorm"
 
 new Handle:SetTankAmount = INVALID_HANDLE;
@@ -127,10 +127,10 @@ public Action:SpawnMoreTanks(Handle:timer, any:client)
 		PrintToChatAll("\x04[Finale Tank Storm Plugin] \x01Spawning %i. of %i Tanks with %i percent Health each!", CountTanks()+1, GetConVarInt(SetTankAmount), RoundFloat(100*GetConVarFloat(HealthDecrease)));
 	}
 	
-	new flags = GetCommandFlags("z_spawn");
-	SetCommandFlags("z_spawn", flags & ~FCVAR_CHEAT);
-	FakeClientCommand(client, "z_spawn tank auto")
-	SetCommandFlags("z_spawn", flags);
+	new flags = GetCommandFlags("z_spawn_old");
+	SetCommandFlags("z_spawn_old", flags & ~FCVAR_CHEAT);
+	FakeClientCommand(client, "z_spawn_old tank auto")
+	SetCommandFlags("z_spawn_old", flags);
 	
 	CreateTimer(3.0, CheckSpawn, 0);
 }
