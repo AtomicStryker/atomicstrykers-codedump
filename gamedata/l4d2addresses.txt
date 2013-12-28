@@ -415,8 +415,8 @@
 			{
 				"library"	"server"
 				"linux"	"@_ZN13ZombieManager11ReplaceTankEP13CTerrorPlayerS1_"
-				"windows" "\x55\x8B\xEC\x83\xEC\x2A\x53\x56\x57\x8B\x7D\x2A\x8B\x07\x8B\x90\x2A\x2A\x2A\x2A\x8B\xF1\x8B\xCF\xFF\xD2\x84"
-				/* 55 8B EC 83 EC ? 53 56 57 8B 7D ? 8B 07 8B 90 ? ? ? ? 8B F1 8B CF FF D2 84 */
+				"windows" "\x55\x8B\xEC\x83\xEC\x2A\x53\x56\x8B\x75\x2A\x8B\x06\x8B\x90\x2A\x2A\x2A\x2A\x57\x8B\xF9\x8B\xCE\xFF\xD2\x84\xC0\x0F"
+				/* 55 8B EC 83 EC ? 53 56 8B 75 ? 8B 06 8B 90 ? ? ? ? 57 8B F9 8B CE FF D2 84 C0 0F */
 			}
 			
 			/*
