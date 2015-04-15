@@ -1,7 +1,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.4"
+#define PLUGIN_VERSION "1.0.5"
 #define PLUGIN_NAME "L4D Survivor AI Pounced Fix"
 
 
@@ -43,13 +43,13 @@ public Action:Event_PlayerHurt(Handle:event, const String:name[], bool:dontBroad
 		decl Float:position[3];
 		GetClientAbsOrigin(attacker, position);
 
-		CallBots(position);
+		CallBots(position, attacker);
 	}
 }
 
-static CallBots(Float:position[3])
+static CallBots(Float:position[3], attacker)
 {
-	decl Float:targetPos[3], Float:EyePos[3], Float:AimOnHunter[3], Float:AimAngles[3];
+	decl Float:targetPos[3];
 
 	for (new target = 1; target <= MaxClients; target++)
 	{
@@ -63,10 +63,10 @@ static CallBots(Float:position[3])
 
 				if (GetVectorDistance(targetPos, position) < 500)
 				{
-					GetClientEyePosition(target, EyePos);
-					MakeVectorFromPoints(EyePos, position, AimOnHunter);
-					GetVectorAngles(AimOnHunter, AimAngles);
-					TeleportEntity(target, NULL_VECTOR, AimAngles, NULL_VECTOR); // make the Survivor Bot aim on the Victim
+                     ScriptCommand(target, "script", 
+                     "CommandABot({cmd=0,bot=GetPlayerFromUserID(%i),target=GetPlayerFromUserID(%i)})", 
+                     GetClientUserId(target), 
+                     GetClientUserId(attacker));
 				}
 			}
 		}
@@ -94,6 +94,17 @@ stock bool:HasValidEnt(client, const String:entprop[])
 	
 	return (ent > 0
 		&& IsClientInGame(ent));
+}
+
+stock ScriptCommand(client, const String:command[], const String:arguments[], any:...)
+{
+    new String:vscript[PLATFORM_MAX_PATH];
+    VFormat(vscript, sizeof(vscript), arguments, 4);
+    
+    new flags = GetCommandFlags(command);
+    SetCommandFlags(command, flags^FCVAR_CHEAT);
+    FakeClientCommand(client, "%s %s", command, vscript);
+    SetCommandFlags(command, flags | FCVAR_CHEAT);
 }
 
 static CheckGame()
