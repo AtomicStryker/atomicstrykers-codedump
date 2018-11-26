@@ -601,7 +601,7 @@ public Action:Command_SpawnItem(client, args) {
 	if (args < 1) {
 		ReplyToCommand(client, "Usage: a4d_spawn_item <item_type>");
 	} else {
-		new String:type[16];
+		new String:type[35];
 		GetCmdArg(1, type, sizeof(type));
 		Do_SpawnItem(client, type);
 	}
